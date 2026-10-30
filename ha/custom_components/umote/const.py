@@ -45,3 +45,7 @@ APP_NAMES = {
     "nl.giejay.android.tv.immich": "Immich",
 }
 UNUSED_AFTER_S = 30 * 86400
+
+# device name -> short display name, where the rule (strip area, sentence case) is not enough
+SHORT_NAMES = {"tv_cabinet": "Cabinet"}
+AREA_PREFIXES = ("living room ", "living_room_")

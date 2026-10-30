@@ -1,0 +1,324 @@
+{
+ "devices": {
+  "02ee36c031020c8b594eea4ccea2829f": {
+   "area_id": "living_room",
+   "id": "02ee36c031020c8b594eea4ccea2829f",
+   "name": "Forecast",
+   "name_by_user": null
+  },
+  "0957c85c128862e8bfe72100c0728ad3": {
+   "area_id": "living_room",
+   "id": "0957c85c128862e8bfe72100c0728ad3",
+   "name": "Fridge Fan",
+   "name_by_user": null
+  },
+  "0c79eeaf89acdc59e037e7e7a20d0378": {
+   "area_id": "living_room",
+   "id": "0c79eeaf89acdc59e037e7e7a20d0378",
+   "name": "clock fan",
+   "name_by_user": null
+  },
+  "159efcf7f0957830b89bafdd6007bc1a": {
+   "area_id": "living_room",
+   "id": "159efcf7f0957830b89bafdd6007bc1a",
+   "name": "Navazdeen",
+   "name_by_user": "Living Room Tv"
+  },
+  "671628fe479aadc604ea5f1c08b38742": {
+   "area_id": "living_room",
+   "id": "671628fe479aadc604ea5f1c08b38742",
+   "name": "weather_matrix",
+   "name_by_user": "Matrix Clock"
+  },
+  "90f16ed8c6672a484530008fb516dc66": {
+   "area_id": "living_room",
+   "id": "90f16ed8c6672a484530008fb516dc66",
+   "name": "Navazdeen",
+   "name_by_user": "Living Room Tv"
+  },
+  "95fe58d758e888c77f7bd3188cecd89e": {
+   "area_id": "bedroom",
+   "id": "95fe58d758e888c77f7bd3188cecd89e",
+   "name": "desktop automation",
+   "name_by_user": "Workspace"
+  },
+  "ebcb21ba8d498c5d0705d6684bd4a17b": {
+   "area_id": "living_room",
+   "id": "ebcb21ba8d498c5d0705d6684bd4a17b",
+   "name": "TV Fan",
+   "name_by_user": null
+  },
+  "f9843ade72dd7703b7fa03f60f8dc335": {
+   "area_id": "living_room",
+   "id": "f9843ade72dd7703b7fa03f60f8dc335",
+   "name": "tv_cabinet",
+   "name_by_user": null
+  }
+ },
+ "entities": [
+  {
+   "area_id": null,
+   "device_id": "159efcf7f0957830b89bafdd6007bc1a",
+   "disabled_by": null,
+   "entity_category": null,
+   "entity_id": "media_player.navazdeen",
+   "hidden_by": null
+  },
+  {
+   "area_id": null,
+   "device_id": "90f16ed8c6672a484530008fb516dc66",
+   "disabled_by": null,
+   "entity_category": null,
+   "entity_id": "media_player.navazdeen_2",
+   "hidden_by": null
+  },
+  {
+   "area_id": null,
+   "device_id": "90f16ed8c6672a484530008fb516dc66",
+   "disabled_by": null,
+   "entity_category": null,
+   "entity_id": "remote.navazdeen",
+   "hidden_by": null
+  },
+  {
+   "area_id": null,
+   "device_id": "0957c85c128862e8bfe72100c0728ad3",
+   "disabled_by": null,
+   "entity_category": null,
+   "entity_id": "fan.fridge_fan",
+   "hidden_by": null
+  },
+  {
+   "area_id": null,
+   "device_id": "ebcb21ba8d498c5d0705d6684bd4a17b",
+   "disabled_by": null,
+   "entity_category": null,
+   "entity_id": "fan.tv_fan",
+   "hidden_by": null
+  },
+  {
+   "area_id": null,
+   "device_id": "0c79eeaf89acdc59e037e7e7a20d0378",
+   "disabled_by": null,
+   "entity_category": null,
+   "entity_id": "fan.clock_fan",
+   "hidden_by": null
+  },
+  {
+   "area_id": null,
+   "device_id": "0957c85c128862e8bfe72100c0728ad3",
+   "disabled_by": null,
+   "entity_category": "config",
+   "entity_id": "switch.fridge_fan_sleep_mode",
+   "hidden_by": null
+  },
+  {
+   "area_id": null,
+   "device_id": "ebcb21ba8d498c5d0705d6684bd4a17b",
+   "disabled_by": null,
+   "entity_category": "config",
+   "entity_id": "switch.tv_fan_sleep_mode",
+   "hidden_by": null
+  },
+  {
+   "area_id": null,
+   "device_id": "0c79eeaf89acdc59e037e7e7a20d0378",
+   "disabled_by": null,
+   "entity_category": "config",
+   "entity_id": "switch.clock_fan_sleep_mode",
+   "hidden_by": null
+  },
+  {
+   "area_id": null,
+   "device_id": "0957c85c128862e8bfe72100c0728ad3",
+   "disabled_by": null,
+   "entity_category": null,
+   "entity_id": "light.fridge_fan_led",
+   "hidden_by": null
+  },
+  {
+   "area_id": null,
+   "device_id": "ebcb21ba8d498c5d0705d6684bd4a17b",
+   "disabled_by": null,
+   "entity_category": null,
+   "entity_id": "light.tv_fan_led",
+   "hidden_by": null
+  },
+  {
+   "area_id": null,
+   "device_id": "0c79eeaf89acdc59e037e7e7a20d0378",
+   "disabled_by": null,
+   "entity_category": null,
+   "entity_id": "light.clock_fan_led",
+   "hidden_by": null
+  },
+  {
+   "area_id": null,
+   "device_id": "0957c85c128862e8bfe72100c0728ad3",
+   "disabled_by": null,
+   "entity_category": null,
+   "entity_id": "sensor.fridge_fan_timer_elapsed_time",
+   "hidden_by": null
+  },
+  {
+   "area_id": null,
+   "device_id": "ebcb21ba8d498c5d0705d6684bd4a17b",
+   "disabled_by": null,
+   "entity_category": null,
+   "entity_id": "sensor.tv_fan_timer_elapsed_time",
+   "hidden_by": null
+  },
+  {
+   "area_id": null,
+   "device_id": "0c79eeaf89acdc59e037e7e7a20d0378",
+   "disabled_by": null,
+   "entity_category": null,
+   "entity_id": "sensor.clock_fan_timer_elapsed_time",
+   "hidden_by": null
+  },
+  {
+   "area_id": null,
+   "device_id": "0957c85c128862e8bfe72100c0728ad3",
+   "disabled_by": null,
+   "entity_category": "config",
+   "entity_id": "select.fridge_fan_set_timer",
+   "hidden_by": null
+  },
+  {
+   "area_id": null,
+   "device_id": "ebcb21ba8d498c5d0705d6684bd4a17b",
+   "disabled_by": null,
+   "entity_category": "config",
+   "entity_id": "select.tv_fan_set_timer",
+   "hidden_by": null
+  },
+  {
+   "area_id": null,
+   "device_id": "0c79eeaf89acdc59e037e7e7a20d0378",
+   "disabled_by": null,
+   "entity_category": "config",
+   "entity_id": "select.clock_fan_set_timer",
+   "hidden_by": null
+  },
+  {
+   "area_id": null,
+   "device_id": "671628fe479aadc604ea5f1c08b38742",
+   "disabled_by": "integration",
+   "entity_category": "config",
+   "entity_id": "update.weather_matrix_firmware_2",
+   "hidden_by": null
+  },
+  {
+   "area_id": null,
+   "device_id": "671628fe479aadc604ea5f1c08b38742",
+   "disabled_by": null,
+   "entity_category": null,
+   "entity_id": "binary_sensor.living_room_weather_matrix_control_button",
+   "hidden_by": null
+  },
+  {
+   "area_id": null,
+   "device_id": "671628fe479aadc604ea5f1c08b38742",
+   "disabled_by": null,
+   "entity_category": null,
+   "entity_id": "number.living_room_weather_matrix_matrix_brightness",
+   "hidden_by": null
+  },
+  {
+   "area_id": null,
+   "device_id": "671628fe479aadc604ea5f1c08b38742",
+   "disabled_by": null,
+   "entity_category": null,
+   "entity_id": "switch.living_room_weather_matrix_matrix_display_power",
+   "hidden_by": null
+  },
+  {
+   "area_id": null,
+   "device_id": "f9843ade72dd7703b7fa03f60f8dc335",
+   "disabled_by": "integration",
+   "entity_category": "config",
+   "entity_id": "update.tv_cabinet_firmware",
+   "hidden_by": null
+  },
+  {
+   "area_id": null,
+   "device_id": "f9843ade72dd7703b7fa03f60f8dc335",
+   "disabled_by": null,
+   "entity_category": null,
+   "entity_id": "switch.tv_cabinet_tv_cabinet_relay_1",
+   "hidden_by": null
+  },
+  {
+   "area_id": null,
+   "device_id": "f9843ade72dd7703b7fa03f60f8dc335",
+   "disabled_by": null,
+   "entity_category": null,
+   "entity_id": "switch.tv_cabinet_tv_cabinet_relay_2",
+   "hidden_by": null
+  },
+  {
+   "area_id": null,
+   "device_id": "f9843ade72dd7703b7fa03f60f8dc335",
+   "disabled_by": null,
+   "entity_category": null,
+   "entity_id": "switch.tv_cabinet_tv_cabinet_relay_3",
+   "hidden_by": null
+  },
+  {
+   "area_id": null,
+   "device_id": "f9843ade72dd7703b7fa03f60f8dc335",
+   "disabled_by": null,
+   "entity_category": null,
+   "entity_id": "light.tv_cabinet_tv_cabinet_light_1",
+   "hidden_by": null
+  },
+  {
+   "area_id": null,
+   "device_id": "f9843ade72dd7703b7fa03f60f8dc335",
+   "disabled_by": null,
+   "entity_category": null,
+   "entity_id": "light.tv_cabinet_tv_cabinet_light_2",
+   "hidden_by": null
+  },
+  {
+   "area_id": null,
+   "device_id": "f9843ade72dd7703b7fa03f60f8dc335",
+   "disabled_by": null,
+   "entity_category": null,
+   "entity_id": "light.tv_cabinet_tv_cabinet_light_3",
+   "hidden_by": null
+  },
+  {
+   "area_id": null,
+   "device_id": "f9843ade72dd7703b7fa03f60f8dc335",
+   "disabled_by": null,
+   "entity_category": null,
+   "entity_id": "light.tv_cabinet_tv_cabinet_light_4",
+   "hidden_by": null
+  },
+  {
+   "area_id": null,
+   "device_id": "f9843ade72dd7703b7fa03f60f8dc335",
+   "disabled_by": null,
+   "entity_category": null,
+   "entity_id": "light.tv_cabinet_tv_cabinet_bottom_light",
+   "hidden_by": null
+  },
+  {
+   "area_id": null,
+   "device_id": "02ee36c031020c8b594eea4ccea2829f",
+   "disabled_by": null,
+   "entity_category": null,
+   "entity_id": "weather.forecast_home",
+   "hidden_by": null
+  },
+  {
+   "area_id": null,
+   "device_id": "95fe58d758e888c77f7bd3188cecd89e",
+   "disabled_by": null,
+   "entity_category": null,
+   "entity_id": "light.desktop_automation_onboard_led",
+   "hidden_by": null
+  }
+ ]
+}

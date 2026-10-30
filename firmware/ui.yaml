@@ -4,7 +4,12 @@
 #
 # The including file defines the hook scripts:
 #   ui_launch(source_id)  ui_power()  ui_tv_key(code)  ui_seek(seconds)  ui_name_source(port, name, go)
-#   ui_page_shown(page)
+#   ui_page_shown(page)  ui_sb_ir(code)  ui_ha(kind, entities, value)
+
+substitutions:
+  # Soundbar buttons: the remote's labels; IR codes are the upper-case names (Task 14 fills them).
+  sb_inputs: "TV,Bluetooth,Music"
+  sb_modes: "Cinema,Voice,Night"
 
 esphome:
   includes:
@@ -54,6 +59,13 @@ lvgl:
         ui::hooks.seek = [](float s) { id(ui_seek).execute(s); };
         ui::hooks.name_source = [](int p, const std::string &n, bool go) { id(ui_name_source).execute(p, n, go); };
         ui::hooks.page_shown = [](int p) { id(ui_page_shown).execute(p); };
+        ui::hooks.sb_ir = [](const std::string &c) { id(ui_sb_ir).execute(c); };
+        ui::hooks.ha = [](const std::string &k, const std::string &e, const std::string &v) { id(ui_ha).execute(k, e, v); };
+        auto split = [](std::string s) { std::vector<std::string> v; size_t p;
+          while ((p = s.find(',')) != std::string::npos) { v.push_back(s.substr(0, p)); s = s.substr(p + 1); }
+          v.push_back(s); return v; };
+        ui::sb_inputs = split("${sb_inputs}");
+        ui::sb_modes = split("${sb_modes}");
         ui::build(id(pages), {id(page_tv), id(page_sb), id(page_home), id(page_set)});
     - script.execute: ui_refresh
 

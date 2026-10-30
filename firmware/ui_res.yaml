@@ -15,6 +15,10 @@ script:
           ui::R.f20b = id(f20b)->get_lv_font();
           ui::R.f12s = id(f12s)->get_lv_font();
           ui::R.f14s = id(f14s)->get_lv_font();
+          ui::R.img["ic_fan_14"] = id(ic_fan_14)->get_lv_image_dsc();
+          ui::R.img["ic_bulb_14"] = id(ic_bulb_14)->get_lv_image_dsc();
+          ui::R.img["ic_clock_14"] = id(ic_clock_14)->get_lv_image_dsc();
+          ui::R.img["ic_plug_14"] = id(ic_plug_14)->get_lv_image_dsc();
           ui::R.img["ic_check_14"] = id(ic_check_14)->get_lv_image_dsc();
           ui::R.img["ic_chev_down_14"] = id(ic_chev_down_14)->get_lv_image_dsc();
           ui::R.img["ic_chev_right_14"] = id(ic_chev_right_14)->get_lv_image_dsc();

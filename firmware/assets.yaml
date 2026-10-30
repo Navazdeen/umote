@@ -67,6 +67,10 @@ font:
     glyphs: ["${glyphs_latin}"]
 
 image:
+  - { id: ic_fan_14, file: assets/icons/fan.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 14x14 }
+  - { id: ic_bulb_14, file: assets/icons/bulb.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 14x14 }
+  - { id: ic_clock_14, file: assets/icons/clock.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 14x14 }
+  - { id: ic_plug_14, file: assets/icons/plug.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 14x14 }
   - { id: ic_check_14, file: assets/icons/check.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 14x14 }
   - { id: ic_chev_down_14, file: assets/icons/chev_down.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 14x14 }
   - { id: ic_chev_right_14, file: assets/icons/chev_right.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 14x14 }

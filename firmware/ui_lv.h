@@ -47,6 +47,9 @@ struct Hooks {
   std::function<void(float)> seek;                              // seconds
   std::function<void(int, const std::string &, bool)> name_source;  // port, name, switch to it
   std::function<void(int)> page_shown;                          // page index
+  std::function<void(const std::string &)> sb_ir;               // soundbar IR code name
+  // Home Assistant call: kind = "toggle" | "on" | "off" | "fan_pct" | "timer"; entities comma-separated.
+  std::function<void(const std::string &, const std::string &, const std::string &)> ha;
   std::function<void(const std::string &)> log;
 };
 inline Hooks hooks;
@@ -495,10 +498,15 @@ inline void render_tv(int64_t now_ms) {
 }
 
 // ---- modal sheets ----------------------------------------------------------------------------------------
+inline std::vector<lv_obj_t *> &modals() {
+  static std::vector<lv_obj_t *> m;
+  return m;
+}
 inline lv_obj_t *dim_layer(const std::string &id) {
   lv_obj_t *d = nm(box(lv_layer_top(), 0, 0, 240, 320, 0x000000, 140), id);
   lv_obj_add_flag(d, LV_OBJ_FLAG_CLICKABLE);   // swallow taps behind the sheet
   show(d, false);
+  modals().push_back(d);
   return d;
 }
 
@@ -511,11 +519,13 @@ struct Sheets {
 };
 inline Sheets sh;
 
-inline bool sheet_open() { return !lv_obj_has_flag(sh.src, LV_OBJ_FLAG_HIDDEN) || !lv_obj_has_flag(sh.hdmi, LV_OBJ_FLAG_HIDDEN); }
-
+inline bool sheet_open() {
+  for (auto *m : modals())
+    if (!lv_obj_has_flag(m, LV_OBJ_FLAG_HIDDEN)) return true;
+  return false;
+}
 inline void close_sheets() {
-  show(sh.src, false);
-  show(sh.hdmi, false);
+  for (auto *m : modals()) show(m, false);
 }
 
 inline void open_new_hdmi(int port) {
@@ -642,6 +652,298 @@ inline void build_sheets() {
                       }), "hdmi_switch");
 }
 
+// ---- Soundbar page --------------------------------------------------------------------------------------
+// Button names come from the soundbar remote (substitutions in ui.yaml); codes are the upper-case names.
+inline std::vector<std::string> sb_inputs = {"TV", "Bluetooth", "Music"}, sb_modes = {"Cinema", "Voice", "Night"};
+struct SbPage {
+  std::vector<lv_obj_t *> in, mode;
+  int in_sel = 0, mode_sel = -1;
+};
+inline SbPage sbp;
+
+inline std::string ir_code(std::string n) {
+  for (auto &c : n) c = c == ' ' ? '_' : (char) toupper(c);
+  return n;
+}
+
+inline void sb_select(std::vector<lv_obj_t *> &row, int sel) {
+  for (size_t i = 0; i < row.size(); i++)
+    lv_obj_set_style_bg_color(row[i], lv_color_hex((int) i == sel ? BLUE : CARD), 0);
+}
+
+inline void build_soundbar(lv_obj_t *page) {
+  page_title(page, "Soundbar", "sb_title");
+  auto row = [&](const char *cap, int y, std::vector<std::string> &names, std::vector<lv_obj_t *> &out,
+                 const char *id, int *sel) {
+    text(page, 12, y - 18, 0, R.f12s, WHITE, cap, LV_TEXT_ALIGN_LEFT, 184);
+    for (int i = 0; i < 3 && i < (int) names.size(); i++) {
+      std::string code = ir_code(names[i]);
+      auto *row_ref = &out;
+      lv_obj_t *b = text_button(page, 12 + 75 * i, y, 66, 44, "", CARD, LV_OPA_COVER, 12, WHITE, [code, i, row_ref, sel] {
+        *sel = i;
+        sb_select(*row_ref, i);
+        if (hooks.sb_ir) hooks.sb_ir(code);
+      });
+      lv_obj_t *l = lv_obj_get_child(b, 0);
+      lv_label_set_text(l, names[i].c_str());
+      lv_obj_update_layout(l);
+      if (lv_obj_get_width(l) > 60) lv_obj_set_style_text_font(l, R.f12s, 0);
+      lv_obj_center(l);
+      out.push_back(nm(b, std::string(id) + std::to_string(i)));
+    }
+  };
+  row("Input", 54, sb_inputs, sbp.in, "sb_in_", &sbp.in_sel);
+  row("Sound", 124, sb_modes, sbp.mode, "sb_mode_", &sbp.mode_sel);
+  sb_select(sbp.in, sbp.in_sel);
+  struct Vol { const char *icon, *label, *code, *id; };
+  static const Vol vols[] = {{"vol_down", "Down", "VOL_DOWN", "sb_vol_down"}, {"mute", "Mute", "MUTE", "sb_mute"},
+                             {"vol_up", "Up", "VOL_UP", "sb_vol_up"}};
+  for (int i = 0; i < 3; i++) {
+    std::string code = vols[i].code;
+    lv_obj_t *b = nm(button(page, 12 + 75 * i, 178, 66, 64, CARD, LV_OPA_COVER, 12, [code] {
+                       if (hooks.sb_ir) hooks.sb_ir(code);
+                     }), vols[i].id);
+    icon(b, vols[i].icon, 24, 21, 12, WHITE);
+    text(b, 0, 38, 66, R.f12, WHITE, vols[i].label, LV_TEXT_ALIGN_CENTER, 204);
+  }
+}
+
+// ---- Home page ------------------------------------------------------------------------------------------
+struct Tile {
+  std::string id, name, kind, icon, state, label, entities, led, timer;
+  int speed_count = 0;
+};
+struct HomePage {
+  lv_obj_t *page, *grid;
+  std::vector<Tile> tiles;
+  std::vector<lv_obj_t *> objs;
+  int focus = 0;
+  int64_t updated_ms = 0;
+};
+inline HomePage hp;
+
+inline void parse_tiles(const std::string &json) {
+  JsonDocument doc;
+  if (deserializeJson(doc, json)) return;
+  hp.tiles.clear();
+  for (JsonObject t : doc.as<JsonArray>()) {
+    Tile tile;
+    tile.id = t["id"] | "";
+    tile.name = umote::sanitize(t["name"] | "", "Device");
+    tile.kind = t["kind"] | "";
+    tile.icon = t["icon"] | "plug";
+    tile.state = t["state"] | "off";
+    tile.label = t["label"] | "";
+    for (JsonVariant e : t["entities"].as<JsonArray>()) {
+      if (!tile.entities.empty()) tile.entities += ",";
+      tile.entities += e.as<std::string>();
+    }
+    tile.led = t["options"]["led"] | "";
+    tile.timer = t["options"]["timer"] | "";
+    tile.speed_count = t["options"]["speed_count"] | 0;
+    hp.tiles.push_back(tile);
+  }
+  if (hp.focus >= (int) hp.tiles.size()) hp.focus = 0;
+}
+
+inline void open_options(int i);
+inline void render_home();
+
+inline void paint_focus() {
+  for (size_t i = 0; i < hp.objs.size(); i++) {
+    bool f = (int) i == hp.focus;
+    lv_obj_set_style_outline_width(hp.objs[i], f ? 3 : 0, 0);
+    lv_obj_set_style_outline_pad(hp.objs[i], f ? 2 : 0, 0);
+  }
+  if (hp.focus < (int) hp.objs.size()) lv_obj_scroll_to_view(hp.objs[hp.focus], LV_ANIM_ON);
+}
+
+inline void toggle_tile(int i) {
+  if (i >= (int) hp.tiles.size()) return;
+  Tile &t = hp.tiles[i];
+  if (t.state == "offline") return;
+  bool on = t.state == "on";
+  if (hooks.ha) hooks.ha(on ? "off" : "on", t.entities, "");
+  t.state = on ? "off" : "on";   // optimistic until HA reports back
+  t.label = on ? "Off" : "On";
+  render_home();
+}
+
+inline void render_home() {
+  lv_obj_clean(hp.grid);
+  hp.objs.clear();
+  for (size_t i = 0; i < hp.tiles.size(); i++) {
+    const Tile &t = hp.tiles[i];
+    bool on = t.state == "on", off_line = t.state == "offline";
+    int x = 12 + 116 * (i % 2), y = 5 + 77 * (i / 2);
+    lv_obj_t *o = nm(button(hp.grid, x, y, 100, 64, on ? 0xF2F2F7 : 0x1F1F22, LV_OPA_COVER, 14, [i] {
+                       hp.focus = (int) i;
+                       toggle_tile((int) i);
+                     }), "home_tile_" + std::to_string(i));
+    lv_obj_set_style_outline_color(o, lv_color_hex(YELLOW), 0);
+    lv_obj_add_event_cb(o, [](lv_event_t *e) { open_options((int) (intptr_t) lv_event_get_user_data(e)); },
+                        LV_EVENT_LONG_PRESSED, (void *) (intptr_t) i);
+    if (off_line) lv_obj_set_style_opa(o, 153, 0);
+    lv_obj_t *ib = box(o, 9, 6, 22, 22, on ? 0xFFCC00 : GREY, LV_OPA_COVER, 8);
+    icon(ib, t.icon, 14, 4, 4, on ? 0x000000 : WHITE);
+    uint32_t fg = on ? 0x000000 : WHITE;
+    text(o, 37, 9, 58, R.f12, fg, t.label.c_str(), LV_TEXT_ALIGN_LEFT, on ? 178 : 199);
+    lv_obj_t *n = text(o, 9, 31, 86, R.f13b, fg, t.name.c_str());
+    lv_label_set_long_mode(n, LV_LABEL_LONG_WRAP);
+    lv_obj_set_height(n, 32);
+    hp.objs.push_back(o);
+  }
+  box(hp.grid, 0, 5 + 77 * ((hp.tiles.size() + 1) / 2), 1, 4, WHITE, LV_OPA_TRANSP);
+  paint_focus();
+}
+
+inline void build_home(lv_obj_t *page) {
+  hp.page = page;
+  page_title(page, "Home", "home_title");
+  text(page, 12, 38, 0, R.f12s, WHITE, "Living room", LV_TEXT_ALIGN_LEFT, 184);
+  hp.grid = nm(box(page, 0, 52, 240, 268, WHITE, LV_OPA_TRANSP), "home_grid");
+  lv_obj_add_flag(hp.grid, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_scroll_dir(hp.grid, LV_DIR_VER);
+  lv_obj_set_scrollbar_mode(hp.grid, LV_SCROLLBAR_MODE_OFF);
+}
+
+// D-pad on the Home page: left/right by one, up/down by a row.
+inline void home_move(const char *dir) {
+  int n = (int) hp.tiles.size();
+  if (!n) return;
+  int d = !strcmp(dir, "LEFT") ? -1 : !strcmp(dir, "RIGHT") ? 1 : !strcmp(dir, "UP") ? -2 : 2;
+  int f = hp.focus + d;
+  if (f >= 0 && f < n) hp.focus = f;
+  paint_focus();
+}
+inline void home_scroll(bool up) { lv_obj_scroll_by(hp.grid, 0, up ? 154 : -154, LV_ANIM_ON); }
+inline void home_toggle_focus() { toggle_tile(hp.focus); }
+
+// ---- device options sheet (fans) -------------------------------------------------------------------------
+struct OptSheet {
+  lv_obj_t *root, *title, *power_tog, *speed, *of, *led_tog, *led_row;
+  std::vector<lv_obj_t *> timers;
+  int tile = -1, speed_val = 0;
+};
+inline OptSheet op;
+
+inline void paint_toggle(lv_obj_t *tog, bool on) {
+  lv_obj_set_style_bg_color(tog, lv_color_hex(on ? 0x34C759 : GREY), 0);
+  lv_obj_set_x(lv_obj_get_child(tog, 0), on ? 20 : 2);
+}
+
+inline lv_obj_t *toggle(lv_obj_t *row) {
+  lv_obj_t *t = box(row, 184, 9, 44, 26, GREY, LV_OPA_COVER, 13);
+  box(t, 2, 2, 22, 22, WHITE, LV_OPA_COVER, 11);
+  return t;
+}
+
+inline void open_options(int i) {
+  if (i < 0 || i >= (int) hp.tiles.size() || hp.tiles[i].kind != "fan") return;
+  op.tile = i;
+  const Tile &t = hp.tiles[i];
+  lv_label_set_text(op.title, t.name.c_str());
+  paint_toggle(op.power_tog, t.state == "on");
+  int step = 0;
+  sscanf(t.label.c_str(), "Speed %d", &step);
+  op.speed_val = t.state == "on" ? step : 0;
+  lv_label_set_text_fmt(op.speed, "%d", op.speed_val);
+  lv_label_set_text_fmt(op.of, "of %d", t.speed_count);
+  show(op.led_row, !t.led.empty());
+  show(op.root, true);
+}
+
+inline void set_speed(int d) {
+  if (op.tile < 0) return;
+  Tile &t = hp.tiles[op.tile];
+  int n = std::max(1, t.speed_count);
+  op.speed_val = std::max(0, std::min(n, op.speed_val + d));
+  lv_label_set_text_fmt(op.speed, "%d", op.speed_val);
+  if (hooks.ha) hooks.ha("fan_pct", t.entities, std::to_string(op.speed_val * 100 / n));
+  paint_toggle(op.power_tog, op.speed_val > 0);
+}
+
+inline void build_options() {
+  op.root = dim_layer("opt_dim");
+  lv_obj_t *s = nm(box(op.root, 0, 46, 240, 274, SHEET, LV_OPA_COVER, 14), "opt_sheet");
+  lv_obj_add_flag(s, LV_OBJ_FLAG_CLICKABLE);
+  box(s, 102, 6, 36, 5, WHITE, 77, 2);
+  lv_obj_t *pw = nm(button(s, 0, 14, 240, 44, WHITE, LV_OPA_TRANSP, 0, [] {
+                      if (op.tile < 0) return;
+                      Tile &t = hp.tiles[op.tile];
+                      bool on = t.state != "on";
+                      if (hooks.ha) hooks.ha(on ? "on" : "off", t.entities, "");
+                      t.state = on ? "on" : "off";
+                      paint_toggle(op.power_tog, on);
+                    }), "row_opt_power");
+  op.title = text(pw, 14, 12, 160, R.f17b, WHITE, "");
+  op.power_tog = toggle(pw);
+  text(s, 12, 66, 0, R.f12s, WHITE, "Speed", LV_TEXT_ALIGN_LEFT, 184);
+  lv_obj_t *minus = nm(button(s, 12, 84, 56, 44, CARD, LV_OPA_COVER, 12, [] { set_speed(-1); }), "opt_speed_minus");
+  icon(minus, "minus", 20, 18, 12, WHITE);
+  op.speed = text(s, 76, 92, 40, R.f20b, WHITE, "0", LV_TEXT_ALIGN_RIGHT);
+  op.of = text(s, 120, 97, 48, R.f13, WHITE, "of 6", LV_TEXT_ALIGN_LEFT, 191);
+  lv_obj_t *plus = nm(button(s, 172, 84, 56, 44, CARD, LV_OPA_COVER, 12, [] { set_speed(1); }), "opt_speed_plus");
+  icon(plus, "plus", 20, 18, 12, WHITE);
+  text(s, 12, 138, 0, R.f12s, WHITE, "Timer", LV_TEXT_ALIGN_LEFT, 184);
+  static const char *const T[] = {"Off", "1 h", "2 h", "4 h"};
+  static const int H[] = {0, 1, 2, 4};
+  for (int i = 0; i < 4; i++) {
+    int hours = H[i];
+    lv_obj_t *b = nm(text_button(s, 12 + 56 * i, 156, 48, 44, T[i], CARD, LV_OPA_COVER, 12, WHITE, [i, hours] {
+                       for (int k = 0; k < 4; k++)
+                         lv_obj_set_style_bg_color(op.timers[k], lv_color_hex(k == i ? BLUE : CARD), 0);
+                       if (op.tile >= 0 && hooks.ha) hooks.ha("timer", hp.tiles[op.tile].timer, std::to_string(hours));
+                     }), "opt_timer_" + std::to_string(i));
+    op.timers.push_back(b);
+  }
+  lv_obj_set_style_bg_color(op.timers[0], lv_color_hex(BLUE), 0);
+  op.led_row = nm(button(s, 0, 210, 240, 44, WHITE, LV_OPA_TRANSP, 0, [] {
+                    if (op.tile < 0) return;
+                    if (hooks.ha) hooks.ha("toggle", hp.tiles[op.tile].led, "");
+                    lv_obj_t *t = op.led_tog;
+                    paint_toggle(t, lv_obj_get_x(lv_obj_get_child(t, 0)) == 2);
+                  }), "row_opt_led");
+  text(op.led_row, 14, 13, 160, R.f15, WHITE, "LED light");
+  op.led_tog = toggle(op.led_row);
+}
+
+// ---- page picker ----------------------------------------------------------------------------------------
+struct Picker {
+  lv_obj_t *root;
+  std::vector<lv_obj_t *> rows, checks;
+};
+inline Picker pk;
+inline void show_page(int i, bool anim = false);
+
+inline void build_picker() {
+  pk.root = dim_layer("picker_dim");
+  lv_obj_t *card = nm(box(pk.root, 8, 36, 164, 176, CARD, LV_OPA_COVER, 12), "page_picker");
+  lv_obj_set_style_clip_corner(card, true, 0);
+  lv_obj_add_flag(card, LV_OBJ_FLAG_CLICKABLE);
+  static const char *const N[] = {"TV", "Soundbar", "Home", "Settings"};
+  static const char *const I[] = {"tv", "soundbar", "home", "sliders"};
+  static const char *const ID[] = {"row_pp_tv", "row_pp_sb", "row_pp_home", "row_pp_settings"};
+  for (int i = 0; i < 4; i++) {
+    lv_obj_t *r = nm(button(card, 0, 44 * i, 164, 44, 0x3A3A3C, LV_OPA_TRANSP, 0, [i] {
+                       show(pk.root, false);
+                       show_page(i, true);
+                     }), ID[i]);
+    icon(r, I[i], 20, 12, 12, WHITE);
+    text(r, 42, 13, 90, R.f15b, WHITE, N[i]);
+    pk.checks.push_back(icon(r, "check", 16, 136, 14, WHITE));
+    pk.rows.push_back(r);
+  }
+}
+
+inline void open_page_picker(int current) {
+  for (int i = 0; i < 4; i++) {
+    lv_obj_set_style_bg_opa(pk.rows[i], i == current ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
+    show(pk.checks[i], i == current);
+  }
+  show(pk.root, true);
+}
+
 // ---- pages -------------------------------------------------------------------------------------------------
 struct Pages {
   lv_obj_t *view;
@@ -650,8 +952,9 @@ struct Pages {
 };
 inline Pages pg;
 
-inline void show_page(int i, bool anim = false) {
+inline void show_page(int i, bool anim) {
   pg.current = i;
+  lv_obj_update_layout(pg.view);   // tiles need their size before scrolling to one
   lv_tileview_set_tile_by_index(pg.view, i, 0, anim ? LV_ANIM_ON : LV_ANIM_OFF);
   if (hooks.page_shown) hooks.page_shown(i);
 }
@@ -672,9 +975,14 @@ inline void build(lv_obj_t *view, std::array<lv_obj_t *, 4> pages) {
         if (hooks.page_shown) hooks.page_shown(i);
       }
   }, LV_EVENT_VALUE_CHANGED, nullptr);
+  open_picker = [] { open_page_picker(pg.current); };
   build_tv(pg.page[0]);
+  build_soundbar(pg.page[1]);
+  build_home(pg.page[2]);
   build_status();
   build_sheets();
+  build_options();
+  build_picker();
   build_overlays();
 }
 

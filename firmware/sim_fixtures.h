@@ -18,6 +18,15 @@ inline const char *SIM_SOURCES = R"([
  {"id":"org.videolan.vlc","kind":"app","name":"VLC","color":"#3a3a3c","icon":"x"},
  {"id":"nl.giejay.android.tv.immich","kind":"app","name":"Immich","color":"#3a3a3c","icon":"x"}])";
 
+inline const char *SIM_TILES = R"([
+ {"id":"a_fan","name":"TV fan","kind":"fan","icon":"fan","state":"on","label":"Speed 3","entities":["fan.tv_fan"],
+  "options":{"led":"light.tv_fan_led","speed_count":6,"timer":"select.tv_fan_set_timer"}},
+ {"id":"b_lights","name":"Cabinet lights","kind":"lights","icon":"bulb","state":"off","label":"Off","entities":["light.a","light.b"],"options":{}},
+ {"id":"c_display","name":"Matrix clock","kind":"display","icon":"clock","state":"on","label":"On","entities":["switch.m"],"options":{}},
+ {"id":"d_power","name":"Cabinet power","kind":"switches","icon":"plug","state":"off","label":"Off","entities":["switch.a"],"options":{}},
+ {"id":"e_fan","name":"Fridge fan","kind":"fan","icon":"fan","state":"offline","label":"Offline","entities":["fan.fridge_fan"],"options":{}},
+ {"id":"f_fan","name":"Clock fan","kind":"fan","icon":"fan","state":"offline","label":"Offline","entities":["fan.clock_fan"],"options":{}}])";
+
 // Returns false for an unknown fixture name.
 inline bool sim_load_fixture(const std::string &f, int64_t now_ms) {
   ui::parse_sources(SIM_SOURCES);
@@ -51,6 +60,14 @@ inline bool sim_load_fixture(const std::string &f, int64_t now_ms) {
   } else if (f == "stale") {
     playing("The Long Road", "Hotstar", "in.startv.hotstar", 4395, 1930);
     ui::tv.updated_ms = now_ms - 95000;
+  } else if (f == "soundbar") {
+    ui::show_page(1);
+  } else if (f == "home" || f == "home_focus_each" || f == "options_fan" || f == "picker") {
+    ui::parse_tiles(SIM_TILES);
+    ui::render_home();
+    ui::show_page(2);
+    if (f == "options_fan") ui::open_options(0);
+    if (f == "picker") ui::open_page_picker(2);
   } else {
     return false;
   }

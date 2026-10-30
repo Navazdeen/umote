@@ -3,7 +3,8 @@
 #   PATH=../.sdl/bin:$PATH esphome run sim.yaml
 # Environment variables:
 #   SIM_STATE = normal | noboard | saver | critical     SIM_PAGE = 0..3     SIM_TOAST = text
-#   SIM_FIXTURE = art | noart_ps5 | off | live | long_title | stale | sheet | new_hdmi
+#   SIM_FIXTURE = art | noart_ps5 | off | live | long_title | stale | sheet | new_hdmi |
+#                 soundbar | home | home_focus_each | options_fan | picker
 #   SIM_DUMP = <path>   write the visible widget tree for tools/check_ui.py, then exit
 
 esphome:
@@ -41,7 +42,16 @@ esphome:
                 const char *st = getenv("SIM_STATE");
                 std::string screen = std::string(fx ? fx : "art") + "/" + (st ? st : "normal") + "/p" +
                                      (getenv("SIM_PAGE") ? getenv("SIM_PAGE") : "0");
-                sim_dump(getenv("SIM_DUMP"), screen.c_str());
+                if (fx && std::string(fx) == "home_focus_each") {
+                  for (size_t i = 0; i < ui::hp.tiles.size(); i++) {
+                    ui::hp.focus = (int) i;
+                    ui::paint_focus();
+                    lv_refr_now(nullptr);
+                    sim_dump(getenv("SIM_DUMP"), (screen + "/focus" + std::to_string(i)).c_str());
+                  }
+                } else {
+                  sim_dump(getenv("SIM_DUMP"), screen.c_str());
+                }
                 exit(0);
 
 host:
@@ -84,6 +94,14 @@ script:
     parameters: { port: int, name: string, go: bool }
     then:
       - lambda: 'ui::toast("HDMI " + std::to_string(port) + " = " + name);'
+  - id: ui_sb_ir
+    parameters: { code: string }
+    then:
+      - lambda: 'ui::toast("IR " + code);'
+  - id: ui_ha
+    parameters: { kind: string, entities: string, value: string }
+    then:
+      - logger.log: { format: "ha %s %s %s", args: [kind.c_str(), entities.c_str(), value.c_str()] }
   - id: ui_page_shown
     parameters: { page: int }
     then:

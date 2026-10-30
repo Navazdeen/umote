@@ -28,3 +28,20 @@ STYLE = {
     "ps5": "#00439c",
 }
 DEFAULT_COLOR = "#3a3a3c"
+
+APP_NAMES = {
+    "com.netflix.ninja": "Netflix",
+    "in.startv.hotstar": "Hotstar",
+    "com.amazon.amazonvideo.livingroom": "Prime Video",
+    "com.google.android.youtube.tv": "YouTube",
+    "com.google.android.youtube.tvmusic": "YouTube Music",
+    "com.spotify.tv.android": "Spotify",
+    "com.sonyliv": "Sony LIV",
+    "com.graymatrix.did": "ZEE5",
+    "com.suntv.sunnxt": "Sun NXT",
+    "com.discoveryplus.tv.android": "discovery+",
+    "com.jio.media.stb.ondemand": "JioHotstar",
+    "org.videolan.vlc": "VLC",
+    "nl.giejay.android.tv.immich": "Immich",
+}
+UNUSED_AFTER_S = 30 * 86400

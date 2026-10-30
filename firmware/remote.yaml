@@ -140,6 +140,7 @@ wifi:
     - script.execute: ui_refresh
 
 packages:
+  assets: !include assets.yaml
   ui: !include ui.yaml
 
 globals:

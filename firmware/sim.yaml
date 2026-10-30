@@ -44,6 +44,7 @@ touchscreen:
     display: lcd
 
 packages:
+  assets: !include assets.yaml
   ui: !include ui.yaml
 
 script:

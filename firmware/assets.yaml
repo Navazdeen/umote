@@ -1,0 +1,144 @@
+# Fonts, icons and app icons shared by remote.yaml and sim.yaml.
+# Icons: SVGs split from the mockup sprite, alpha-only (grayscale + alpha), tinted at runtime.
+
+substitutions:
+  glyphs_latin: ' !"#$%&''()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~ ¡¢£¤¥¦§¨©ª«¬®¯°±²³´µ¶·¸¹º»¼½¾¿ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿĀāĂăĄąĆćĈĉĊċČčĎďĐđĒēĔĕĖėĘęĚěĜĝĞğĠġĢģĤĥĦħĨĩĪīĬĭĮįİıĲĳĴĵĶķĸĹĺĻļĽľĿŀŁłŃńŅņŇňŊŋŌōŎŏŐőŒœŔŕŖŗŘřŚśŜŝŞşŠšŢţŤťŦŧŨũŪūŬŭŮůŰűŲųŴŵŶŷŸŹźŻżŽžſ…−'
+
+font:
+  - id: f12
+    file: { type: gfonts, family: Inter, weight: 400 }
+    size: 12
+    bpp: 4
+    glyphs: ["${glyphs_latin}"]
+  - id: f13
+    file: { type: gfonts, family: Inter, weight: 400 }
+    size: 13
+    bpp: 4
+    glyphs: ["${glyphs_latin}"]
+  - id: f14
+    file: { type: gfonts, family: Inter, weight: 400 }
+    size: 14
+    bpp: 4
+    glyphs: ["${glyphs_latin}"]
+  - id: f15
+    file: { type: gfonts, family: Inter, weight: 400 }
+    size: 15
+    bpp: 4
+    glyphs: ["${glyphs_latin}"]
+  - id: f17
+    file: { type: gfonts, family: Inter, weight: 400 }
+    size: 17
+    bpp: 4
+    glyphs: ["${glyphs_latin}"]
+  - id: f20
+    file: { type: gfonts, family: Inter, weight: 400 }
+    size: 20
+    bpp: 4
+    glyphs: ["${glyphs_latin}"]
+  - id: f13b
+    file: { type: gfonts, family: Inter, weight: 700 }
+    size: 13
+    bpp: 4
+    glyphs: ["${glyphs_latin}"]
+  - id: f15b
+    file: { type: gfonts, family: Inter, weight: 700 }
+    size: 15
+    bpp: 4
+    glyphs: ["${glyphs_latin}"]
+  - id: f17b
+    file: { type: gfonts, family: Inter, weight: 700 }
+    size: 17
+    bpp: 4
+    glyphs: ["${glyphs_latin}"]
+  - id: f20b
+    file: { type: gfonts, family: Inter, weight: 700 }
+    size: 20
+    bpp: 4
+    glyphs: ["${glyphs_latin}"]
+  - id: f12s
+    file: { type: gfonts, family: Inter, weight: 600 }
+    size: 12
+    bpp: 4
+    glyphs: ["${glyphs_latin}"]
+  - id: f14s
+    file: { type: gfonts, family: Inter, weight: 600 }
+    size: 14
+    bpp: 4
+    glyphs: ["${glyphs_latin}"]
+
+image:
+  - { id: ic_check_14, file: assets/icons/check.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 14x14 }
+  - { id: ic_chev_down_14, file: assets/icons/chev_down.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 14x14 }
+  - { id: ic_chev_right_14, file: assets/icons/chev_right.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 14x14 }
+  - { id: ic_lock_14, file: assets/icons/lock.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 14x14 }
+  - { id: ic_wifi_14, file: assets/icons/wifi.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 14x14 }
+  - { id: ic_check_16, file: assets/icons/check.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 16x16 }
+  - { id: ic_chev_down_16, file: assets/icons/chev_down.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 16x16 }
+  - { id: ic_chev_left_16, file: assets/icons/chev_left.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 16x16 }
+  - { id: ic_chev_right_16, file: assets/icons/chev_right.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 16x16 }
+  - { id: ic_lock_16, file: assets/icons/lock.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 16x16 }
+  - { id: ic_play_16, file: assets/icons/play.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 16x16 }
+  - { id: ic_tv_16, file: assets/icons/tv.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 16x16 }
+  - { id: ic_wifi_16, file: assets/icons/wifi.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 16x16 }
+  - { id: ic_back10_20, file: assets/icons/back10.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 20x20 }
+  - { id: ic_bulb_20, file: assets/icons/bulb.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 20x20 }
+  - { id: ic_check_20, file: assets/icons/check.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 20x20 }
+  - { id: ic_chev_down_20, file: assets/icons/chev_down.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 20x20 }
+  - { id: ic_chev_left_20, file: assets/icons/chev_left.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 20x20 }
+  - { id: ic_chev_right_20, file: assets/icons/chev_right.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 20x20 }
+  - { id: ic_clock_20, file: assets/icons/clock.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 20x20 }
+  - { id: ic_del_20, file: assets/icons/del.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 20x20 }
+  - { id: ic_eye_20, file: assets/icons/eye.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 20x20 }
+  - { id: ic_fan_20, file: assets/icons/fan.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 20x20 }
+  - { id: ic_fwd10_20, file: assets/icons/fwd10.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 20x20 }
+  - { id: ic_home_20, file: assets/icons/home.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 20x20 }
+  - { id: ic_lock_20, file: assets/icons/lock.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 20x20 }
+  - { id: ic_mic_20, file: assets/icons/mic.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 20x20 }
+  - { id: ic_minus_20, file: assets/icons/minus.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 20x20 }
+  - { id: ic_more_20, file: assets/icons/more.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 20x20 }
+  - { id: ic_mute_20, file: assets/icons/mute.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 20x20 }
+  - { id: ic_pause_20, file: assets/icons/pause.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 20x20 }
+  - { id: ic_play_20, file: assets/icons/play.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 20x20 }
+  - { id: ic_plug_20, file: assets/icons/plug.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 20x20 }
+  - { id: ic_plus_20, file: assets/icons/plus.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 20x20 }
+  - { id: ic_power_20, file: assets/icons/power.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 20x20 }
+  - { id: ic_shift_20, file: assets/icons/shift.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 20x20 }
+  - { id: ic_sliders_20, file: assets/icons/sliders.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 20x20 }
+  - { id: ic_soundbar_20, file: assets/icons/soundbar.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 20x20 }
+  - { id: ic_tv_20, file: assets/icons/tv.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 20x20 }
+  - { id: ic_vol_down_20, file: assets/icons/vol_down.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 20x20 }
+  - { id: ic_vol_up_20, file: assets/icons/vol_up.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 20x20 }
+  - { id: ic_wifi_20, file: assets/icons/wifi.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 20x20 }
+  - { id: ic_pause_22, file: assets/icons/pause.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 22x22 }
+  - { id: ic_play_22, file: assets/icons/play.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 22x22 }
+  - { id: ic_back10_24, file: assets/icons/back10.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 24x24 }
+  - { id: ic_fwd10_24, file: assets/icons/fwd10.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 24x24 }
+  - { id: ic_home_24, file: assets/icons/home.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 24x24 }
+  - { id: ic_mute_24, file: assets/icons/mute.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 24x24 }
+  - { id: ic_power_24, file: assets/icons/power.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 24x24 }
+  - { id: ic_sliders_24, file: assets/icons/sliders.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 24x24 }
+  - { id: ic_soundbar_24, file: assets/icons/soundbar.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 24x24 }
+  - { id: ic_tv_24, file: assets/icons/tv.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 24x24 }
+  - { id: ic_vol_down_24, file: assets/icons/vol_down.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 24x24 }
+  - { id: ic_vol_up_24, file: assets/icons/vol_up.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 24x24 }
+  - { id: ic_bulb_34, file: assets/icons/bulb.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 34x34 }
+  - { id: ic_clock_34, file: assets/icons/clock.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 34x34 }
+  - { id: ic_fan_34, file: assets/icons/fan.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 34x34 }
+  - { id: ic_mic_34, file: assets/icons/mic.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 34x34 }
+  - { id: ic_plug_34, file: assets/icons/plug.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 34x34 }
+  - { id: ic_power_34, file: assets/icons/power.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 34x34 }
+  - { id: ic_soundbar_34, file: assets/icons/soundbar.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 34x34 }
+  - { id: ic_tv_34, file: assets/icons/tv.svg, type: GRAYSCALE, transparency: alpha_channel, resize: 34x34 }
+  - { id: app_com_amazon_amazonvideo_livingroom, file: assets/apps/com.amazon.amazonvideo.livingroom.png, type: RGB565, transparency: alpha_channel, resize: 44x44 }
+  - { id: app_com_discoveryplus_tv_android, file: assets/apps/com.discoveryplus.tv.android.png, type: RGB565, transparency: alpha_channel, resize: 44x44 }
+  - { id: app_com_google_android_youtube_tv, file: assets/apps/com.google.android.youtube.tv.png, type: RGB565, transparency: alpha_channel, resize: 44x44 }
+  - { id: app_com_google_android_youtube_tvmusic, file: assets/apps/com.google.android.youtube.tvmusic.png, type: RGB565, transparency: alpha_channel, resize: 44x44 }
+  - { id: app_com_graymatrix_did, file: assets/apps/com.graymatrix.did.png, type: RGB565, transparency: alpha_channel, resize: 44x44 }
+  - { id: app_com_jio_media_stb_ondemand, file: assets/apps/com.jio.media.stb.ondemand.png, type: RGB565, transparency: alpha_channel, resize: 44x44 }
+  - { id: app_com_netflix_ninja, file: assets/apps/com.netflix.ninja.png, type: RGB565, transparency: alpha_channel, resize: 44x44 }
+  - { id: app_com_sonyliv, file: assets/apps/com.sonyliv.png, type: RGB565, transparency: alpha_channel, resize: 44x44 }
+  - { id: app_com_spotify_tv_android, file: assets/apps/com.spotify.tv.android.png, type: RGB565, transparency: alpha_channel, resize: 44x44 }
+  - { id: app_com_suntv_sunnxt, file: assets/apps/com.suntv.sunnxt.png, type: RGB565, transparency: alpha_channel, resize: 44x44 }
+  - { id: app_in_startv_hotstar, file: assets/apps/in.startv.hotstar.png, type: RGB565, transparency: alpha_channel, resize: 44x44 }
+  - { id: app_nl_giejay_android_tv_immich, file: assets/apps/nl.giejay.android.tv.immich.png, type: RGB565, transparency: alpha_channel, resize: 44x44 }
+  - { id: app_org_videolan_vlc, file: assets/apps/org.videolan.vlc.png, type: RGB565, transparency: alpha_channel, resize: 44x44 }

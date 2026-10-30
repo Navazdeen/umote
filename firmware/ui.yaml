@@ -5,11 +5,13 @@
 # The including file defines the hook scripts:
 #   ui_launch(source_id)  ui_power()  ui_tv_key(code)  ui_seek(seconds)  ui_name_source(port, name, go)
 #   ui_page_shown(page)  ui_sb_ir(code)  ui_ha(kind, entities, value)
+#   ui_wifi_scan()  ui_wifi_join(ssid, password)  ui_settings_changed()
 
 substitutions:
   # Soundbar buttons: the remote's labels; IR codes are the upper-case names (Task 14 fills them).
   sb_inputs: "TV,Bluetooth,Music"
   sb_modes: "Cinema,Voice,Night"
+  fw_version: "1.0"
 
 esphome:
   includes:
@@ -29,6 +31,11 @@ globals:
   - { id: g_ssid, type: std::string, initial_value: '""' }   # filled in by the device on connect
   - { id: g_ip, type: std::string, initial_value: '""' }
   - { id: g_rssi, type: int, initial_value: '0' }            # dBm, 0 = unknown
+  # Settings page, kept across restarts
+  - { id: g_vol_to_tv, type: bool, restore_value: true, initial_value: 'false' }
+  - { id: g_text_large, type: bool, restore_value: true, initial_value: 'false' }
+  - { id: g_brightness, type: float, restore_value: true, initial_value: '0.6' }
+  - { id: g_sleep_s, type: int, restore_value: true, initial_value: '20' }
 
 lvgl:
   buffer_size: 25%               # no PSRAM: 38 KB draw buffer, partial redraws only
@@ -53,6 +60,19 @@ lvgl:
   on_boot:
     - script.execute: ui_load_res
     - lambda: |-
+        ui::cfg = {id(g_vol_to_tv), id(g_text_large), id(g_brightness), id(g_sleep_s)};
+        ui::large_text = id(g_text_large);
+        if (ui::large_text) ui::enlarge_fonts();
+        ui::hooks.wifi_scan = []() { id(ui_wifi_scan).execute(); };
+        ui::hooks.wifi_join = [](const std::string &s, const std::string &p) { id(ui_wifi_join).execute(s, p); };
+        ui::hooks.settings_changed = []() {
+          id(g_vol_to_tv) = ui::cfg.vol_to_tv;
+          id(g_brightness) = ui::cfg.brightness;
+          id(g_sleep_s) = ui::cfg.sleep_s;
+          bool restart = id(g_text_large) != ui::cfg.text_large;
+          id(g_text_large) = ui::cfg.text_large;
+          id(ui_settings_changed).execute(restart);
+        };
         ui::hooks.launch = [](const std::string &s) { id(ui_launch).execute(s); };
         ui::hooks.power = []() { id(ui_power).execute(); };
         ui::hooks.tv_key = [](const char *c) { id(ui_tv_key).execute(std::string(c)); };
@@ -86,6 +106,20 @@ script:
           const char *warn = mode == 2 ? "Battery critical" : mode == 1 ? "Saver mode"
                              : !id(g_board_ok) ? "Touch only" : "";
           ui::set_status(id(g_batt_pct), id(g_net) >= 2, warn, mode ? 0xE5484D : 0xF2A33A);
+      - script.execute: ui_about
+
+  # Values shown on the Settings and About views.
+  - id: ui_about
+    then:
+      - lambda: |-
+          ui::about.batt_pct = id(g_batt_pct);
+          ui::about.batt_mv = id(g_batt_mv);
+          ui::about.board = id(g_board_ok);
+          ui::about.ssid = id(g_net) >= 2 ? id(g_ssid) : "";
+          ui::about.ip = id(g_net) >= 2 ? id(g_ip) : "";
+          ui::about.rssi = id(g_rssi);
+          ui::about.firmware = "v${fw_version}";
+          ui::refresh_settings();
 
   - id: ui_toast
     parameters: { text: string }

@@ -51,6 +51,8 @@ def check(objs: list[dict]) -> list[str]:
                     fails.append(f"text: {where(o)} is {o['font_px']} px")
                 if o.get("text_w") is not None and o["text_w"] > o["w"] and not o["obj"].endswith("_trunc"):
                     fails.append(f"clipped: {where(o)} text {o['text_w']} px in {o['w']} px")
+                if o.get("text_h") is not None and o["text_h"] > o["h"] and not o["obj"].endswith("_trunc"):
+                    fails.append(f"clipped: {where(o)} text {o['text_h']} px tall in {o['h']} px")
                 if GLYPH.search(o["text"]):
                     fails.append(f"glyph: {where(o)} {o['text'][:18]!r}")
         targets = [o for o in live if o["clickable"]]

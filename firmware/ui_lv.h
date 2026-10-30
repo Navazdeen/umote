@@ -27,6 +27,12 @@ struct Res {
 };
 inline Res R;
 
+// "Large" text size: every font one step up (applied before build, so it needs a restart).
+inline void enlarge_fonts() {
+  R = Res{R.f13, R.f14, R.f15, R.f17, R.f20, R.f20, R.f15b, R.f17b, R.f20b, R.f20b, R.f13b, R.f15b, R.img};
+}
+inline bool large_text = false;
+
 // Widget names, used by the simulator's layout dump (tools/check_ui.py rules key off them).
 inline std::map<const lv_obj_t *, std::string> &names() {
   static std::map<const lv_obj_t *, std::string> m;
@@ -50,6 +56,9 @@ struct Hooks {
   std::function<void(const std::string &)> sb_ir;               // soundbar IR code name
   // Home Assistant call: kind = "toggle" | "on" | "off" | "fan_pct" | "timer"; entities comma-separated.
   std::function<void(const std::string &, const std::string &, const std::string &)> ha;
+  std::function<void()> wifi_scan;
+  std::function<void(const std::string &, const std::string &)> wifi_join;   // ssid, password
+  std::function<void()> settings_changed;                                    // ui::cfg was edited
   std::function<void(const std::string &)> log;
 };
 inline Hooks hooks;
@@ -347,6 +356,7 @@ inline void build_tv(lv_obj_t *page) {
   lv_obj_set_style_clip_corner(tvp.art, true, 0);
   lv_obj_set_style_bg_color(tvp.art, lv_color_hex(CARD), 0);
   lv_obj_set_style_bg_opa(tvp.art, LV_OPA_COVER, 0);
+  if (large_text) lv_obj_add_flag(tvp.art, LV_OBJ_FLAG_HIDDEN);   // room for bigger text
   tvp.title = nm(text(tvp.np, 14, 115, 212, R.f20b, WHITE, ""), "np_title");
   tvp.app = nm(text(tvp.np, 14, 141, 0, R.f13b, 0xFF8FA6, ""), "np_app");
   tvp.sub = nm(text(tvp.np, 70, 141, 156, R.f13, WHITE, "", LV_TEXT_ALIGN_LEFT, 199), "np_sub");
@@ -469,6 +479,7 @@ inline void render_tv(int64_t now_ms) {
   const Source *cur = find_source(tv.current);
   show(tvp.off, view == umote::TvView::OFF);
   show(tvp.np, view == umote::TvView::PLAYING_ART);
+  if (large_text) show(tvp.art, false);
   show(tvp.noart, view != umote::TvView::OFF && view != umote::TvView::PLAYING_ART);
   tint(tvp.root, view == umote::TvView::OFF ? BG : darken(cur ? cur->color : GREY, 60));
 
@@ -788,9 +799,11 @@ inline void render_home() {
     icon(ib, t.icon, 14, 4, 4, on ? 0x000000 : WHITE);
     uint32_t fg = on ? 0x000000 : WHITE;
     text(o, 37, 9, 58, R.f12, fg, t.label.c_str(), LV_TEXT_ALIGN_LEFT, on ? 178 : 199);
-    lv_obj_t *n = text(o, 9, 31, 86, R.f13b, fg, t.name.c_str());
-    lv_label_set_long_mode(n, LV_LABEL_LONG_WRAP);
-    lv_obj_set_height(n, 32);
+    lv_obj_t *n = text(o, 9, 28, 86, R.f13b, fg, t.name.c_str());
+    if (!large_text) {   // two lines fit at the default size; Large keeps one line with an ellipsis
+      lv_label_set_long_mode(n, LV_LABEL_LONG_WRAP);
+      lv_obj_set_height(n, 36);
+    }
     hp.objs.push_back(o);
   }
   box(hp.grid, 0, 5 + 77 * ((hp.tiles.size() + 1) / 2), 1, 4, WHITE, LV_OPA_TRANSP);
@@ -800,7 +813,7 @@ inline void render_home() {
 inline void build_home(lv_obj_t *page) {
   hp.page = page;
   page_title(page, "Home", "home_title");
-  text(page, 12, 38, 0, R.f12s, WHITE, "Living room", LV_TEXT_ALIGN_LEFT, 184);
+  text(page, 12, large_text ? 34 : 38, 0, R.f12s, WHITE, "Living room", LV_TEXT_ALIGN_LEFT, 184);
   hp.grid = nm(box(page, 0, 52, 240, 268, WHITE, LV_OPA_TRANSP), "home_grid");
   lv_obj_add_flag(hp.grid, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_set_scroll_dir(hp.grid, LV_DIR_VER);
@@ -944,6 +957,471 @@ inline void open_page_picker(int current) {
   show(pk.root, true);
 }
 
+// ---- Settings page --------------------------------------------------------------------------------------
+struct Config {
+  bool vol_to_tv = false, text_large = false;
+  float brightness = 0.6f;
+  int sleep_s = 20;
+};
+inline Config cfg;
+
+struct Net {
+  std::string ssid;
+  int rssi = 0;
+  bool secure = true;
+};
+struct About {
+  int batt_pct = 0, batt_mv = 0, rssi = 0, free_kb = 0;
+  bool board = false;
+  std::string ssid, ip, firmware;
+};
+inline About about;
+
+inline const char *signal_word(int rssi) {
+  return rssi >= -60 ? "Strong" : rssi >= -70 ? "Good" : rssi >= -80 ? "Fair" : "Weak";
+}
+
+// Horizontal slider drawn inside a 44 px tall hit area; on_change gets 0..1 when released.
+struct HSlider {
+  lv_obj_t *hit, *fill, *knob;
+  int w;
+  std::function<void(float)> on_change;
+};
+inline void hslider_set(HSlider *h, float f) {
+  int x = (int) (h->w * f);
+  lv_obj_set_width(h->fill, std::max(1, x));
+  lv_obj_set_x(h->knob, std::max(0, std::min(h->w - 18, x - 9)));
+}
+// Touches go to `parent` (a full-width row), so the row is the single touch target.
+inline HSlider *hslider(lv_obj_t *parent, int x, int y, int w, std::function<void(float)> fn) {
+  auto *h = new HSlider{nullptr, nullptr, nullptr, w, std::move(fn)};
+  h->hit = box(parent, x, y, w, 44, WHITE, LV_OPA_TRANSP);
+  lv_obj_add_flag(parent, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_remove_flag(parent, LV_OBJ_FLAG_SCROLL_CHAIN);
+  lv_obj_remove_flag(parent, LV_OBJ_FLAG_GESTURE_BUBBLE);
+  lv_obj_t *track = box(h->hit, 0, 20, w, 5, GREY, LV_OPA_COVER, 2);
+  h->fill = box(track, 0, 0, 1, 5, WHITE, LV_OPA_COVER, 2);
+  h->knob = box(h->hit, 0, 13, 18, 18, WHITE, LV_OPA_COVER, 9);
+  auto cb = [](lv_event_t *e) {
+    auto *h = static_cast<HSlider *>(lv_event_get_user_data(e));
+    lv_point_t p;
+    lv_indev_get_point(lv_indev_active(), &p);
+    lv_area_t a;
+    lv_obj_get_coords(h->hit, &a);
+    if (p.x < a.x1 - 12) return;   // the row's label side does nothing
+    float f = std::max(0.0f, std::min(1.0f, (p.x - a.x1) / (float) h->w));
+    hslider_set(h, f);
+    if (lv_event_get_code(e) == LV_EVENT_RELEASED && h->on_change) h->on_change(f);
+  };
+  lv_obj_add_event_cb(parent, cb, LV_EVENT_PRESSING, h);
+  lv_obj_add_event_cb(parent, cb, LV_EVENT_RELEASED, h);
+  return h;
+}
+
+struct SetPage {
+  lv_obj_t *page, *list, *wifi, *wifi_list, *about_view, *kb;
+  lv_obj_t *v_wifi, *v_buttons, *v_sleep, *v_text, *v_about;
+  HSlider *bright;
+  std::vector<lv_obj_t *> rows;   // focusable rows of the visible list
+  int focus = -1;
+  std::vector<Net> nets;
+  std::vector<lv_obj_t *> about_vals;
+};
+inline SetPage sp;
+
+inline lv_obj_t *list_row(lv_obj_t *parent, int y, const std::string &id, const char *label, Tap fn) {
+  lv_obj_t *r = nm(button(parent, 0, y, 240, 44, CARD, LV_OPA_TRANSP, 0, std::move(fn)), id);
+  text(r, 14, 12, 0, R.f15, WHITE, label);
+  return r;
+}
+inline lv_obj_t *row_value(lv_obj_t *row, const char *v, bool chevron = true) {
+  lv_obj_t *l = text(row, 70, 13, chevron ? 140 : 156, R.f13, WHITE, v, LV_TEXT_ALIGN_RIGHT, 191);
+  if (chevron) icon(row, "chev_right", 16, 212, 14, WHITE, 191);
+  return l;
+}
+
+inline void set_focus_rows(std::vector<lv_obj_t *> rows) {
+  sp.rows = std::move(rows);
+  sp.focus = -1;
+}
+inline void paint_set_focus() {
+  for (size_t i = 0; i < sp.rows.size(); i++)
+    lv_obj_set_style_bg_opa(sp.rows[i], (int) i == sp.focus ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
+  if (sp.focus >= 0 && sp.focus < (int) sp.rows.size()) lv_obj_scroll_to_view(sp.rows[sp.focus], LV_ANIM_ON);
+}
+
+inline void refresh_settings() {
+  lv_label_set_text(sp.v_wifi, about.ssid.empty() ? "Not connected" : about.ssid.c_str());
+  lv_label_set_text(sp.v_buttons, cfg.vol_to_tv ? "Volume: TV" : "Volume: Soundbar");
+  lv_label_set_text_fmt(sp.v_sleep, "%d s", cfg.sleep_s);
+  lv_label_set_text(sp.v_text, cfg.text_large ? "Large" : "Default");
+  lv_label_set_text_fmt(sp.v_about, "%d%%, %s", about.batt_pct, about.firmware.c_str());
+  hslider_set(sp.bright, cfg.brightness);
+}
+
+inline void show_settings_view(lv_obj_t *v);
+inline void open_wifi();
+inline void open_about();
+inline void open_keypad(const std::string &ssid);
+
+inline void build_settings(lv_obj_t *page) {
+  sp.page = page;
+  page_title(page, "Settings", "set_title");
+  sp.list = box(page, 0, 52, 240, 268, WHITE, LV_OPA_TRANSP);
+  lv_obj_add_flag(sp.list, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_scrollbar_mode(sp.list, LV_SCROLLBAR_MODE_OFF);
+  auto changed = [] {
+    refresh_settings();
+    if (hooks.settings_changed) hooks.settings_changed();
+  };
+  lv_obj_t *wifi = list_row(sp.list, 0, "row_set_wifi", "Wi-Fi", [] { open_wifi(); });
+  sp.v_wifi = row_value(wifi, "");
+  lv_obj_t *br = nm(box(sp.list, 0, 44, 240, 44, CARD, LV_OPA_TRANSP), "row_set_brightness");
+  text(br, 14, 12, 0, R.f15, WHITE, "Brightness");
+  sp.bright = hslider(br, 118, 0, 110, [changed](float f) {
+    cfg.brightness = std::max(0.1f, f);
+    changed();
+  });
+  lv_obj_t *bt = list_row(sp.list, 88, "row_set_buttons", "Buttons", [changed] {
+    cfg.vol_to_tv = !cfg.vol_to_tv;
+    changed();
+  });
+  sp.v_buttons = row_value(bt, "");
+  lv_obj_t *sl = list_row(sp.list, 132, "row_set_sleep", "Sleep after", [changed] {
+    static const int S[] = {10, 20, 30, 60};
+    int i = 0;
+    while (i < 4 && S[i] != cfg.sleep_s) i++;
+    cfg.sleep_s = S[(i + 1) % 4];
+    changed();
+  });
+  sp.v_sleep = row_value(sl, "");
+  lv_obj_t *ts = list_row(sp.list, 176, "row_set_textsize", "Text size", [changed] {
+    cfg.text_large = !cfg.text_large;
+    changed();   // takes effect after a restart (the YAML side reboots)
+  });
+  sp.v_text = row_value(ts, "");
+  lv_obj_t *ab = list_row(sp.list, 220, "row_set_about", "About", [] { open_about(); });
+  sp.v_about = row_value(ab, "");
+
+  // Wi-Fi list view
+  sp.wifi = box(page, 0, 0, 240, 320, BG, LV_OPA_COVER);
+  lv_obj_t *back = nm(button(sp.wifi, 4, 0, 130, 44, WHITE, LV_OPA_TRANSP, 9, [] { show_settings_view(sp.list); }),
+                      "wifi_back");
+  icon(back, "chev_left", 20, 2, 7, WHITE);
+  text(back, 26, 10, 0, R.f17b, WHITE, "Wi-Fi");
+  sp.wifi_list = box(sp.wifi, 0, 52, 240, 268, WHITE, LV_OPA_TRANSP);
+  lv_obj_add_flag(sp.wifi_list, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_set_scrollbar_mode(sp.wifi_list, LV_SCROLLBAR_MODE_OFF);
+
+  // About view
+  sp.about_view = box(page, 0, 0, 240, 320, BG, LV_OPA_COVER);
+  lv_obj_t *ab_back = nm(button(sp.about_view, 4, 0, 130, 44, WHITE, LV_OPA_TRANSP, 9,
+                                [] { show_settings_view(sp.list); }), "about_back");
+  icon(ab_back, "chev_left", 20, 2, 7, WHITE);
+  text(ab_back, 26, 10, 0, R.f17b, WHITE, "About");
+  static const char *const A[] = {"Battery", "Wi-Fi", "IP", "Firmware", "Button board", "Free memory"};
+  for (int i = 0; i < 6; i++) {
+    lv_obj_t *r = nm(box(sp.about_view, 0, 52 + 44 * i, 240, 44, WHITE, LV_OPA_TRANSP), "row_about_" + std::to_string(i));
+    text(r, 14, 12, 0, R.f15, WHITE, A[i]);
+    sp.about_vals.push_back(row_value(r, "", false));
+  }
+  show(sp.wifi, false);
+  show(sp.about_view, false);
+}
+
+inline void show_settings_view(lv_obj_t *v) {
+  show(sp.list, v == sp.list);
+  show(sp.wifi, v == sp.wifi);
+  show(sp.about_view, v == sp.about_view);
+  if (sp.kb) show(sp.kb, v == sp.kb);
+  if (v == sp.list) {
+    std::vector<lv_obj_t *> rows;
+    for (uint32_t i = 0; i < lv_obj_get_child_count(sp.list); i++) rows.push_back(lv_obj_get_child(sp.list, i));
+    set_focus_rows(rows);
+    refresh_settings();
+  }
+}
+
+inline void render_wifi() {
+  lv_obj_t *l = sp.wifi_list;
+  lv_obj_clean(l);
+  std::vector<lv_obj_t *> rows;
+  int y = 0;
+  if (!about.ssid.empty()) {
+    lv_obj_t *cur = nm(box(l, 0, 0, 240, 44, WHITE, LV_OPA_TRANSP), "row_wifi_current");
+    icon(cur, "check", 16, 12, 14, 0x30D158);
+    text(cur, 34, 12, 140, R.f15, WHITE, umote::sanitize(about.ssid, "Wi-Fi").c_str());
+    text(cur, 176, 13, 52, R.f13, WHITE, signal_word(about.rssi), LV_TEXT_ALIGN_RIGHT, 191);
+    y = 52;
+  }
+  text(l, 12, y, 0, R.f12s, WHITE, "Other networks", LV_TEXT_ALIGN_LEFT, 184);
+  y += 18;
+  int n = 0;
+  for (auto &net : sp.nets) {
+    if (net.ssid == about.ssid) continue;
+    std::string ssid = net.ssid;
+    bool secure = net.secure;
+    lv_obj_t *r = nm(button(l, 0, y, 240, 44, CARD, LV_OPA_TRANSP, 0, [ssid, secure] {
+                       if (secure) open_keypad(ssid);
+                       else if (hooks.wifi_join) hooks.wifi_join(ssid, "");
+                     }), "row_wifi_" + std::to_string(n) + "_trunc");
+    text(r, 14, 12, 140, R.f15, WHITE, umote::sanitize(net.ssid, "Hidden network").c_str());
+    if (net.secure) icon(r, "lock", 16, 162, 14, WHITE, 191);
+    text(r, 180, 13, 48, R.f13, WHITE, signal_word(net.rssi), LV_TEXT_ALIGN_RIGHT, 191);
+    rows.push_back(r);
+    y += 44;
+    n++;
+  }
+  lv_obj_t *again = nm(button(l, 0, y, 240, 44, CARD, LV_OPA_TRANSP, 0, [] {
+                         if (hooks.wifi_scan) hooks.wifi_scan();
+                       }), "row_wifi_scan");
+  text(again, 14, 12, 0, R.f15, LINK, "Scan again");
+  rows.push_back(again);
+  set_focus_rows(rows);
+}
+
+// Scan results from the device: dedupe by SSID keeping the strongest, strongest first.
+inline void set_wifi_scan(std::vector<Net> nets) {
+  std::vector<Net> out;
+  for (auto &n : nets) {
+    if (n.ssid.empty()) continue;
+    auto it = std::find_if(out.begin(), out.end(), [&](const Net &o) { return o.ssid == n.ssid; });
+    if (it == out.end()) out.push_back(n);
+    else if (n.rssi > it->rssi) *it = n;
+  }
+  std::sort(out.begin(), out.end(), [](const Net &a, const Net &b) { return a.rssi > b.rssi; });
+  sp.nets = out;
+  render_wifi();
+}
+
+inline void open_wifi() {
+  render_wifi();
+  show_settings_view(sp.wifi);
+  if (hooks.wifi_scan) hooks.wifi_scan();
+}
+
+inline void open_about() {
+  char buf[48];
+  snprintf(buf, sizeof buf, "%d%%, %d.%02d V", about.batt_pct, about.batt_mv / 1000, about.batt_mv % 1000 / 10);
+  lv_label_set_text(sp.about_vals[0], buf);
+  snprintf(buf, sizeof buf, "%s, \xE2\x88\x92%d dBm", signal_word(about.rssi), std::abs(about.rssi));
+  lv_label_set_text(sp.about_vals[1], about.ssid.empty() ? "Off" : buf);
+  lv_label_set_text(sp.about_vals[2], about.ip.empty() ? "None" : about.ip.c_str());
+  lv_label_set_text(sp.about_vals[3], about.firmware.c_str());
+  lv_label_set_text(sp.about_vals[4], about.board ? "Found" : "Not found");
+  lv_label_set_text_fmt(sp.about_vals[5], "%d KB", about.free_kb);
+  show_settings_view(sp.about_view);
+  set_focus_rows({});
+}
+
+// ---- keypad (Wi-Fi password) ---------------------------------------------------------------------------
+struct Keypad {
+  lv_obj_t *title, *field, *dots, *last, *caret, *full, *eye_icon;
+  lv_obj_t *pick_root, *pick_cap;
+  std::vector<lv_obj_t *> keys, key_main, key_sub, picks;
+  int layout = 0;          // 0 abc, 1 ABC, 2 123, 3 #+=
+  int key_focus = 4, pick_focus = 0, pick_group = -1;
+  bool show_pw = false;
+  std::string ssid, pw;
+};
+inline Keypad kb;
+
+inline const std::vector<std::string> &kb_groups(int layout) {
+  static const std::vector<std::string> L[4] = {
+      {"abc", "def", "ghi", "jkl", "mno", "pqrs", "tuv", "wxyz"},
+      {"ABC", "DEF", "GHI", "JKL", "MNO", "PQRS", "TUV", "WXYZ"},
+      {"12", "34", "56", "78", "90", ".-", "_@", "/:"},
+      {"!@", "#$", "%&", "*?", "()", "+=", ",;", "'\""}};
+  return L[layout];
+}
+// Picks for a group: its characters, plus the digit when there is room (at most 4 keys).
+inline std::string kb_picks(int g) {
+  std::string p = kb_groups(kb.layout)[g];
+  if (kb.layout < 2 && p.size() < 4) p += (char) ('2' + g);
+  return p;
+}
+
+inline void kb_paint() {
+  static const char *const SHIFT[] = {"aA 1#", "ABC", "123", "#+="};
+  for (int i = 0; i < 8; i++) {
+    lv_label_set_text(kb.key_main[i], kb_groups(kb.layout)[i].c_str());
+    char d[2] = {(char) ('2' + i), 0};
+    lv_label_set_text(kb.key_sub[i], kb.layout < 2 ? d : "");
+  }
+  lv_label_set_text(kb.key_sub[8], SHIFT[kb.layout]);
+  for (size_t i = 0; i < kb.keys.size(); i++)
+    lv_obj_set_style_bg_color(kb.keys[i], lv_color_hex((int) i == kb.key_focus ? 0x4A4A4C : i >= 8 && i != 11 ? GREY : CARD), 0);
+  // field: dots for all but the last character, which shows briefly; or everything with the eye on
+  lv_obj_clean(kb.dots);
+  size_t n = kb.pw.size();
+  bool plain = kb.show_pw;
+  show(kb.full, plain);
+  show(kb.dots, !plain);
+  show(kb.last, !plain && n > 0);
+  lv_label_set_text(kb.full, kb.pw.c_str());
+  int x = 0;
+  for (size_t i = 0; !plain && i + 1 < n && x < 120; i++, x += 11) box(kb.dots, x, 0, 8, 8, WHITE, LV_OPA_COVER, 4);
+  if (n) lv_label_set_text(kb.last, kb.pw.substr(n - 1).c_str());
+  lv_obj_set_x(kb.last, 11 + x);
+  lv_obj_update_layout(plain ? kb.full : kb.last);
+  int cx = plain ? 11 + std::min(lv_obj_get_width(kb.full), 136) : 11 + x + (n ? lv_obj_get_width(kb.last) + 2 : 0);
+  lv_obj_set_x(kb.caret, cx);
+  set_icon(kb.eye_icon, "eye", 20);
+  lv_obj_set_style_image_recolor(kb.eye_icon, lv_color_hex(kb.show_pw ? LINK : WHITE), 0);
+}
+
+inline void kb_open_pick(int g) {
+  kb.pick_group = g;
+  kb.pick_focus = 0;
+  std::string p = kb_picks(g);
+  std::string cap = kb_groups(kb.layout)[g];
+  for (auto &c : cap) c = (char) toupper(c);
+  lv_label_set_text(kb.pick_cap, cap.c_str());
+  for (int i = 0; i < 4; i++) {
+    show(kb.picks[i], i < (int) p.size());
+    if (i < (int) p.size()) {
+      char t[2] = {p[i], 0};
+      lv_label_set_text(lv_obj_get_child(kb.picks[i], 0), t);
+    }
+    lv_obj_set_style_bg_color(kb.picks[i], lv_color_hex(i == 0 ? 0x4A4A4C : GREY), 0);
+  }
+  show(kb.pick_root, true);
+}
+
+inline void kb_append(char c) {
+  if (kb.pw.size() < 63) kb.pw += c;
+  show(kb.pick_root, false);
+  kb.pick_group = -1;
+  if (kb.layout == 1) kb.layout = 0;   // one capital, like a phone
+  kb_paint();
+}
+
+// Keys: 0..7 groups, 8 shift, 9 space, 10 delete (drawn at slot 8 of the grid), 11 join.
+inline void kb_press(int k) {
+  if (k < 8) kb_open_pick(k);
+  else if (k == 8) kb.layout = (kb.layout + 1) % 4;
+  else if (k == 9) kb_append(' ');
+  else if (k == 10 && !kb.pw.empty()) kb.pw.pop_back();
+  else if (k == 11 && hooks.wifi_join) hooks.wifi_join(kb.ssid, kb.pw);
+  kb_paint();
+}
+
+inline void build_keypad(lv_obj_t *page) {
+  sp.kb = box(page, 0, 0, 240, 320, BG, LV_OPA_COVER);
+  lv_obj_t *back = nm(button(sp.kb, 4, 0, 146, 44, WHITE, LV_OPA_TRANSP, 9, [] { open_wifi(); }), "kb_back");
+  icon(back, "chev_left", 20, 2, 7, WHITE);
+  kb.title = text(back, 25, 10, 118, R.f17b, WHITE, "");
+  kb.field = nm(box(sp.kb, 12, 52, 160, 44, SHEET, LV_OPA_COVER, 10), "kb_field");
+  lv_obj_set_style_border_color(kb.field, lv_color_hex(BLUE), 0);
+  lv_obj_set_style_border_width(kb.field, 2, 0);
+  kb.dots = box(kb.field, 11, 16, 128, 8, WHITE, LV_OPA_TRANSP);
+  kb.last = text(kb.field, 11, 11, 0, R.f15b, WHITE, "");
+  kb.full = text(kb.field, 11, 12, 136, R.f15, WHITE, "");
+  kb.caret = box(kb.field, 11, 10, 2, 20, BLUE, LV_OPA_COVER);
+  lv_obj_t *eye = nm(button(sp.kb, 180, 52, 48, 44, CARD, LV_OPA_COVER, 12, [] {
+                       kb.show_pw = !kb.show_pw;
+                       kb_paint();
+                     }), "kb_eye");
+  kb.eye_icon = icon(eye, "eye", 20, 14, 12, WHITE);
+  // grid slots: 3 columns x 4 rows; slot -> key id
+  static const int SLOT_KEY[12] = {0, 1, 2, 3, 4, 5, 6, 7, 10, 8, 9, 11};
+  kb.keys.assign(12, nullptr);
+  kb.key_main.assign(8, nullptr);
+  kb.key_sub.assign(9, nullptr);
+  for (int slot = 0; slot < 12; slot++) {
+    int k = SLOT_KEY[slot];
+    int x = 12 + 75 * (slot % 3), y = 104 + 52 * (slot / 3);
+    lv_obj_t *b = nm(button(sp.kb, x, y, 66, 44, CARD, LV_OPA_COVER, 10, [k] { kb_press(k); }),
+                     "kb_key_" + std::to_string(k));
+    kb.keys[k] = b;
+    if (k < 8) {
+      kb.key_main[k] = text(b, 0, 6, 66, R.f15b, WHITE, "", LV_TEXT_ALIGN_CENTER);
+      kb.key_sub[k] = text(b, 0, 23, 66, R.f12, WHITE, "", LV_TEXT_ALIGN_CENTER, 178);
+    } else if (k == 8) {
+      icon(b, "shift", 20, 23, 3, WHITE);
+      kb.key_sub[8] = text(b, 0, 25, 66, R.f12, WHITE, "", LV_TEXT_ALIGN_CENTER, 178);
+    } else if (k == 9) {
+      lv_obj_center(text(b, 0, 0, 0, R.f13, WHITE, "space"));
+    } else if (k == 10) {
+      icon(b, "del", 20, 23, 12, WHITE);
+    } else {
+      lv_obj_center(text(b, 0, 0, 0, R.f14s, WHITE, "Join"));
+    }
+  }
+  // letter picker
+  kb.pick_root = dim_layer("kb_pick_dim");
+  lv_obj_t *card = nm(box(kb.pick_root, 4, 136, 232, 92, SHEET, LV_OPA_COVER, 14), "kb_pick");
+  lv_obj_add_flag(card, LV_OBJ_FLAG_CLICKABLE);
+  kb.pick_cap = text(card, 12, 8, 0, R.f12s, WHITE, "", LV_TEXT_ALIGN_LEFT, 184);
+  for (int i = 0; i < 4; i++) {
+    lv_obj_t *b = nm(button(card, 8 + 58 * i, 30, 48, 52, GREY, LV_OPA_COVER, 10, [i] {
+                       std::string p = kb_picks(kb.pick_group);
+                       if (i < (int) p.size()) kb_append(p[i]);
+                     }), "kb_pick_" + std::to_string(i));
+    lv_obj_center(text(b, 0, 0, 0, R.f20b, WHITE, ""));
+    kb.picks.push_back(b);
+  }
+  show(sp.kb, false);
+}
+
+inline void open_keypad(const std::string &ssid) {
+  kb.ssid = ssid;
+  kb.pw.clear();
+  kb.layout = 0;
+  kb.key_focus = 4;
+  kb.show_pw = false;
+  lv_label_set_text(kb.title, umote::sanitize(ssid, "Wi-Fi").c_str());
+  kb_paint();
+  show_settings_view(sp.kb);
+  set_focus_rows({});
+}
+
+inline bool keypad_open() { return sp.kb && !lv_obj_has_flag(sp.kb, LV_OBJ_FLAG_HIDDEN); }
+
+// D-pad, OK and Back on the Settings page (lists, keypad and its picker).
+inline void settings_key(const char *what) {
+  bool ok = !strcmp(what, "OK"), back = !strcmp(what, "BACK");
+  if (keypad_open()) {
+    if (kb.pick_group >= 0) {
+      int n = (int) kb_picks(kb.pick_group).size();
+      if (back) { show(kb.pick_root, false); kb.pick_group = -1; return; }
+      if (ok) { kb_append(kb_picks(kb.pick_group)[kb.pick_focus]); return; }
+      if (!strcmp(what, "LEFT") && kb.pick_focus > 0) kb.pick_focus--;
+      if (!strcmp(what, "RIGHT") && kb.pick_focus < n - 1) kb.pick_focus++;
+      for (int i = 0; i < 4; i++)
+        lv_obj_set_style_bg_color(kb.picks[i], lv_color_hex(i == kb.pick_focus ? 0x4A4A4C : GREY), 0);
+      return;
+    }
+    if (back) { open_wifi(); return; }
+    static const int SLOT_KEY[12] = {0, 1, 2, 3, 4, 5, 6, 7, 10, 8, 9, 11};
+    int slot = 0;
+    while (SLOT_KEY[slot] != kb.key_focus) slot++;
+    if (ok) { kb_press(kb.key_focus); return; }
+    int d = !strcmp(what, "LEFT") ? -1 : !strcmp(what, "RIGHT") ? 1 : !strcmp(what, "UP") ? -3 : 3;
+    if (slot + d >= 0 && slot + d < 12) kb.key_focus = SLOT_KEY[slot + d];
+    kb_paint();
+    return;
+  }
+  if (back) {
+    show_settings_view(sp.list);
+    return;
+  }
+  if (ok) {
+    if (sp.focus >= 0 && sp.focus < (int) sp.rows.size()) lv_obj_send_event(sp.rows[sp.focus], LV_EVENT_CLICKED, nullptr);
+    return;
+  }
+  int n = (int) sp.rows.size();
+  if (!n) return;
+  if (!strcmp(what, "UP")) sp.focus = std::max(0, sp.focus - 1);
+  else if (!strcmp(what, "DOWN")) sp.focus = std::min(n - 1, sp.focus + 1);
+  else if (sp.focus >= 0 && sp.rows[sp.focus] == lv_obj_get_parent(sp.bright->hit)) {   // brightness row
+    cfg.brightness = std::max(0.1f, std::min(1.0f, cfg.brightness + (!strcmp(what, "LEFT") ? -0.1f : 0.1f)));
+    refresh_settings();
+    if (hooks.settings_changed) hooks.settings_changed();
+  }
+  paint_set_focus();
+}
+
 // ---- pages -------------------------------------------------------------------------------------------------
 struct Pages {
   lv_obj_t *view;
@@ -979,10 +1457,13 @@ inline void build(lv_obj_t *view, std::array<lv_obj_t *, 4> pages) {
   build_tv(pg.page[0]);
   build_soundbar(pg.page[1]);
   build_home(pg.page[2]);
+  build_settings(pg.page[3]);
   build_status();
   build_sheets();
   build_options();
   build_picker();
+  build_keypad(pg.page[3]);
+  show_settings_view(sp.list);
   build_overlays();
 }
 

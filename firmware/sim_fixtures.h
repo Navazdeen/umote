@@ -1,6 +1,8 @@
 // Simulator only: canned Home Assistant data, picked with SIM_FIXTURE=<name>.
 #pragma once
 
+#include <cstdio>
+#include <cstdlib>
 #include <string>
 #include "ui_lv.h"
 
@@ -68,6 +70,33 @@ inline bool sim_load_fixture(const std::string &f, int64_t now_ms) {
     ui::show_page(2);
     if (f == "options_fan") ui::open_options(0);
     if (f == "picker") ui::open_page_picker(2);
+  } else if (f == "settings" || f == "wifi_scan" || f == "keypad" || f == "keypad_pick" || f == "about") {
+    ui::show_page(3);
+    if (f == "wifi_scan") {
+      ui::open_wifi();
+    } else if (f == "about") {
+      ui::open_about();
+    } else if (f != "settings") {
+      ui::open_keypad("NavazAirFiber");
+      ui::kb.pw = "navazde";
+      ui::kb_paint();
+      if (f == "keypad_pick") ui::kb_open_pick(4);
+    }
+  } else if (f == "keypad_type") {
+    // Type "abc1" with D-pad events only, then check the field.
+    ui::show_page(3);
+    ui::open_keypad("NavazAirFiber");
+    const char *seq[] = {"UP", "LEFT", "OK", "OK",                 // focus abc, open picker, a
+                         "OK", "RIGHT", "OK",                       // b
+                         "OK", "RIGHT", "RIGHT", "OK",              // c
+                         "DOWN", "DOWN", "DOWN", "OK", "OK",        // shift x2 -> 123
+                         "UP", "UP", "UP", "OK", "OK"};             // group "12", pick 1
+    for (const char *k : seq) ui::settings_key(k);
+    bool ok = ui::kb.pw == "abc1" && lv_obj_get_child_count(ui::kb.dots) == 3 &&
+              std::string(lv_label_get_text(ui::kb.last)) == "1";
+    printf("keypad_type: pw=%s dots=%u %s\n", ui::kb.pw.c_str(), (unsigned) lv_obj_get_child_count(ui::kb.dots),
+           ok ? "PASS" : "FAIL");
+    exit(ok ? 0 : 3);
   } else {
     return false;
   }

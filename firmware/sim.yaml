@@ -5,6 +5,7 @@
 #   SIM_STATE = normal | noboard | saver | critical     SIM_PAGE = 0..3     SIM_TOAST = text
 #   SIM_FIXTURE = art | noart_ps5 | off | live | long_title | stale | sheet | new_hdmi |
 #                 soundbar | home | home_focus_each | options_fan | picker
+#   SIM_TEXT = large    the Large text size
 #   SIM_DUMP = <path>   write the visible widget tree for tools/check_ui.py, then exit
 
 esphome:
@@ -13,46 +14,49 @@ esphome:
     - sim_fixtures.h
     - sim_dump.h
   on_boot:
-    priority: -100
-    then:
-      - lambda: |-
-          const char *s = getenv("SIM_STATE");
-          std::string st = s ? s : "normal";
-          id(g_board_ok) = st != "noboard";
-          id(g_batt_pct) = st == "critical" ? 4 : st == "saver" ? 18 : st == "noboard" ? 64 : 82;
-          id(g_batt_mv) = st == "critical" ? 3480 : st == "saver" ? 3660 : st == "noboard" ? 3830 : 3990;
-          id(g_mode) = st == "critical" ? 2 : st == "saver" ? 1 : 0;
-          id(g_net) = st == "normal" ? 3 : 0;
-          id(g_ssid) = "HomeNet"; id(g_ip) = "192.168.31.60"; id(g_rssi) = -58;
-          const char *fx = getenv("SIM_FIXTURE");
-          sim_load_fixture(fx ? fx : "art", millis());
-          const char *p = getenv("SIM_PAGE");
-          if (p) ui::show_page(atoi(p));
-      - script.execute: ui_refresh
-      - lambda: |-
-          const char *m = getenv("SIM_TOAST");
-          if (m) ui::toast(m);
-      - if:
-          condition:
-            lambda: 'return getenv("SIM_DUMP") != nullptr;'
-          then:
-            - delay: 1500ms
-            - lambda: |-
-                const char *fx = getenv("SIM_FIXTURE");
-                const char *st = getenv("SIM_STATE");
-                std::string screen = std::string(fx ? fx : "art") + "/" + (st ? st : "normal") + "/p" +
-                                     (getenv("SIM_PAGE") ? getenv("SIM_PAGE") : "0");
-                if (fx && std::string(fx) == "home_focus_each") {
-                  for (size_t i = 0; i < ui::hp.tiles.size(); i++) {
-                    ui::hp.focus = (int) i;
-                    ui::paint_focus();
-                    lv_refr_now(nullptr);
-                    sim_dump(getenv("SIM_DUMP"), (screen + "/focus" + std::to_string(i)).c_str());
+    - priority: 800
+      then:
+        - lambda: 'id(g_text_large) = getenv("SIM_TEXT") && std::string(getenv("SIM_TEXT")) == "large";'
+    - priority: -100
+      then:
+        - lambda: |-
+            const char *s = getenv("SIM_STATE");
+            std::string st = s ? s : "normal";
+            id(g_board_ok) = st != "noboard";
+            id(g_batt_pct) = st == "critical" ? 4 : st == "saver" ? 18 : st == "noboard" ? 64 : 82;
+            id(g_batt_mv) = st == "critical" ? 3480 : st == "saver" ? 3660 : st == "noboard" ? 3830 : 3990;
+            id(g_mode) = st == "critical" ? 2 : st == "saver" ? 1 : 0;
+            id(g_net) = st == "normal" ? 3 : 0;
+            id(g_ssid) = "HomeNet"; id(g_ip) = "192.168.31.60"; id(g_rssi) = -58;
+            const char *fx = getenv("SIM_FIXTURE");
+            sim_load_fixture(fx ? fx : "art", millis());
+            const char *p = getenv("SIM_PAGE");
+            if (p) ui::show_page(atoi(p));
+        - script.execute: ui_refresh
+        - lambda: |-
+            const char *m = getenv("SIM_TOAST");
+            if (m) ui::toast(m);
+        - if:
+            condition:
+              lambda: 'return getenv("SIM_DUMP") != nullptr;'
+            then:
+              - delay: 1500ms
+              - lambda: |-
+                  const char *fx = getenv("SIM_FIXTURE");
+                  const char *st = getenv("SIM_STATE");
+                  std::string screen = std::string(fx ? fx : "art") + "/" + (st ? st : "normal") + "/p" +
+                                       (getenv("SIM_PAGE") ? getenv("SIM_PAGE") : "0");
+                  if (fx && std::string(fx) == "home_focus_each") {
+                    for (size_t i = 0; i < ui::hp.tiles.size(); i++) {
+                      ui::hp.focus = (int) i;
+                      ui::paint_focus();
+                      lv_refr_now(nullptr);
+                      sim_dump(getenv("SIM_DUMP"), (screen + "/focus" + std::to_string(i)).c_str());
+                    }
+                  } else {
+                    sim_dump(getenv("SIM_DUMP"), screen.c_str());
                   }
-                } else {
-                  sim_dump(getenv("SIM_DUMP"), screen.c_str());
-                }
-                exit(0);
+                  exit(0);
 
 host:
 
@@ -102,6 +106,20 @@ script:
     parameters: { kind: string, entities: string, value: string }
     then:
       - logger.log: { format: "ha %s %s %s", args: [kind.c_str(), entities.c_str(), value.c_str()] }
+  - id: ui_wifi_scan
+    then:
+      - lambda: |-
+          ui::set_wifi_scan({{"NavazAirFiber_EXT", -33, true}, {"NavazAirFiber", -64, true},
+                             {"JioFiber-5G", -74, true}, {"NavazAirFiber", -70, true},
+                             {"Neighbour_2G_with_a_very_long_name", -85, true}, {"CafeGuest", -79, false}});
+  - id: ui_wifi_join
+    parameters: { ssid: string, password: string }
+    then:
+      - lambda: 'ui::toast("Join " + ssid);'
+  - id: ui_settings_changed
+    parameters: { restart: bool }
+    then:
+      - lambda: 'ui::toast(restart ? "Restart to apply" : "Saved");'
   - id: ui_page_shown
     parameters: { page: int }
     then:

@@ -53,7 +53,7 @@ inline void sim_dump_obj(FILE *f, const char *screen, lv_obj_t *obj, lv_area_t c
   bool gone = hidden || !on;
   if (name.empty()) name = std::string("anon@") + std::to_string(a.x1) + "," + std::to_string(a.y1);
   const char *text = nullptr;
-  int font_px = -1, text_w = -1;
+  int font_px = -1, text_w = -1, text_h = -1;
   if (lv_obj_check_type(obj, &lv_label_class)) {
     text = lv_label_get_text(obj);
     const lv_font_t *font = lv_obj_get_style_text_font(obj, LV_PART_MAIN);
@@ -63,6 +63,12 @@ inline void sim_dump_obj(FILE *f, const char *screen, lv_obj_t *obj, lv_area_t c
     lv_text_get_size(&sz, text, font, lv_obj_get_style_text_letter_space(obj, LV_PART_MAIN), 0, LV_COORD_MAX,
                      LV_TEXT_FLAG_NONE);
     lv_label_long_mode_t lm = lv_label_get_long_mode(obj);
+    if (lm == LV_LABEL_LONG_WRAP && lv_obj_get_style_height(obj, LV_PART_MAIN) != LV_SIZE_CONTENT) {
+      lv_point_t wsz;
+      lv_text_get_size(&wsz, text, font, lv_obj_get_style_text_letter_space(obj, LV_PART_MAIN),
+                       lv_obj_get_style_text_line_space(obj, LV_PART_MAIN), lv_area_get_width(&a), LV_TEXT_FLAG_NONE);
+      text_h = wsz.y;
+    }
     text_w = lm == LV_LABEL_LONG_WRAP || lm == LV_LABEL_LONG_DOT ? 0 : sz.x;
   }
   int outline = lv_obj_get_style_outline_width(obj, LV_PART_MAIN) + lv_obj_get_style_outline_pad(obj, LV_PART_MAIN);
@@ -72,14 +78,23 @@ inline void sim_dump_obj(FILE *f, const char *screen, lv_obj_t *obj, lv_area_t c
   if (!gone && !peek) {
     fprintf(f,
             "{\"screen\":\"%s\",\"obj\":\"%s\",\"x\":%d,\"y\":%d,\"w\":%d,\"h\":%d,\"clickable\":%s,\"hidden\":false,"
-            "\"text\":%s%s%s,\"font_px\":%d,\"text_w\":%d,\"outline\":%d,\"layer\":\"%s\"}\n",
+            "\"text\":%s%s%s,\"font_px\":%d,\"text_w\":%d,\"text_h\":%d,\"outline\":%d,\"layer\":\"%s\"}\n",
             screen, name.c_str(), (int) a.x1, (int) a.y1, (int) lv_area_get_width(&a), (int) lv_area_get_height(&a),
             clickable ? "true" : "false", text ? "\"" : "", text ? sim_json_escape(text).c_str() : "null",
-            text ? "\"" : "", font_px, text_w, outline, modal ? "modal" : "base");
+            text ? "\"" : "", font_px, text_w, text_h, outline, modal ? "modal" : "base");
   }
   if (gone) return;
-  for (uint32_t i = 0; i < lv_obj_get_child_count(obj); i++)
-    sim_dump_obj(f, screen, lv_obj_get_child(obj, i), vis, hidden, modal, peek);
+  // Children of a scrolling container that are not fully in view are scrolled away: skip them.
+  bool scroller = lv_obj_has_flag(obj, LV_OBJ_FLAG_SCROLLABLE) && obj != lv_screen_active() && obj != lv_layer_top();
+  for (uint32_t i = 0; i < lv_obj_get_child_count(obj); i++) {
+    lv_obj_t *c = lv_obj_get_child(obj, i);
+    if (scroller) {
+      lv_area_t ca;
+      lv_obj_get_coords(c, &ca);
+      if (ca.x1 < vis.x1 || ca.y1 < vis.y1 || ca.x2 > vis.x2 || ca.y2 > vis.y2) continue;
+    }
+    sim_dump_obj(f, screen, c, vis, hidden, modal, peek);
+  }
 }
 
 inline void sim_dump(const char *path, const char *screen) {

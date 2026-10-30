@@ -62,3 +62,11 @@ def test_cli(tmp_path, capsys):
     p.write_text("\n".join(json.dumps(o) for o in [obj("btn", 10, 10, 40, 44)]))
     assert main([str(p)]) == 1
     assert "target" in capsys.readouterr().out
+
+
+def test_wrapped_text_taller_than_box_fails():
+    o = obj("lbl", 10, 10, 80, 32, False, "Cabinet lights", 15, 0)
+    o["text_h"] = 40
+    assert "clipped" in kinds([o])
+    o["text_h"] = 32
+    assert not check([o])

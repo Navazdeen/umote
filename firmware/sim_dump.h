@@ -5,16 +5,16 @@
 #include <map>
 #include <string>
 #include "lvgl.h"
+#include "ui_lv.h"
 
-inline lv_obj_t *umote_obj(lv_obj_t *o) { return o; }
-template<class T> lv_obj_t *umote_obj(T *t) { return t->obj; }
-
-inline std::map<const lv_obj_t *, std::string> &sim_name_map() {
-  static std::map<const lv_obj_t *, std::string> m;
-  return m;
-}
+inline std::map<const lv_obj_t *, std::string> &sim_name_map() { return ui::names(); }
 inline std::map<const lv_font_t *, int> &sim_font_map() {
   static std::map<const lv_font_t *, int> m;
+  if (m.empty()) {
+    const ui::Res &r = ui::R;
+    m = {{r.f12, 12}, {r.f13, 13}, {r.f14, 14}, {r.f15, 15}, {r.f17, 17}, {r.f20, 20}, {r.f13b, 13},
+         {r.f15b, 15}, {r.f17b, 17}, {r.f20b, 20}, {r.f12s, 12}, {r.f14s, 14}};
+  }
   return m;
 }
 
@@ -62,7 +62,8 @@ inline void sim_dump_obj(FILE *f, const char *screen, lv_obj_t *obj, lv_area_t c
     lv_point_t sz;
     lv_text_get_size(&sz, text, font, lv_obj_get_style_text_letter_space(obj, LV_PART_MAIN), 0, LV_COORD_MAX,
                      LV_TEXT_FLAG_NONE);
-    text_w = lv_label_get_long_mode(obj) == LV_LABEL_LONG_WRAP ? 0 : sz.x;
+    lv_label_long_mode_t lm = lv_label_get_long_mode(obj);
+    text_w = lm == LV_LABEL_LONG_WRAP || lm == LV_LABEL_LONG_DOT ? 0 : sz.x;
   }
   int outline = lv_obj_get_style_outline_width(obj, LV_PART_MAIN) + lv_obj_get_style_outline_pad(obj, LV_PART_MAIN);
   // LVGL marks every object clickable; a real target also has an event handler.

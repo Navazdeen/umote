@@ -1,0 +1,13 @@
+{
+  "domain": "umote",
+  "name": "umote remote",
+  "after_dependencies": ["androidtv", "androidtv_remote", "cast"],
+  "codeowners": [],
+  "config_flow": true,
+  "dependencies": ["image", "media_player"],
+  "documentation": "https://github.com/navazdeen/umote",
+  "iot_class": "local_polling",
+  "requirements": ["Pillow"],
+  "single_config_entry": true,
+  "version": "0.1.0"
+}

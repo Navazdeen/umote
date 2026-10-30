@@ -1,0 +1,9 @@
+{
+  "config": {
+    "step": {"user": {"title": "umote remote", "description": "Set up the umote remote helper."}},
+    "abort": {"single_instance_allowed": "umote is already set up."}
+  },
+  "exceptions": {
+    "unknown_source": {"message": "Unknown source: {source_id}"}
+  }
+}

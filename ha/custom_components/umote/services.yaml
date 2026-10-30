@@ -1,0 +1,19 @@
+launch:
+  fields:
+    source_id:
+      required: true
+      example: hdmi1
+      selector:
+        text:
+name_source:
+  fields:
+    port:
+      required: true
+      selector:
+        number:
+          min: 1
+          max: 4
+    name:
+      required: true
+      selector:
+        text:

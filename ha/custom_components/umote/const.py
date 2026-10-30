@@ -49,3 +49,15 @@ UNUSED_AFTER_S = 30 * 86400
 # device name -> short display name, where the rule (strip area, sentence case) is not enough
 SHORT_NAMES = {"tv_cabinet": "Cabinet"}
 AREA_PREFIXES = ("living room ", "living_room_")
+
+TV_PLAYER = "media_player.navazdeen_2"   # androidtv_remote: play_media url/app
+SCAN_INTERVAL_S = 120
+WAKE_TIMEOUT_S = 15
+HOME_SETTLE_S = 1.5
+USE_AFTER_S = 10
+MAX_ATTR_BYTES = 3072
+
+CMD_TV_INPUT = "dumpsys tv_input"
+CMD_HDMI = "dumpsys hdmi_control"
+CMD_PACKAGES = ("cmd package query-activities --brief -a android.intent.action.MAIN "
+                "-c android.intent.category.LEANBACK_LAUNCHER")

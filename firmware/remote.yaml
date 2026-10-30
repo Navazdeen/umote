@@ -1,0 +1,712 @@
+# ESPHome firmware: ESP32-32E 2.4" (LCDwiki E32R24P) universal remote
+# Lines marked [CHECK] need a value from your hardware or a quick test.
+# The screens live in ui.yaml (shared with sim.yaml, the desktop simulator).
+#
+# Pin map (display board -> button board J5):
+#   IO1  SDA  (MCP23017)    IO5  SCL  (MCP23017)     IO35 INT  (MCP23017, wakes from sleep)
+#   IO18 MIC SCK            IO19 MIC WS              IO23 MIC SD
+#   IO27 IR transistor      IO34 battery voltage (on board, x2 divider)
+#   IO4  speaker amp shutdown (high = off, R11 pull-up)  IO21 backlight (R25 pull-down)
+#   IO22/IO16/IO17  on-board RGB LED (common anode, low = on)
+#   IO36 touch PENIRQ (R22 10k pull-up): second deep-sleep wake source
+#
+# Runs with or without the button board. At boot the MCP23017 either sets up or is
+# marked failed; without it the keys are ignored (a failed expander reads every pin
+# as low, i.e. "pressed"), the remote wakes on touch only (IO35 floats without the
+# board's pull-up), a banner says so, and I2C 0x20 is probed every 2 s while awake.
+# When the chip answers, the remote reboots into full mode.
+#
+# Power (2000 mAh, target: months). Measured on nothing yet, estimates only:
+#   deep sleep  ~100 uA board floor: ESP32 ~10, LDO ~45, battery divider 18.5,
+#               LCD in SLPIN ~10, XPT2046/MCP23017/INMP441 a few uA each.
+#               The CH340C runs from 3V3 all the time and is NOT in that figure:
+#               measure it, and lift its VCC pin if sleep current is over ~1 mA.
+#   IR key      ~0.5 s awake, WiFi stays off                  ~0.01 mAh
+#   WiFi key    ~3 s awake (WiFi + HA)                         ~0.1 mAh
+#   touch use   20 s (8 s in saver), backlight 70 % (25 %)
+# Ways the firmware saves power:
+#   - WiFi is off at boot and starts only for Android TV keys, voice, or "stay awake".
+#   - CPU scales 80..240 MHz (ESP-IDF DFS): 240 only for 1.5 s after any input.
+#   - The LCD gets SLPIN before sleep (ESPHome powerdown hook); the backlight, LED,
+#     IR, amp and mic-clock pins are held in their off state through deep sleep.
+#   - No ROM boot log on wake (also keeps UART0 TX = SDA quiet), no image
+#     re-validation on wake, QIO 80 MHz flash: shorter wakes.
+#   - Battery read once per wake before the backlight is on (no-load voltage).
+#   - <= 20 %: ultra saver (25 % backlight, 8 s timeout, no voice). <= 5 %: IR only.
+
+substitutions:
+  name: tv-remote
+  relay_host: 192.168.31.128     # box running voice_relay.py [CHECK]
+  relay_port: "7777"
+  static_ip: 192.168.31.60       # [CHECK]
+  stb_nec_address: "0x0000"      # set-top box NEC address [CHECK: capture]
+  key_mask: "0xDDFF"             # the 14 key bits used in pinmap.json
+
+esphome:
+  name: ${name}
+  includes:
+    - <esp_pm.h>
+  on_boot:
+    - priority: 800              # as early as possible
+      then:
+        - lambda: |-
+            // release the pins held through deep sleep; the amp stays off via R11
+            for (auto p : {GPIO_NUM_27, GPIO_NUM_4, GPIO_NUM_18, GPIO_NUM_21, GPIO_NUM_22, GPIO_NUM_16, GPIO_NUM_17})
+              gpio_hold_dis(p);
+            gpio_deep_sleep_hold_dis();
+            // dynamic frequency scaling: 80 MHz when idle, 240 MHz while a PM lock is held.
+            // APB stays at 80 MHz across that range, so LEDC, RMT and SPI timing don't move.
+            esp_pm_config_t pm = {.max_freq_mhz = 240, .min_freq_mhz = 80, .light_sleep_enable = false};
+            esp_pm_configure(&pm);
+            esp_pm_lock_create(ESP_PM_CPU_FREQ_MAX, 0, "ui", &id(g_pm_lock));
+            esp_pm_lock_acquire(id(g_pm_lock));      // full speed for boot and first render
+            id(g_fast) = true;
+        - output.turn_on: amp_off
+    - priority: 550              # I2C, MCP23017 and ADC are set up
+      then:
+        - lambda: |-
+            id(g_board_ok) = !id(mcp).is_failed();
+            switch (esp_sleep_get_wakeup_cause()) {
+              case ESP_SLEEP_WAKEUP_EXT0: id(g_wake) = 1; break;
+              case ESP_SLEEP_WAKEUP_EXT1: id(g_wake) = 2; break;
+              case ESP_SLEEP_WAKEUP_TIMER: id(g_wake) = 3; break;
+              default:                    // power-on, reset, or our own reboot after a probe hit
+                id(g_wake) = esp_reset_reason() == ESP_RST_SW ? 2 : 0;
+                id(g_autoprobe) = esp_reset_reason() != ESP_RST_SW;
+            }
+            if (id(g_board_ok) && id(g_wake) == 1) {
+              // INTCAP holds the port state latched at the moment of the press,
+              // so a quick tap that's already released is still seen.
+              uint8_t a = 0xFF, b = 0xFF;
+              id(mcp).read_byte(0x10, &a);           // INTCAPA
+              id(mcp).read_byte(0x11, &b);           // INTCAPB
+              id(g_wake_keys) = (uint16_t) ~((b << 8) | a) & ${key_mask};
+            }
+            id(board_present).publish_state(id(g_board_ok));
+        - component.update: batt_v   # before the backlight is on: no-load voltage
+    - priority: -100             # LVGL is drawing
+      then:
+        - script.execute: ui_refresh
+        - script.execute: start_session
+
+esp32:
+  board: esp32dev
+  cpu_frequency: 240MHZ
+  flash_size: 4MB
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_PM_ENABLE: y                              # DFS (see on_boot)
+      CONFIG_BOOTLOADER_SKIP_VALIDATE_IN_DEEP_SLEEP: y # faster wake
+      CONFIG_BOOTLOADER_LOG_LEVEL_NONE: y
+      CONFIG_ESPTOOLPY_FLASHMODE_QIO: y                # WROOM-32E flash does QIO at 80 MHz
+      CONFIG_ESPTOOLPY_FLASHFREQ_80M: y
+
+logger:
+  baud_rate: 0                   # IO1 is SDA: no logs over UART, use WiFi logs
+  level: DEBUG                   # bring-up; back to INFO once WiFi on IO1 is confirmed
+
+api:
+  reboot_timeout: 0s             # WiFi is off most of the time; never reboot for that
+  on_client_connected:
+    - lambda: 'id(g_net) = 3;'
+    - script.execute: ui_refresh
+  on_client_disconnected:
+    - lambda: 'id(g_net) = id(g_net) ? 2 : 0;'
+    - script.execute: ui_refresh
+
+ota:
+  - platform: esphome
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  enable_on_boot: false          # started on demand by net_up
+  reboot_timeout: 0s
+  fast_connect: true             # skip the scan on wake
+  power_save_mode: light
+  output_power: 13dB             # one room from the AP; less TX current [CHECK range]
+  manual_ip:                     # static IP avoids DHCP time on every wake
+    static_ip: ${static_ip}
+    gateway: 192.168.31.1
+    subnet: 255.255.255.0
+  on_connect:
+    - lambda: |-
+        if (id(g_net) < 2) id(g_net) = 2;
+        id(read_wifi).execute();
+    - script.execute: ui_refresh
+  on_disconnect:
+    - lambda: 'if (id(g_net)) id(g_net) = 1;'
+    - script.execute: ui_refresh
+
+packages:
+  ui: !include ui.yaml
+
+globals:
+  - { id: g_wake_keys, type: uint16_t, initial_value: '0' }
+  - { id: g_armed, type: bool, initial_value: 'true' }      # false until the waking tap is released
+  - { id: g_touched, type: bool, initial_value: 'false' }   # touched since this wake
+  - { id: g_awake_until, type: uint32_t, initial_value: '0' }  # millis(); sleep is held off until then
+  - { id: g_bright, type: float, initial_value: '0.7' }
+  - { id: g_idle_ms, type: uint32_t, initial_value: '20000' }
+  - { id: g_fast, type: bool, initial_value: 'false' }      # PM lock held (CPU at 240 MHz)
+  - { id: g_autoprobe, type: bool, initial_value: 'true' }  # interval may auto-reboot on a probe hit
+  - { id: g_pm_lock, type: esp_pm_lock_handle_t, initial_value: 'nullptr' }
+
+# ---------------------------------------------------------------- power
+deep_sleep:
+  id: sleeper                    # IO35 (key) wake is armed in go_to_sleep: the MCP23017 owns that pin
+  esp32_ext1_wakeup:             # touch: XPT2046 PENIRQ, active low, R22 pull-up
+    mode: ALL_LOW
+    pins:
+      - number: GPIO36
+        allow_other_uses: true
+
+output:
+  - platform: gpio
+    id: amp_off
+    pin: GPIO4                   # high = SC8002B shut down
+  - platform: ledc
+    id: backlight_pwm
+    pin: GPIO21
+  - { platform: ledc, id: led_r, pin: { number: GPIO22, inverted: true } }
+  - { platform: ledc, id: led_g, pin: { number: GPIO16, inverted: true } }
+  - { platform: ledc, id: led_b, pin: { number: GPIO17, inverted: true } }
+
+light:
+  - platform: monochromatic
+    id: backlight
+    output: backlight_pwm
+    restore_mode: ALWAYS_OFF     # turned on after LVGL has drawn the first frame
+    default_transition_length: 0s
+  - platform: rgb
+    id: status_led
+    red: led_r
+    green: led_g
+    blue: led_b
+    restore_mode: ALWAYS_OFF
+    default_transition_length: 0s
+    effects:
+      - pulse: { name: listening, transition_length: 400ms, update_interval: 400ms }
+
+sensor:
+  - platform: adc
+    id: batt_v
+    name: Battery voltage
+    pin: GPIO34
+    attenuation: 12db
+    samples: 16
+    update_interval: 60s
+    accuracy_decimals: 2
+    filters:
+      - multiply: 2.0            # R2/R3 100k/100k halve the cell voltage [CHECK against a meter]
+    on_value:
+      - lambda: |-
+          // resting LiPo curve
+          static const float V[] = {3.30, 3.50, 3.61, 3.67, 3.71, 3.75, 3.80, 3.85, 3.92, 4.00, 4.10, 4.20};
+          static const int P[] = {0, 5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100};
+          int pct = x >= V[11] ? 100 : 0;
+          for (int i = 1; i < 12; i++)
+            if (x < V[i]) { pct = x <= V[0] ? 0 : P[i-1] + (int) ((x - V[i-1]) / (V[i] - V[i-1]) * (P[i] - P[i-1])); break; }
+          id(g_batt_pct) = pct;
+          id(g_batt_mv) = (int) (x * 1000);
+          id(batt_pct).publish_state(pct);
+          // mode with hysteresis, remembered across deep sleep
+          static RTC_DATA_ATTR int8_t last = 0;
+          int m = last;
+          if (pct <= 5) m = 2;
+          else if (m == 2 && pct >= 9) m = 1;
+          if (m != 2) { if (pct <= 20) m = 1; else if (pct >= 25) m = 0; }
+          if (m > last && m == 1) id(ui_toast).execute(std::string("Ultra power saver on"));
+          last = m;
+          id(g_mode) = m;
+          static const char *const NAME[] = {"Normal", "Ultra saver", "Critical"};
+          id(power_mode).publish_state(NAME[m]);
+      - script.execute: ui_refresh
+  - platform: template
+    id: batt_pct
+    name: Battery
+    unit_of_measurement: "%"
+    device_class: battery
+    accuracy_decimals: 0
+    update_interval: never
+
+text_sensor:
+  - platform: template
+    id: power_mode
+    name: Power mode
+    entity_category: diagnostic
+    update_interval: never
+
+# ---------------------------------------------------------------- session
+script:
+  - id: start_session
+    then:
+      - if:
+          condition:             # woken by a key release: nothing to do, back to sleep dark
+            lambda: 'return id(g_wake) == 1 && id(g_wake_keys) == 0;'
+          then:
+            - script.execute: go_to_sleep
+          else:
+            - lambda: |-
+                if (id(g_wake) == 2) id(g_armed) = false;   // the waking tap isn't a button press
+                if (id(g_wake) == 0) id(g_awake_until) = millis() + 180000;   // OTA window after power-on
+            - script.execute: idle_timer
+            - if:
+                condition:
+                  lambda: 'return !id(g_board_ok);'
+                then:
+                  - logger.log: { level: WARN, format: "Button board (MCP23017 @ 0x20) not found: touch-only mode" }
+                  - light.turn_on: { id: status_led, red: 100%, green: 55%, blue: 0%, brightness: 30% }
+                  - delay: 150ms
+                  - light.turn_off: status_led
+            - if:
+                condition:
+                  lambda: 'return id(g_wake) == 0;'
+                then:
+                  - script.execute: net_up
+                  - script.execute: { id: ui_toast, text: "Awake 3 min for OTA" }
+            - lambda: |-
+                for (int k = 0; k < 16; k++)
+                  if (id(g_wake_keys) & (1 << k)) id(press).execute(k);
+
+  # Every input restarts this. Backlight and timeout depend on how we woke and the battery.
+  - id: idle_timer
+    mode: restart
+    then:
+      - script.stop: go_to_sleep
+      - lambda: |-
+          bool full = id(g_touched) || id(g_wake) != 1;       // a key wake gets a dim glance only
+          float b = id(g_mode) ? 0.25f : 0.7f;                  // [CHECK] to taste
+          id(g_bright) = full ? b : std::min(b, 0.2f);
+          id(g_idle_ms) = !full ? 6000 : id(g_mode) ? 8000 : 20000;
+          if (!id(g_fast)) { esp_pm_lock_acquire(id(g_pm_lock)); id(g_fast) = true; }
+      - light.turn_on: { id: backlight, brightness: !lambda 'return id(g_bright);' }
+      - delay: 1500ms
+      - lambda: 'if (id(g_fast)) { esp_pm_lock_release(id(g_pm_lock)); id(g_fast) = false; }'
+      - delay: !lambda 'return id(g_idle_ms) - 4500;'
+      - light.turn_on: { id: backlight, brightness: 6% }
+      - delay: 3s
+      - script.execute: go_to_sleep
+
+  - id: go_to_sleep
+    mode: single
+    then:
+      - wait_until:              # "stay awake" / OTA window, and work in flight
+          condition:
+            lambda: 'return millis() >= id(g_awake_until) && !id(tv_key).is_running() && !id(voice_start).is_running();'
+      - lambda: 'id(g_stay) = false;'
+      - wait_until:              # no finger on the screen, no key held: else the release wakes us again
+          condition:
+            lambda: |-
+              return gpio_get_level(GPIO_NUM_36) && (!id(g_board_ok) || [] {
+                  uint8_t a = 0xFF, b = 0xFF;   // GPIOA/B; reading also clears INT
+                  id(mcp).read_byte(0x12, &a);
+                  id(mcp).read_byte(0x13, &b);
+                  return (~((b << 8) | a) & ${key_mask}) == 0;
+                }());
+          timeout: 3s
+      - light.turn_off: backlight
+      - light.turn_off: status_led
+      - lambda: |-
+          bool stuck = !(gpio_get_level(GPIO_NUM_36) && (!id(g_board_ok) || [] {
+            uint8_t a = 0xFF, b = 0xFF;   // GPIOA/B; reading also clears INT
+            id(mcp).read_byte(0x12, &a);
+            id(mcp).read_byte(0x13, &b);
+            return (~((b << 8) | a) & ${key_mask}) == 0;
+          }()));
+          // key wake: MCP23017 INTA, active low, 10k pull-up on the button board. Not armed when
+          // the board is missing (IO35 floats) or a key is jammed (it would wake at once).
+          if (id(g_board_ok) && !stuck)
+            esp_sleep_enable_ext0_wakeup(GPIO_NUM_35, 0);
+          if (stuck)
+            id(sleeper).set_sleep_duration(10 * 60 * 1000);   // look again in 10 min
+          // drive or release every pin into its zero-current state and hold it through sleep
+          auto drive = [](gpio_num_t p, int level) {
+            gpio_reset_pin(p);
+            gpio_set_pull_mode(p, GPIO_FLOATING);
+            gpio_set_level(p, level);
+            gpio_set_direction(p, GPIO_MODE_OUTPUT);
+            gpio_hold_en(p);
+          };
+          drive(GPIO_NUM_27, 0);     // IR transistor off
+          drive(GPIO_NUM_4, 1);      // amp shut down
+          drive(GPIO_NUM_21, 0);     // backlight off
+          drive(GPIO_NUM_18, 0);     // mic SCK stopped: INMP441 sleeps
+          drive(GPIO_NUM_22, 1);     // RGB LED off (common anode)
+          drive(GPIO_NUM_16, 1);
+          drive(GPIO_NUM_17, 1);
+          // IO19 (WS) and IO23 (SD) have 10k pull-ups from the SD slot: leave them inputs, never low
+          gpio_reset_pin(GPIO_NUM_19);
+          gpio_set_pull_mode(GPIO_NUM_19, GPIO_FLOATING);
+          gpio_reset_pin(GPIO_NUM_23);
+          gpio_set_pull_mode(GPIO_NUM_23, GPIO_FLOATING);
+          gpio_deep_sleep_hold_en();
+          esp_deep_sleep_disable_rom_logging();
+          if (id(g_board_ok)) {      // reading GPIOA/B clears a pending INT so IO35 is high
+            uint8_t v;
+            id(mcp).read_byte(0x12, &v);
+            id(mcp).read_byte(0x13, &v);
+          }
+      - deep_sleep.enter: sleeper    # LCD gets SLPIN in the powerdown hook
+
+  # Shared by every key: 0..15 are MCP23017 bit numbers (pinmap.json), the rest are touch-only.
+  - id: press
+    parameters: { k: int }
+    then:
+      - script.execute: idle_timer
+      - lambda: |-
+          auto tv = [](const char *cmd, const char *label) {
+            id(ui_toast).execute(std::string(label));
+            id(tv_key).execute(std::string(cmd));
+          };
+          // Sony SIRC 15-bit (soundbar) and NEC (set-top box). 0 = not captured yet.
+          // Capture real codes with remote_receiver dump: all [CHECK]
+          auto sb = [](int code, const char *label) {
+            id(ui_toast).execute(std::string(code ? label : "Soundbar code not captured yet"));
+            if (code) id(sb_ir).execute(code);
+          };
+          auto stb = [](int code, const char *label) {
+            id(ui_toast).execute(std::string(code ? label : "Set-top box code not captured yet"));
+            if (code) id(stb_ir).execute(code);
+          };
+          auto home = [](const char *name) {
+            ESP_LOGI("home", "mock tile: %s", name);
+            id(ui_toast).execute(std::string("Mock: ") + name);
+          };
+          switch (k) {
+            case 0:  tv("DPAD_RIGHT", ""); break;
+            case 1:  id(voice_start).execute(); break;
+            case 2:  tv("HOME", " Home"); break;
+            case 3:  tv("DPAD_DOWN", ""); break;
+            case 4:  tv("DPAD_CENTER", "OK"); break;
+            case 5:  tv("DPAD_UP", ""); break;
+            case 6:  tv("DPAD_LEFT", ""); break;
+            case 7:  tv("BACK", " Back"); break;
+            case 8:  id(ui_toast).execute(std::string(" Power all")); id(key_power).execute(); break;
+            case 10: case 23: sb(0x640C, " Vol -"); break;
+            case 11: case 25: sb(0x240C, " Vol +"); break;
+            case 14: case 24: sb(0x140C, " Mute"); break;
+            case 20: sb(0x540C, " Soundbar"); break;
+            case 21: sb(0, "Input"); break;
+            case 22: sb(0, "Sound mode"); break;
+            case 12: case 33: stb(0, "CH -"); break;
+            case 15: case 35: stb(0, "CH +"); break;
+            case 30: stb(0, " Set-top box"); break;
+            case 31: stb(0, "Guide"); break;
+            case 32: stb(0, "Menu"); break;
+            case 34: stb(0, "OK"); break;
+            case 50: home("Lights"); break;
+            case 51: home("Fan"); break;
+            case 52: home("AC"); break;
+            case 53: home("Curtains"); break;
+            case 54: home("Movie scene"); break;
+            case 55: home("All off"); break;
+            case 90:
+              if ([] { uint8_t r = 0x00, v;   // IODIRA: a real read, not an empty write
+              return id(i2c_bus).write_readv(0x20, &r, 1, &v, 1) == i2c::ERROR_OK; }()) { id(board_found).execute(); }
+              else id(ui_toast).execute(std::string("Still no MCP23017 at 0x20"));
+              break;
+            case 91:
+              id(g_stay) = !id(g_stay);
+              id(g_awake_until) = id(g_stay) ? millis() + 600000 : 0;
+              if (id(g_stay)) id(net_up).execute();
+              id(ui_toast).execute(std::string(id(g_stay) ? "Awake 10 min, WiFi on" : "Sleep allowed"));
+              id(ui_refresh).execute();
+              break;
+            case 92:
+              id(g_stay) = false;
+              id(g_awake_until) = 0;
+              id(go_to_sleep).execute();
+              break;
+          }
+
+  # Touch entry points used by ui.yaml
+  - id: ui_press
+    parameters: { k: int }
+    then:
+      - lambda: 'if (id(g_armed)) id(press).execute(k);'
+  - id: ui_voice
+    parameters: { active: bool }
+    then:
+      - lambda: |-
+          if (!id(g_armed)) return;
+          if (active) id(voice_start).execute(); else id(voice_stop).execute();
+
+  # Bring WiFi up once; it then stays up until sleep.
+  - id: net_up
+    then:
+      - if:
+          condition:
+            lambda: 'return id(g_net) == 0;'
+          then:
+            - lambda: |-
+                id(g_net) = 1;
+                ESP_LOGD("net", "WiFi on; internal DMA heap free %u, largest block %u",
+                         heap_caps_get_free_size(MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL),
+                         heap_caps_get_largest_free_block(MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL));
+            - wifi.enable:
+            - script.execute: ui_refresh
+
+  # Android TV keys go through HA's Android TV Remote integration
+  - id: tv_key
+    mode: queued
+    max_runs: 6
+    parameters: { command: string }
+    then:
+      - if:
+          condition:
+            lambda: 'return id(g_mode) == 2;'
+          then:
+            - script.execute: { id: ui_toast, text: "Battery critical: WiFi keys off" }
+          else:
+            - script.execute: net_up
+            - wait_until: { condition: api.connected, timeout: 6s }
+            - if:
+                condition: api.connected
+                then:
+                  - script.execute: flash_wifi
+                  - homeassistant.action:
+                      action: remote.send_command
+                      data:
+                        entity_id: remote.android_tv     # [CHECK]
+                      data_template:
+                        command: "{{ cmd }}"
+                      variables:
+                        cmd: !lambda 'return command;'
+                  - delay: 150ms                         # let it leave before a possible sleep
+                else:
+                  - script.execute: { id: ui_toast, text: "TV unreachable (no HA link)" }
+
+  - id: key_power
+    then:
+      # one press: TV + soundbar + set-top box all off/on
+      - script.execute: { id: tv_key, command: POWER }
+      - script.execute: { id: sb_ir, code: 0x540C }      # soundbar power [CHECK code]
+      # set-top box power: add its NEC command here once captured [CHECK]
+
+  - id: sb_ir
+    mode: queued
+    max_runs: 4
+    parameters: { code: int }
+    then:
+      - script.execute: flash_ir
+      - remote_transmitter.transmit_sony:
+          data: !lambda 'return code;'
+          nbits: 15
+          repeat: { times: 3, wait_time: 20ms }          # Sony gear wants the frame 3x
+
+  - id: stb_ir
+    mode: queued
+    max_runs: 4
+    parameters: { code: int }
+    then:
+      - script.execute: flash_ir
+      - remote_transmitter.transmit_nec:
+          address: ${stb_nec_address}
+          command: !lambda 'return (uint16_t) code;'
+
+  - id: voice_start
+    mode: restart
+    then:
+      - if:
+          condition:
+            lambda: 'return id(g_mode) >= 1;'
+          then:
+            - script.execute: { id: ui_toast, text: "Voice is off in power saver" }
+          else:
+            - script.execute: net_up
+            - microphone.capture: mic   # starts buffering at once; sent when WiFi is up
+            - light.turn_on: { id: status_led, red: 0%, green: 30%, blue: 100%, brightness: 50%, effect: listening }
+            - script.execute: { id: ui_toast, text: "Listening..." }
+            - delay: 15s                # hard stop if the release is missed
+            - script.execute: voice_stop
+  - id: voice_stop
+    then:
+      - microphone.stop_capture: mic
+      - light.turn_off: status_led
+
+  # SSID, IP and signal for the Status tab
+  - id: read_wifi
+    then:
+      - lambda: |-
+          auto *w = wifi::global_wifi_component;
+          char ssid[wifi::SSID_BUFFER_SIZE], ip[network::IP_ADDRESS_BUFFER_SIZE];
+          id(g_ssid) = w->wifi_ssid_to(ssid);
+          id(g_ip) = w->wifi_sta_ip_addresses()[0].str_to(ip);
+          id(g_rssi) = w->wifi_rssi();
+          ESP_LOGD("net", "connected to %s, %s, %d dBm", ssid, ip, id(g_rssi));
+
+  - id: board_found
+    then:
+      - script.execute: { id: ui_toast, text: "Button board found - restarting" }
+      - delay: 1500ms
+      - lambda: 'App.safe_reboot();'
+
+  # Feedback: short green = IR sent, short blue = sent over WiFi
+  - id: flash_ir
+    mode: restart
+    then:
+      - light.turn_on: { id: status_led, red: 0%, green: 100%, blue: 0%, brightness: 35% }
+      - delay: 60ms
+      - light.turn_off: status_led
+  - id: flash_wifi
+    mode: restart
+    then:
+      - light.turn_on: { id: status_led, red: 0%, green: 0%, blue: 100%, brightness: 35% }
+      - delay: 60ms
+      - light.turn_off: status_led
+
+interval:
+  - interval: 2s                 # only while awake
+    then:
+      - lambda: |-
+          if (id(g_net) >= 2) {      // keep the signal reading fresh; redraw only on a real change
+            int r = wifi::global_wifi_component->wifi_rssi();
+            if (abs(r - id(g_rssi)) >= 3) { id(g_rssi) = r; id(ui_refresh).execute(); }
+          }
+          if (!id(g_board_ok)) {
+            // after one probe-triggered reboot that still failed, only the Rescan button retries
+            if (id(g_autoprobe) && [] { uint8_t r = 0x00, v;   // IODIRA: a real read, not an empty write
+                return id(i2c_bus).write_readv(0x20, &r, 1, &v, 1) == i2c::ERROR_OK; }())
+              id(board_found).execute();
+          } else if (id(mcp).status_has_warning()) {
+            // the board went away while running: stop trusting its reads
+            id(g_board_ok) = false;
+            id(board_present).publish_state(false);
+            id(ui_toast).execute(std::string("Button board lost"));
+            id(ui_refresh).execute();
+          }
+
+# ---------------------------------------------------------------- buttons
+i2c:
+  id: i2c_bus
+  sda: GPIO1
+  scl: GPIO5
+  frequency: 400kHz
+  scan: false
+
+mcp23017:
+  - id: mcp
+    address: 0x20
+    open_drain_interrupt: true   # INTA is wired to IO35 with a 10k pull-up
+    interrupt_pin: GPIO35        # also makes ESPHome set IOCON.MIRROR, so port-B keys
+                                 # (POWER, VOL, CH, MUTE) reach INTA and can wake the ESP32
+
+binary_sensor:
+  - platform: template
+    id: board_present
+    name: Button board
+    device_class: connectivity
+    entity_category: diagnostic
+
+  # Bit numbers from pcb/fab/pinmap.json (GPA0..7 = 0..7, GPB0 = 8).
+  # The filter drops every reading while the board is missing.
+  - { platform: gpio, id: k_right, pin: { mcp23xxx: mcp, number: 0, mode: { input: true, pullup: true }, inverted: true, interrupt: CHANGE },
+      filters: [ lambda: 'if (!id(g_board_ok)) return {}; return x;', delayed_on: 10ms ], on_press: [ script.execute: { id: press, k: 0 } ] }
+  - platform: gpio
+    id: k_voice
+    pin: { mcp23xxx: mcp, number: 1, mode: { input: true, pullup: true }, inverted: true, interrupt: CHANGE }
+    filters: [ lambda: 'if (!id(g_board_ok)) return {}; return x;', delayed_on: 10ms ]
+    on_press: [ script.execute: idle_timer, script.execute: voice_start ]
+    on_release: [ script.execute: voice_stop ]
+  - { platform: gpio, id: k_home, pin: { mcp23xxx: mcp, number: 2, mode: { input: true, pullup: true }, inverted: true, interrupt: CHANGE },
+      filters: [ lambda: 'if (!id(g_board_ok)) return {}; return x;', delayed_on: 10ms ], on_press: [ script.execute: { id: press, k: 2 } ] }
+  - { platform: gpio, id: k_down, pin: { mcp23xxx: mcp, number: 3, mode: { input: true, pullup: true }, inverted: true, interrupt: CHANGE },
+      filters: [ lambda: 'if (!id(g_board_ok)) return {}; return x;', delayed_on: 10ms ], on_press: [ script.execute: { id: press, k: 3 } ] }
+  - { platform: gpio, id: k_ok, pin: { mcp23xxx: mcp, number: 4, mode: { input: true, pullup: true }, inverted: true, interrupt: CHANGE },
+      filters: [ lambda: 'if (!id(g_board_ok)) return {}; return x;', delayed_on: 10ms ], on_press: [ script.execute: { id: press, k: 4 } ] }
+  - { platform: gpio, id: k_up, pin: { mcp23xxx: mcp, number: 5, mode: { input: true, pullup: true }, inverted: true, interrupt: CHANGE },
+      filters: [ lambda: 'if (!id(g_board_ok)) return {}; return x;', delayed_on: 10ms ], on_press: [ script.execute: { id: press, k: 5 } ] }
+  - { platform: gpio, id: k_left, pin: { mcp23xxx: mcp, number: 6, mode: { input: true, pullup: true }, inverted: true, interrupt: CHANGE },
+      filters: [ lambda: 'if (!id(g_board_ok)) return {}; return x;', delayed_on: 10ms ], on_press: [ script.execute: { id: press, k: 6 } ] }
+  - { platform: gpio, id: k_back, pin: { mcp23xxx: mcp, number: 7, mode: { input: true, pullup: true }, inverted: true, interrupt: CHANGE },
+      filters: [ lambda: 'if (!id(g_board_ok)) return {}; return x;', delayed_on: 10ms ], on_press: [ script.execute: { id: press, k: 7 } ] }
+  - { platform: gpio, id: k_power, pin: { mcp23xxx: mcp, number: 8, mode: { input: true, pullup: true }, inverted: true, interrupt: CHANGE },
+      filters: [ lambda: 'if (!id(g_board_ok)) return {}; return x;', delayed_on: 10ms ], on_press: [ script.execute: { id: press, k: 8 } ] }
+  - { platform: gpio, id: k_vol_down, pin: { mcp23xxx: mcp, number: 10, mode: { input: true, pullup: true }, inverted: true, interrupt: CHANGE },
+      filters: [ lambda: 'if (!id(g_board_ok)) return {}; return x;', delayed_on: 10ms ], on_press: [ script.execute: { id: press, k: 10 } ] }
+  - { platform: gpio, id: k_vol_up, pin: { mcp23xxx: mcp, number: 11, mode: { input: true, pullup: true }, inverted: true, interrupt: CHANGE },
+      filters: [ lambda: 'if (!id(g_board_ok)) return {}; return x;', delayed_on: 10ms ], on_press: [ script.execute: { id: press, k: 11 } ] }
+  - { platform: gpio, id: k_ch_down, pin: { mcp23xxx: mcp, number: 12, mode: { input: true, pullup: true }, inverted: true, interrupt: CHANGE },
+      filters: [ lambda: 'if (!id(g_board_ok)) return {}; return x;', delayed_on: 10ms ], on_press: [ script.execute: { id: press, k: 12 } ] }
+  - { platform: gpio, id: k_mute, pin: { mcp23xxx: mcp, number: 14, mode: { input: true, pullup: true }, inverted: true, interrupt: CHANGE },
+      filters: [ lambda: 'if (!id(g_board_ok)) return {}; return x;', delayed_on: 10ms ], on_press: [ script.execute: { id: press, k: 14 } ] }
+  - { platform: gpio, id: k_ch_up, pin: { mcp23xxx: mcp, number: 15, mode: { input: true, pullup: true }, inverted: true, interrupt: CHANGE },
+      filters: [ lambda: 'if (!id(g_board_ok)) return {}; return x;', delayed_on: 10ms ], on_press: [ script.execute: { id: press, k: 15 } ] }
+
+# ---------------------------------------------------------------- IR
+remote_transmitter:
+  pin: GPIO27
+  carrier_duty_percent: 33%
+  non_blocking: true
+
+# ---------------------------------------------------------------- voice
+i2s_audio:
+  - id: i2s_mic
+    i2s_lrclk_pin: GPIO19
+    i2s_bclk_pin: GPIO18
+
+microphone:
+  - platform: i2s_audio
+    id: mic
+    i2s_audio_id: i2s_mic
+    i2s_din_pin: GPIO23
+    adc_type: external
+    pdm: false
+    channel: left                # L/R pin of the INMP441 tied to GND
+    sample_rate: 16000
+    bits_per_sample: 32bit
+    on_data:
+      - udp.write:
+          id: voice_udp
+          data: !lambda 'return x;'
+
+udp:
+  - id: voice_udp
+    addresses: ["${relay_host}"]
+    port: ${relay_port}
+
+# ---------------------------------------------------------------- display + touch
+spi:
+  - id: lcd_spi                  # IO14/IO13 are HSPI's IOMUX pins: 80 MHz is possible
+    clk_pin: GPIO14
+    mosi_pin: GPIO13
+  - id: touch_spi
+    clk_pin: GPIO25
+    mosi_pin: GPIO32
+    miso_pin: GPIO39
+
+display:
+  - platform: ili9xxx
+    id: lcd
+    spi_id: lcd_spi
+    model: ST7789V
+    data_rate: 80MHz             # [CHECK] drop to 40MHz if the picture shows noise
+    cs_pin: GPIO15
+    dc_pin: GPIO2
+    dimensions: { width: 240, height: 320 }
+    invert_colors: true          # [CHECK] flip if colours look negative
+    color_order: bgr             # [CHECK]
+    transform: { mirror_x: false, mirror_y: false }   # USB-C end faces the tip [CHECK]
+    auto_clear_enabled: false
+    update_interval: never
+
+touchscreen:
+  - platform: xpt2046
+    id: touch
+    spi_id: touch_spi
+    cs_pin: GPIO33
+    interrupt_pin:               # only read the panel when PENIRQ says it's touched
+      number: GPIO36
+      allow_other_uses: true
+    # Measured 2026-10-30 (corner taps): raw X falls left->right, so X is mirrored; Y is normal.
+    calibration: { x_min: 280, x_max: 3720, y_min: 300, y_max: 3850 }
+    transform: { mirror_x: true }
+    on_touch:
+      - lambda: |-
+          id(g_touched) = true;
+          ESP_LOGD("touch", "screen x=%d y=%d  raw x=%d y=%d", touch.x, touch.y, touch.x_raw, touch.y_raw);
+      - script.execute: idle_timer
+    on_release:
+      - lambda: 'id(g_armed) = true;'

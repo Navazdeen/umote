@@ -1,0 +1,11 @@
+.secret
+firmware/secrets.yaml
+**/.esphome/
+ha-backup/
+.superpowers/
+.playwright-mcp/
+__pycache__/
+.venv/
+*.pyc
+.remember/
+*.log

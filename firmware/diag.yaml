@@ -1,0 +1,17 @@
+# Diagnostic build of the remote: logs over USB serial (115200) for bring-up.
+# Only for use WITHOUT the button board: I2C moves off IO1 so IO1 can be UART0 TX again.
+# Flash it, then open https://web.esphome.io -> Connect -> Logs (or any serial monitor).
+packages:
+  base: !include remote.yaml
+
+logger:
+  baud_rate: 115200
+  level: VERBOSE
+  logs:                          # verbose only where the bugs are
+    lvgl: INFO
+    sensor: INFO
+    light: INFO
+    script: INFO
+
+i2c:
+  sda: GPIO26                    # diag only: frees IO1 (TX0) for the log

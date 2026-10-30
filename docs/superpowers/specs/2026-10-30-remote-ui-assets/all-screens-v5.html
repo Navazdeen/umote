@@ -1,0 +1,390 @@
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-chev-down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+    <symbol id="i-chev-right" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+    <symbol id="i-chev-left" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6.5" y="5" width="3.6" height="14" rx="1" class="f"/><rect x="13.9" y="5" width="3.6" height="14" rx="1" class="f"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13l10.5-6.5z" class="f"/></symbol>
+    <symbol id="i-back10" viewBox="0 0 24 24"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3"/><path d="M4 4.5v4h4"/></symbol>
+    <symbol id="i-fwd10" viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M20 4.5v4h-4"/></symbol>
+    <symbol id="i-fan" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1.8"/><path d="M12 10.2C11 6 12.5 3.5 15 3.5c2 0 2.5 2.6.5 4.2-1.2 1-2.3 1.6-3.5 2.5"/><path d="M13.6 12.9c3.2 2.9 3.3 5.8 1.2 7.1-1.7 1-3.7-.8-2.9-3.2.4-1.4 1-2.4 1.7-3.9"/><path d="M10.4 12.9c-4.1 1.3-6.6-.1-6.6-2.6 0-2 2.5-2.6 3.9-.6.8 1.2 1.3 2.2 2.7 3.2"/></symbol>
+    <symbol id="i-bulb" viewBox="0 0 24 24"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.4 1.1 2.2h5c0-.8.4-1.6 1.1-2.2A6 6 0 0 0 12 3z"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol>
+    <symbol id="i-power" viewBox="0 0 24 24"><path d="M12 3.5v8"/><path d="M6.6 6.8a7.5 7.5 0 1 0 10.8 0"/></symbol>
+    <symbol id="i-plug" viewBox="0 0 24 24"><path d="M9 3v5M15 3v5"/><path d="M6.5 8h11v3a5.5 5.5 0 0 1-11 0z"/><path d="M12 16.5V21"/></symbol>
+    <symbol id="i-tv" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M9 20.5h6"/></symbol>
+    <symbol id="i-soundbar" viewBox="0 0 24 24"><rect x="2.5" y="9" width="19" height="6.5" rx="2"/><circle cx="7" cy="12.25" r="1.2" class="f"/><circle cx="12" cy="12.25" r="1.2" class="f"/><circle cx="17" cy="12.25" r="1.2" class="f"/></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M4 11l8-6.5 8 6.5"/><path d="M6 9.5V19h12V9.5"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></symbol>
+    <symbol id="i-vol-down" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9.5a3.5 3.5 0 0 1 0 5"/></symbol>
+    <symbol id="i-vol-up" viewBox="0 0 24 24"><path d="M3 9.5h3.5L11 5.5v13l-4.5-4H3z"/><path d="M14.5 9.5a3.5 3.5 0 0 1 0 5"/><path d="M17.3 6.8a7.3 7.3 0 0 1 0 10.4"/></symbol>
+    <symbol id="i-mute" viewBox="0 0 24 24"><path d="M3 9.5h3.5L11 5.5v13l-4.5-4H3z"/><path d="M15 9.5l5 5M20 9.5l-5 5"/></symbol>
+    <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14M12 5v14"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/></symbol>
+    <symbol id="i-del" viewBox="0 0 24 24"><path d="M9 5.5h10.5a1.5 1.5 0 0 1 1.5 1.5v10a1.5 1.5 0 0 1-1.5 1.5H9L3 12z"/><path d="M12 9.5l5 5M17 9.5l-5 5"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-shift" viewBox="0 0 24 24"><path d="M12 4l7.5 8H15v7H9v-7H4.5z"/></symbol>
+    <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M2.5 9a14 14 0 0 1 19 0"/><path d="M5.8 12.6a9.2 9.2 0 0 1 12.4 0"/><path d="M9.1 16.1a4.5 4.5 0 0 1 5.8 0"/><circle cx="12" cy="19.3" r="1.3" class="f"/></symbol>
+    <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0"/><path d="M12 17.5V21"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><circle cx="6" cy="12" r="1.6" class="f"/><circle cx="12" cy="12" r="1.6" class="f"/><circle cx="18" cy="12" r="1.6" class="f"/></symbol>
+  </defs>
+</svg>
+
+<style>
+  .grid3{display:flex;gap:30px;flex-wrap:wrap;justify-content:center;margin:12px 0 4px;align-items:flex-start}
+  .dev{zoom:1.4;width:240px;height:320px;border-radius:14px;overflow:hidden;position:relative;background:#0b0b0c;
+       font-family:-apple-system,"SF Pro Text","Inter","Segoe UI",system-ui,sans-serif;color:#fff;
+       box-shadow:0 0 0 6px #1b1b1d,0 0 0 7px #3a3a3c,0 18px 36px rgba(0,0,0,.45);-webkit-font-smoothing:antialiased}
+  .dev *{box-sizing:border-box}
+  .a{position:absolute}
+  svg.ic{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+  svg.ic .f{fill:currentColor;stroke:none}
+  .title{position:absolute;left:4px;top:0;width:130px;height:44px;display:flex;align-items:flex-start;padding:6px 0 0 8px;gap:3px;font-size:17px;font-weight:700;letter-spacing:-.3px}
+  .title svg.ic{width:16px;height:16px;margin-top:3px;opacity:.8}
+  .batt{position:absolute;right:10px;top:9px;font-size:12px;font-weight:600;color:rgba(255,255,255,.85);display:flex;align-items:center;gap:5px}
+  .batt i{display:inline-block;width:20px;height:9px;border:1px solid rgba(255,255,255,.7);border-radius:2.5px;position:relative}
+  .batt i::after{content:"";position:absolute;left:1px;top:1px;bottom:1px;width:76%;background:#fff;border-radius:1px}
+  .btn{position:absolute;border-radius:12px;background:#2c2c2e;display:flex;align-items:center;justify-content:center;gap:5px;font-size:14px;font-weight:600;letter-spacing:-.2px;white-space:nowrap;overflow:hidden}
+  .btn.col{flex-direction:column;gap:2px}
+  .btn small{font-size:12px;font-weight:500;color:rgba(255,255,255,.8)}
+  .sel{background:#0a84ff}
+  .cap{position:absolute;left:12px;font-size:12px;line-height:14px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:rgba(255,255,255,.72)}
+  .hint{position:absolute;left:12px;right:12px;font-size:12px;line-height:15px;color:rgba(255,255,255,.75)}
+  .src{position:absolute;top:256px;width:50px;height:60px;text-align:center;font-size:12px;line-height:14px;letter-spacing:-.3px;color:rgba(255,255,255,.88)}
+  .src .im{width:44px;height:44px;margin:0 auto 2px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;overflow:hidden}
+  .src .im img{width:44px;height:44px;display:block}
+  .src .lb,.tile .lb{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .on-ring .im{box-shadow:0 0 0 2px #fff}
+  .dot{position:absolute;width:9px;height:9px;border-radius:50%;background:#fff;box-shadow:0 0 0 2px #0b0b0c}
+  .tile{position:absolute;width:100px;height:64px;border-radius:14px;background:#1f1f22;padding:6px 9px}
+  .tile .top{display:flex;align-items:center;gap:6px;height:22px}
+  .tile .ib{width:22px;height:22px;border-radius:11px;display:flex;align-items:center;justify-content:center;background:#3a3a3c}
+  .tile .ib svg.ic{width:14px;height:14px}
+  .tile .s{font-size:12px;line-height:14px;color:rgba(255,255,255,.78);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tile .n{font-size:13px;font-weight:600;line-height:15px;margin-top:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .tile.on{background:#f2f2f7;color:#000}.tile.on .s{color:rgba(0,0,0,.7)}.tile.on .ib{background:#ffcc00;color:#000}
+  .tile.off{opacity:.6}
+  .focus{outline:3px solid #ffd60a;outline-offset:2px}
+  .dim{position:absolute;inset:0;background:rgba(0,0,0,.55)}
+  .sheet{position:absolute;left:0;right:0;bottom:0;background:#1c1c1e;border-radius:14px 14px 0 0;box-shadow:0 -6px 20px rgba(0,0,0,.55)}
+  .grab{position:absolute;left:102px;width:36px;height:5px;border-radius:3px;background:rgba(255,255,255,.3)}
+  .row{position:absolute;left:0;right:0;height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 12px;font-size:15px;border-bottom:1px solid rgba(255,255,255,.08)}
+  .row .v{display:flex;align-items:center;gap:2px;color:rgba(255,255,255,.75);font-size:13px;min-width:0}
+  .row .v span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row .v svg.ic{width:16px;height:16px}
+  .tog{width:44px;height:26px;border-radius:13px;background:#34c759;position:relative;flex:none}.tog::after{content:"";position:absolute;right:2px;top:2px;width:22px;height:22px;border-radius:11px;background:#fff}
+  .tog.no{background:#3a3a3c}.tog.no::after{left:2px;right:auto}
+
+  .key{position:absolute;width:66px;height:44px;border-radius:10px;background:#2c2c2e;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:15px}
+  .key b{font-size:15px;font-weight:700;letter-spacing:.5px}
+  .key small{font-size:12px;color:rgba(255,255,255,.7)}
+  .key.fn{background:#3a3a3c}
+  .field{position:absolute;left:12px;top:52px;width:160px;height:44px;border-radius:10px;background:#1c1c1e;border:2px solid #0a84ff;display:flex;align-items:center;padding:0 10px;gap:3px}
+  .field i{display:inline-block;width:8px;height:8px;border-radius:4px;background:#fff}
+  .field .last{font-size:16px;font-weight:600;margin-left:2px}
+  .field .caret{width:2px;height:20px;background:#0a84ff;margin-left:1px}
+  .key.focus,.pick.focus{outline:none;box-shadow:inset 0 0 0 3px #ffd60a;background:#4a4a4c}
+  .pick{position:absolute;width:48px;height:52px;border-radius:10px;background:#3a3a3c;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700}
+  .label{text-align:center;font-size:13px;margin-top:14px;opacity:.85;max-width:240px}
+  #report{font:13px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;background:#111;color:#eee;border-radius:10px;padding:10px 14px;margin:10px 0 4px;white-space:pre-wrap}
+  #report .ok{color:#30d158}#report .bad{color:#ff453a}
+</style>
+
+<h2>All screens v5 — no instruction text, Wi-Fi icon, voice</h2>
+<p class="subtitle">Each device is 240×320 real pixels (shown 1.4×). The report below is computed live from the rendered screens.</p>
+<div id="report">validating…</div>
+
+<div class="grid3">
+
+<!-- 1 NOW PLAYING (artwork) -->
+<div><div class="dev" data-screen="Now Playing (artwork)" style="background:linear-gradient(170deg,#3d1120 0%,#170811 55%,#0b0b0c 100%)">
+  <div class="title hit" data-name="page title">TV<svg class="ic"><use href="#i-chev-down"/></svg></div>
+  <div class="batt"><svg class="ic" style="width:15px;height:15px"><use href="#i-wifi"/></svg>82%<i></i></div>
+  <div class="a" style="left:14px;top:36px;width:212px;height:76px;border-radius:9px;overflow:hidden;box-shadow:0 8px 22px rgba(0,0,0,.55)">
+    <svg viewBox="0 0 212 76" width="212" height="76" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2b0f3a"/><stop offset=".55" stop-color="#b8325a"/><stop offset="1" stop-color="#f7a35c"/></linearGradient></defs>
+      <rect width="212" height="76" fill="url(#sky)"/><circle cx="148" cy="48" r="10" fill="#ffd28a"/>
+      <path d="M0 58 L30 40 L52 52 L80 31 L108 50 L130 38 L160 55 L186 42 L212 54 L212 76 L0 76Z" fill="#3a1630"/>
+      <path d="M0 67 L24 55 L58 65 L90 50 L124 63 L150 53 L184 67 L212 60 L212 76 L0 76Z" fill="#1b0a18"/></svg>
+  </div>
+  <div class="a" style="left:14px;right:14px;top:117px;font-size:20px;line-height:24px;font-weight:700;letter-spacing:-.4px;white-space:nowrap">The Long Road</div>
+  <div class="a" style="left:14px;right:14px;top:141px;font-size:13px;line-height:16px;color:rgba(255,255,255,.78);white-space:nowrap"><b style="color:#ff8fa6">Hotstar</b> · S1 E3 · Crossing</div>
+  <div class="a hit" data-name="scrub" style="left:8px;top:148px;width:224px;height:44px">
+    <div class="a" style="left:6px;right:6px;top:18px;height:5px;border-radius:3px;background:rgba(255,255,255,.28)"><div style="width:44%;height:5px;border-radius:3px;background:#fff"></div></div>
+    <div class="a" style="left:calc(6px + 44% - 8px);top:12.5px;width:16px;height:16px;border-radius:8px;background:#fff;box-shadow:0 1px 5px rgba(0,0,0,.5)"></div>
+    <div class="a" style="left:6px;right:6px;top:28px;display:flex;justify-content:space-between;font-size:12px;line-height:14px;color:rgba(255,255,255,.78)"><span>32:10</span><span>−41:05</span></div>
+  </div>
+  <div class="btn hit" data-name="back 10" style="left:14px;top:200px;width:56px;height:44px;background:rgba(255,255,255,.1)"><svg class="ic"><use href="#i-back10"/></svg><span style="font-size:12px">10</span></div>
+  <div class="btn hit" data-name="play/pause" style="left:88px;top:200px;width:64px;height:44px;border-radius:22px;background:#fff;color:#000"><svg class="ic" style="width:22px;height:22px"><use href="#i-pause"/></svg></div>
+  <div class="btn hit" data-name="fwd 10" style="left:170px;top:200px;width:56px;height:44px;background:rgba(255,255,255,.1)"><span style="font-size:12px">10</span><svg class="ic"><use href="#i-fwd10"/></svg></div>
+  <div class="a" style="left:0;right:0;top:250px;height:1px;background:rgba(255,255,255,.1)"></div>
+  <div class="src hit" data-name="PS5" style="left:10px"><div class="im" style="background:#00439c">PS5</div><span class="lb">PS5</span></div>
+  <div class="src hit" data-name="Netflix" style="left:68px"><div class="im"><img src="icon-netflix.png" alt=""></div><span class="lb">Netflix</span></div>
+  <div class="src hit" data-name="YouTube" style="left:126px"><div class="im" style="background:#fff;color:#f00"><svg class="ic" style="width:22px;height:22px"><use href="#i-play"/></svg></div><span class="lb">YouTube</span></div>
+  <div class="src hit on-ring" data-name="Hotstar" style="left:184px"><div class="im"><img src="icon-hotstar.png" alt=""></div><span class="lb">Hotstar</span><div class="dot" style="right:-1px;top:-3px"></div></div>
+  <div class="src" data-peek="1" style="left:242px"><div class="im"><img src="icon-prime.png" alt=""></div></div>
+</div><p class="label"><b>TV page, OTT playing</b></p></div>
+
+<!-- 2 NOW PLAYING (PS5) -->
+<div><div class="dev" data-screen="Now Playing (PS5)" style="background:linear-gradient(170deg,#0b2f6b 0%,#061733 55%,#0b0b0c 100%)">
+  <div class="title hit" data-name="page title">TV<svg class="ic"><use href="#i-chev-down"/></svg></div>
+  <div class="batt"><svg class="ic" style="width:15px;height:15px"><use href="#i-wifi"/></svg>82%<i></i></div>
+  <div class="a" style="left:86px;top:40px;width:68px;height:68px;border-radius:17px;background:#00439c;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:19px;box-shadow:0 10px 26px rgba(0,0,0,.5)">PS5</div>
+  <div class="a" style="left:14px;right:14px;top:117px;font-size:20px;line-height:24px;font-weight:700;letter-spacing:-.4px">PlayStation 5</div>
+  <div class="a" style="left:14px;right:14px;top:141px;font-size:13px;line-height:16px;color:rgba(255,255,255,.78)">HDMI 1 · On</div>
+  <div class="btn hit" data-name="back to TV" style="left:14px;top:168px;width:102px;height:44px;background:rgba(255,255,255,.12)">Back to TV</div>
+  <div class="btn hit" data-name="sources" style="left:124px;top:168px;width:102px;height:44px;background:rgba(255,255,255,.12)">Sources</div>
+  <div class="a" style="left:0;right:0;top:250px;height:1px;background:rgba(255,255,255,.1)"></div>
+  <div class="src hit on-ring" data-name="PS5" style="left:10px"><div class="im" style="background:#00439c">PS5</div><span class="lb">PS5</span><div class="dot" style="right:-1px;top:-3px"></div></div>
+  <div class="src hit" data-name="Netflix" style="left:68px"><div class="im"><img src="icon-netflix.png" alt=""></div><span class="lb">Netflix</span></div>
+  <div class="src hit" data-name="YouTube" style="left:126px"><div class="im" style="background:#fff;color:#f00"><svg class="ic" style="width:22px;height:22px"><use href="#i-play"/></svg></div><span class="lb">YouTube</span></div>
+  <div class="src hit" data-name="Hotstar" style="left:184px"><div class="im"><img src="icon-hotstar.png" alt=""></div><span class="lb">Hotstar</span></div>
+  <div class="src" data-peek="1" style="left:242px"><div class="im"><img src="icon-prime.png" alt=""></div></div>
+</div><p class="label"><b>TV page, HDMI source</b></p></div>
+
+<!-- 3 SOURCES SHEET -->
+<div><div class="dev" data-screen="Sources sheet">
+  <div class="dim" style="background:linear-gradient(170deg,#3d1120,#0b0b0c 60%);filter:brightness(.45)"></div>
+  <div class="sheet" data-layer="modal" style="top:26px">
+    <div class="grab" style="top:6px"></div>
+    <div class="a" style="left:14px;top:12px;font-size:17px;line-height:22px;font-weight:700">Sources</div>
+    <div class="btn hit" data-name="done" style="left:172px;top:2px;width:60px;height:44px;background:none;color:#64a8ff">Done</div>
+    <div class="cap" style="top:54px">Inputs</div>
+    <div class="src hit" data-name="PS5" style="left:8px;top:74px;width:50px"><div class="im" style="background:#00439c">PS5</div><span class="lb">PS5</span></div>
+    <div class="src hit" data-name="Live TV" style="left:66px;top:74px;width:50px"><div class="im" style="background:#3a3a3c;color:#fff"><svg class="ic"><use href="#i-tv"/></svg></div><span class="lb">Live TV</span></div>
+    <div class="src hit" data-name="HDMI 3" style="left:124px;top:74px;width:50px"><div class="im" style="background:#3a3a3c;font-size:12px">HDMI</div><span class="lb">HDMI 3</span>
+      <div class="a" style="left:6px;top:-7px;height:14px;padding:0 5px;border-radius:7px;background:#ffd60a;color:#000;font-size:12px;line-height:14px;font-weight:700">New</div></div>
+    <div class="cap" style="top:142px">Apps</div>
+    <div class="src hit" data-name="Netflix" style="left:8px;top:162px;width:50px"><div class="im"><img src="icon-netflix.png" alt=""></div><span class="lb">Netflix</span></div>
+    <div class="src hit" data-name="YouTube" style="left:66px;top:162px;width:50px"><div class="im" style="background:#fff;color:#f00"><svg class="ic" style="width:22px;height:22px"><use href="#i-play"/></svg></div><span class="lb">YouTube</span></div>
+    <div class="src hit on-ring" data-name="Hotstar" style="left:124px;top:162px;width:50px"><div class="im"><img src="icon-hotstar.png" alt=""></div><span class="lb">Hotstar</span><div class="dot" style="right:0;top:-3px;box-shadow:0 0 0 2px #1c1c1e"></div></div>
+    <div class="src hit" data-name="Prime" style="left:182px;top:162px;width:50px"><div class="im"><img src="icon-prime.png" alt=""></div><span class="lb">Prime</span></div>
+    <div class="src hit" data-name="Spotify" style="left:8px;top:230px;width:50px"><div class="im" style="background:#1db954;color:#000">S</div><span class="lb">Spotify</span></div>
+    <div class="src hit" data-name="Sony LIV" style="left:66px;top:230px;width:50px"><div class="im" style="background:#e8a33d;color:#000">L</div><span class="lb">Sony LIV</span></div>
+  </div>
+</div><p class="label"><b>Sources sheet</b> (rows continue on scroll)</p></div>
+
+<!-- 4 NEW HDMI DIALOG -->
+<div><div class="dev" data-screen="New HDMI device">
+  <div class="dim" style="background:#1c1c1e"></div><div class="dim"></div>
+  <div class="a" data-layer="modal" style="left:12px;top:40px;width:216px;height:248px;background:#2c2c2e;border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.6)">
+    <div class="a" style="left:12px;top:12px;font-size:17px;line-height:22px;font-weight:700">New on HDMI 3</div>
+    <div class="a" style="left:12px;right:12px;top:38px;font-size:13px;line-height:17px;color:rgba(255,255,255,.8)">It didn't say its name. What is it?</div>
+    <div class="btn hit" data-name="set-top box" style="left:12px;top:78px;width:104px;height:44px;border-radius:22px;background:rgba(255,255,255,.12)">Set-top box</div>
+    <div class="btn hit" data-name="fire tv" style="left:124px;top:78px;width:80px;height:44px;border-radius:22px;background:rgba(255,255,255,.12)">Fire TV</div>
+    <div class="btn hit" data-name="pc" style="left:12px;top:130px;width:64px;height:44px;border-radius:22px;background:rgba(255,255,255,.12)">PC</div>
+    <div class="btn hit" data-name="other" style="left:84px;top:130px;width:84px;height:44px;border-radius:22px;background:rgba(255,255,255,.12)">Other</div>
+    <div class="btn hit" data-name="later" style="left:12px;top:192px;width:92px;height:44px;background:rgba(255,255,255,.1)">Later</div>
+    <div class="btn hit sel" data-name="switch" style="left:112px;top:192px;width:92px;height:44px">Switch</div>
+  </div>
+</div><p class="label"><b>New device without a name</b></p></div>
+
+<!-- 5 SOUNDBAR -->
+<div><div class="dev" data-screen="Soundbar">
+  <div class="title hit" data-name="page title">Soundbar<svg class="ic"><use href="#i-chev-down"/></svg></div>
+  <div class="batt"><svg class="ic" style="width:15px;height:15px"><use href="#i-wifi"/></svg>82%<i></i></div>
+  <div class="cap" style="top:36px">Input</div>
+  <div class="btn hit sel" data-name="tv" style="left:12px;top:54px;width:66px;height:44px">TV</div>
+  <div class="btn hit" data-name="bt" style="left:87px;top:54px;width:66px;height:44px;font-size:12px;letter-spacing:-.3px">Bluetooth</div>
+  <div class="btn hit" data-name="music" style="left:162px;top:54px;width:66px;height:44px">Music</div>
+  <div class="cap" style="top:106px">Sound</div>
+  <div class="btn hit" data-name="cinema" style="left:12px;top:124px;width:66px;height:44px">Cinema</div>
+  <div class="btn hit" data-name="voice" style="left:87px;top:124px;width:66px;height:44px">Voice</div>
+  <div class="btn hit" data-name="night" style="left:162px;top:124px;width:66px;height:44px">Night</div>
+  <div class="btn col hit" data-name="vol down" style="left:12px;top:178px;width:66px;height:64px"><svg class="ic" style="width:24px;height:24px"><use href="#i-vol-down"/></svg><small>Down</small></div>
+  <div class="btn col hit" data-name="mute" style="left:87px;top:178px;width:66px;height:64px"><svg class="ic" style="width:24px;height:24px"><use href="#i-mute"/></svg><small>Mute</small></div>
+  <div class="btn col hit" data-name="vol up" style="left:162px;top:178px;width:66px;height:64px"><svg class="ic" style="width:24px;height:24px"><use href="#i-vol-up"/></svg><small>Up</small></div>
+</div><p class="label"><b>Soundbar page</b> (all IR)</p></div>
+
+<!-- 6 HOME -->
+<div><div class="dev" data-screen="Home">
+  <div class="title hit" data-name="page title">Home<svg class="ic"><use href="#i-chev-down"/></svg></div>
+  <div class="batt"><svg class="ic" style="width:15px;height:15px"><use href="#i-wifi"/></svg>82%<i></i></div>
+  <div class="cap" style="top:38px">Living room</div>
+  <div class="tile hit on focus" data-name="tv fan" style="left:12px;top:57px"><div class="top"><div class="ib"><svg class="ic"><use href="#i-fan"/></svg></div><span class="s">Speed 3</span></div><div class="n">TV Fan</div></div>
+  <div class="tile hit" data-name="cabinet lights" style="left:128px;top:57px"><div class="top"><div class="ib"><svg class="ic"><use href="#i-bulb"/></svg></div><span class="s">Off</span></div><div class="n">Cabinet lights</div></div>
+  <div class="tile hit on" data-name="matrix clock" style="left:12px;top:134px"><div class="top"><div class="ib"><svg class="ic"><use href="#i-clock"/></svg></div><span class="s">On</span></div><div class="n">Matrix clock</div></div>
+  <div class="tile hit" data-name="cabinet power" style="left:128px;top:134px"><div class="top"><div class="ib"><svg class="ic"><use href="#i-plug"/></svg></div><span class="s">All off</span></div><div class="n">Cabinet power</div></div>
+  <div class="tile hit off" data-name="fridge fan" style="left:12px;top:211px"><div class="top"><div class="ib"><svg class="ic"><use href="#i-fan"/></svg></div><span class="s">Offline</span></div><div class="n">Fridge fan</div></div>
+  <div class="tile hit off" data-name="clock fan" style="left:128px;top:211px"><div class="top"><div class="ib"><svg class="ic"><use href="#i-fan"/></svg></div><span class="s">Offline</span></div><div class="n">Clock fan</div></div>
+</div><p class="label"><b>Home page</b> (Living Room only)</p></div>
+
+<!-- 7 HOLD SHEET -->
+<div><div class="dev" data-screen="Device options">
+  <div class="title" style="opacity:.5">Home<svg class="ic"><use href="#i-chev-down"/></svg></div>
+  <div class="dim"></div>
+  <div class="sheet" data-layer="modal" style="top:46px">
+    <div class="grab" style="top:6px"></div>
+    <div class="row hit" data-name="power toggle" style="top:14px;font-size:17px;font-weight:700;border:0">TV Fan<div class="tog"></div></div>
+    <div class="cap" style="top:66px">Speed</div>
+    <div class="btn hit" data-name="speed down" style="left:12px;top:84px;width:56px;height:44px"><svg class="ic"><use href="#i-minus"/></svg></div>
+    <div class="a" style="left:76px;right:76px;top:84px;height:44px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:20px;font-weight:700">3<span style="font-size:13px;font-weight:500;color:rgba(255,255,255,.75)">of 6</span></div>
+    <div class="btn hit" data-name="speed up" style="left:172px;top:84px;width:56px;height:44px"><svg class="ic"><use href="#i-plus"/></svg></div>
+    <div class="cap" style="top:138px">Timer</div>
+    <div class="btn hit sel" data-name="timer off" style="left:12px;top:156px;width:48px;height:44px">Off</div>
+    <div class="btn hit" data-name="1h" style="left:68px;top:156px;width:48px;height:44px">1 h</div>
+    <div class="btn hit" data-name="2h" style="left:124px;top:156px;width:48px;height:44px">2 h</div>
+    <div class="btn hit" data-name="4h" style="left:180px;top:156px;width:48px;height:44px">4 h</div>
+    <div class="row hit" data-name="led" style="top:210px">LED light<div class="tog no"></div></div>
+  </div>
+</div><p class="label"><b>Hold for more</b> (closes with Back)</p></div>
+
+<!-- 8 SETTINGS -->
+<div><div class="dev" data-screen="Settings">
+  <div class="title hit" data-name="page title">Settings<svg class="ic"><use href="#i-chev-down"/></svg></div>
+  <div class="batt"><svg class="ic" style="width:15px;height:15px"><use href="#i-wifi"/></svg>82%<i></i></div>
+  <div class="row hit list" data-name="wifi" style="top:52px">Wi-Fi<span class="v"><span data-truncate-ok="1" style="max-width:118px">NavazAirFiber_EXT</span><svg class="ic"><use href="#i-chev-right"/></svg></span></div>
+  <div class="row hit list" data-name="brightness" style="top:96px">Brightness<span class="a" style="right:12px;top:19px;width:104px;height:5px;border-radius:3px;background:#3a3a3c"><span class="a" style="left:0;top:0;width:60%;height:5px;border-radius:3px;background:#fff"></span><span class="a" style="left:calc(60% - 9px);top:-6.5px;width:18px;height:18px;border-radius:9px;background:#fff"></span></span></div>
+  <div class="row hit list" data-name="buttons" style="top:140px">Buttons<span class="v"><span>Volume: Soundbar</span><svg class="ic"><use href="#i-chev-right"/></svg></span></div>
+  <div class="row hit list" data-name="sleep" style="top:184px">Sleep after<span class="v"><span>20 s</span><svg class="ic"><use href="#i-chev-right"/></svg></span></div>
+  <div class="row hit list" data-name="text size" style="top:228px">Text size<span class="v"><span>Default</span><svg class="ic"><use href="#i-chev-right"/></svg></span></div>
+  <div class="row hit list" data-name="about" style="top:272px;border:0">About<span class="v"><span>82%, v1.0</span><svg class="ic"><use href="#i-chev-right"/></svg></span></div>
+</div><p class="label"><b>Settings</b></p></div>
+
+<!-- 9 WIFI -->
+<div><div class="dev" data-screen="Wi-Fi">
+  <div class="title hit" data-name="back" style="padding-left:2px"><svg class="ic" style="width:20px;height:20px;margin-top:1px;opacity:1"><use href="#i-chev-left"/></svg>Wi-Fi</div>
+  <div class="batt"><svg class="ic" style="width:15px;height:15px"><use href="#i-wifi"/></svg>82%<i></i></div>
+  <div class="row hit list" data-name="current" style="top:52px"><span style="display:flex;align-items:center;gap:6px;min-width:0"><svg class="ic" style="width:16px;height:16px;color:#30d158"><use href="#i-check"/></svg><span data-truncate-ok="1" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px">NavazAirFiber_EXT</span></span><span class="v"><span>Strong</span></span></div>
+  <div class="cap" style="top:104px">Other networks</div>
+  <div class="row hit list" data-name="net1" style="top:122px">NavazAirFiber<span class="v"><svg class="ic"><use href="#i-lock"/></svg><span>Good</span></span></div>
+  <div class="row hit list" data-name="net2" style="top:166px">JioFiber-5G<span class="v"><svg class="ic"><use href="#i-lock"/></svg><span>Fair</span></span></div>
+  <div class="row hit list" data-name="net3" style="top:210px">Neighbour_2G<span class="v"><svg class="ic"><use href="#i-lock"/></svg><span>Weak</span></span></div>
+  <div class="row hit list" data-name="scan" style="top:254px;border:0;color:#64a8ff">Scan again</div>
+</div><p class="label"><b>Wi-Fi</b> (password: on-screen keyboard)</p></div>
+
+
+<!-- 11 KEYBOARD -->
+<div><div class="dev" data-screen="Keyboard">
+  <div class="title hit" data-name="back" style="padding-left:2px;width:200px"><svg class="ic" style="width:20px;height:20px;margin-top:1px;opacity:1"><use href="#i-chev-left"/></svg><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:170px" data-truncate-ok="1">NavazAirFiber</span></div>
+  <div class="field"><i></i><i></i><i></i><i></i><i></i><span class="last">m</span><span class="caret"></span></div>
+  <div class="btn hit" data-name="show" style="left:180px;top:52px;width:48px;height:44px"><svg class="ic"><use href="#i-eye"/></svg></div>
+<div class="key hit" data-name="abc" style="left:12px;top:104px"><b>abc</b><small>2</small></div>
+<div class="key hit" data-name="def" style="left:87px;top:104px"><b>def</b><small>3</small></div>
+<div class="key hit" data-name="ghi" style="left:162px;top:104px"><b>ghi</b><small>4</small></div>
+<div class="key hit" data-name="jkl" style="left:12px;top:156px"><b>jkl</b><small>5</small></div>
+<div class="key hit focus" data-name="mno" style="left:87px;top:156px"><b>mno</b><small>6</small></div>
+<div class="key hit" data-name="pqrs" style="left:162px;top:156px"><b>pqrs</b><small>7</small></div>
+<div class="key hit" data-name="tuv" style="left:12px;top:208px"><b>tuv</b><small>8</small></div>
+<div class="key hit" data-name="wxyz" style="left:87px;top:208px"><b>wxyz</b><small>9</small></div>
+<div class="key hit fn" data-name="delete" style="left:162px;top:208px"><svg class="ic"><use href="#i-del"/></svg></div>
+<div class="key hit fn" data-name="shift" style="left:12px;top:260px"><svg class="ic"><use href="#i-shift"/></svg><small>aA 1#</small></div>
+<div class="key hit fn" data-name="space" style="left:87px;top:260px"><small style="color:#fff;font-size:13px">space</small></div>
+<div class="key hit sel" data-name="join" style="left:162px;top:260px"><b style="font-size:14px;letter-spacing:0">Join</b></div>
+</div><p class="label"><b>Password keypad</b>: tap a group, or move the ring with the D-pad and press OK</p></div>
+
+<!-- 12 KEYBOARD PICK -->
+<div><div class="dev" data-screen="Keyboard: pick letter">
+  <div class="title hit" data-name="back" style="padding-left:2px;width:200px"><svg class="ic" style="width:20px;height:20px;margin-top:1px;opacity:1"><use href="#i-chev-left"/></svg><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:170px" data-truncate-ok="1">NavazAirFiber</span></div>
+  <div class="field"><i></i><i></i><i></i><i></i><i></i><span class="last">m</span><span class="caret"></span></div>
+  <div class="btn hit" data-name="show" style="left:180px;top:52px;width:48px;height:44px"><svg class="ic"><use href="#i-eye"/></svg></div>
+<div class="key hit" data-name="abc" style="left:12px;top:104px"><b>abc</b><small>2</small></div>
+<div class="key hit" data-name="def" style="left:87px;top:104px"><b>def</b><small>3</small></div>
+<div class="key hit" data-name="ghi" style="left:162px;top:104px"><b>ghi</b><small>4</small></div>
+<div class="key hit" data-name="jkl" style="left:12px;top:156px"><b>jkl</b><small>5</small></div>
+<div class="key hit" data-name="mno" style="left:87px;top:156px"><b>mno</b><small>6</small></div>
+<div class="key hit" data-name="pqrs" style="left:162px;top:156px"><b>pqrs</b><small>7</small></div>
+<div class="key hit" data-name="tuv" style="left:12px;top:208px"><b>tuv</b><small>8</small></div>
+<div class="key hit" data-name="wxyz" style="left:87px;top:208px"><b>wxyz</b><small>9</small></div>
+<div class="key hit fn" data-name="delete" style="left:162px;top:208px"><svg class="ic"><use href="#i-del"/></svg></div>
+<div class="key hit fn" data-name="shift" style="left:12px;top:260px"><svg class="ic"><use href="#i-shift"/></svg><small>aA 1#</small></div>
+<div class="key hit fn" data-name="space" style="left:87px;top:260px"><small style="color:#fff;font-size:13px">space</small></div>
+<div class="key hit sel" data-name="join" style="left:162px;top:260px"><b style="font-size:14px;letter-spacing:0">Join</b></div>
+  <div class="dim"></div>
+  <div class="a" data-layer="modal" style="left:4px;top:136px;width:232px;height:92px;background:#1c1c1e;border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.6)">
+    <div class="a" style="left:12px;top:8px;font-size:12px;line-height:14px;font-weight:600;letter-spacing:.4px;color:rgba(255,255,255,.72)">MNO</div>
+    <div class="pick hit focus" data-name="m" style="left:8px;top:30px">m</div>
+    <div class="pick hit" data-name="n" style="left:66px;top:30px">n</div>
+    <div class="pick hit" data-name="o" style="left:124px;top:30px">o</div>
+    <div class="pick hit" data-name="6" style="left:182px;top:30px">6</div>
+  </div>
+</div><p class="label"><b>Pick the letter</b>: tap it, or left/right then OK. Back cancels.</p></div>
+
+
+<!-- 13 VOICE LISTENING -->
+<div><div class="dev" data-screen="Voice: listening" style="background:radial-gradient(120% 80% at 50% 38%,#16305f 0%,#0b0b0c 70%)">
+  <div class="batt"><svg class="ic" style="width:15px;height:15px"><use href="#i-wifi"/></svg>82%<i></i></div>
+  <div class="a" style="left:80px;top:56px;width:80px;height:80px;border-radius:40px;background:#0a84ff;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 10px rgba(10,132,255,.25),0 0 0 22px rgba(10,132,255,.10)"><svg class="ic" style="width:34px;height:34px"><use href="#i-mic"/></svg></div>
+  <div class="a" style="left:60px;top:160px;width:120px;height:28px;display:flex;align-items:center;justify-content:center;gap:5px">
+    <span style="width:4px;height:10px;border-radius:2px;background:#64a8ff"></span><span style="width:4px;height:20px;border-radius:2px;background:#64a8ff"></span><span style="width:4px;height:28px;border-radius:2px;background:#fff"></span><span style="width:4px;height:16px;border-radius:2px;background:#64a8ff"></span><span style="width:4px;height:24px;border-radius:2px;background:#fff"></span><span style="width:4px;height:12px;border-radius:2px;background:#64a8ff"></span><span style="width:4px;height:18px;border-radius:2px;background:#64a8ff"></span>
+  </div>
+  <div class="a" style="left:12px;right:12px;top:204px;text-align:center;font-size:13px;line-height:16px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:rgba(255,255,255,.72)">Listening</div>
+  <div class="a" style="left:16px;right:16px;top:228px;text-align:center;font-size:20px;line-height:25px;font-weight:600;letter-spacing:-.3px">play Bigg Boss on Hotstar</div>
+</div><p class="label"><b>Voice, while the key is held</b></p></div>
+
+<!-- 14 VOICE RESULT -->
+<div><div class="dev" data-screen="Voice: result" style="background:radial-gradient(120% 80% at 50% 38%,#16305f 0%,#0b0b0c 70%)">
+  <div class="batt"><svg class="ic" style="width:15px;height:15px"><use href="#i-wifi"/></svg>82%<i></i></div>
+  <div class="a" style="left:88px;top:62px;width:64px;height:64px;border-radius:16px;overflow:hidden;box-shadow:0 10px 26px rgba(0,0,0,.5)"><img src="icon-hotstar.png" alt="" style="width:64px;height:64px"></div>
+  <div class="a" style="left:16px;right:16px;top:146px;text-align:center;font-size:13px;line-height:16px;color:rgba(255,255,255,.75)">"play Bigg Boss on Hotstar"</div>
+  <div class="a" style="left:16px;right:16px;top:172px;text-align:center;font-size:20px;line-height:25px;font-weight:700;letter-spacing:-.3px">Opening Hotstar</div>
+  <div class="btn hit" data-name="cancel" style="left:70px;top:236px;width:100px;height:44px;background:rgba(255,255,255,.12)">Cancel</div>
+</div><p class="label"><b>Voice, after release</b></p></div>
+
+<!-- 10 PAGE PICKER -->
+<div><div class="dev" data-screen="Page picker">
+  <div class="title" style="opacity:.5">Home<svg class="ic"><use href="#i-chev-down"/></svg></div>
+  <div class="dim"></div>
+  <div class="a" data-layer="modal" style="left:8px;top:36px;width:164px;height:176px;background:#2c2c2e;border-radius:12px;box-shadow:0 10px 28px rgba(0,0,0,.6);overflow:hidden">
+    <div class="row hit list" data-name="tv" style="top:0;gap:10px;justify-content:flex-start;font-weight:600"><svg class="ic"><use href="#i-tv"/></svg>TV</div>
+    <div class="row hit list" data-name="soundbar" style="top:44px;gap:10px;justify-content:flex-start;font-weight:600"><svg class="ic"><use href="#i-soundbar"/></svg>Soundbar</div>
+    <div class="row hit list" data-name="home" style="top:88px;gap:10px;justify-content:flex-start;font-weight:600;background:#3a3a3c"><svg class="ic"><use href="#i-home"/></svg>Home<svg class="ic" style="margin-left:auto;width:16px;height:16px"><use href="#i-check"/></svg></div>
+    <div class="row hit list" data-name="settings" style="top:132px;gap:10px;justify-content:flex-start;font-weight:600;border:0"><svg class="ic"><use href="#i-sliders"/></svg>Settings</div>
+  </div>
+</div><p class="label"><b>Page picker</b> (tap the title)</p></div>
+
+</div>
+
+<script>
+(function validate(){
+  const GLYPH=/[←-⇿⌀-⏿①-⓿■-➿⤀-⯿‹›«»✓✔✕]|\p{Extended_Pictographic}/u;
+  const MIN_T=44, MIN_GAP=8, MIN_FONT=12, RING=5;  // outline 3 + offset 2
+  const out=[]; let fails=0;
+  document.querySelectorAll('.dev[data-screen]').forEach(dev=>{
+    const name=dev.dataset.screen, issues=[];
+    const dr=dev.getBoundingClientRect(), k=dr.width/240;
+    const box=el=>{const r=el.getBoundingClientRect();return{l:(r.left-dr.left)/k,t:(r.top-dr.top)/k,r:(r.right-dr.left)/k,b:(r.bottom-dr.top)/k}};
+    const layer=el=>el.closest('[data-layer]')?.dataset.layer||'base';
+    const hasModal=!!dev.querySelector('[data-layer="modal"]');
+    // targets
+    const T=[...dev.querySelectorAll('.hit')].filter(el=>!hasModal||layer(el)==='modal').map(el=>{
+      const b=box(el); const cs=getComputedStyle(el); const ring=cs.outlineStyle!=='none'?parseFloat(cs.outlineWidth)+parseFloat(cs.outlineOffset):0; if(ring){b.l-=ring;b.t-=ring;b.r+=ring;b.b+=ring} b.ring=ring;
+      return{el,n:el.dataset.name||el.textContent.trim().slice(0,14),b,list:el.classList.contains('list')}});
+    T.forEach(t=>{
+      const w=t.b.r-t.b.l-2*t.b.ring, h=t.b.b-t.b.t-2*t.b.ring;
+      if(w<MIN_T-0.5||h<MIN_T-0.5) issues.push(`target "${t.n}" is ${w.toFixed(0)}×${h.toFixed(0)} (< 44)`);
+      if(t.b.l<-0.5||t.b.t<-0.5||t.b.r>240.5||t.b.b>320.5) issues.push(`target "${t.n}" leaves the screen`);
+    });
+    for(let i=0;i<T.length;i++)for(let j=i+1;j<T.length;j++){
+      const a=T[i].b,b=T[j].b;
+      const gx=Math.max(b.l-a.r,a.l-b.r), gy=Math.max(b.t-a.b,a.t-b.b), gap=Math.max(gx,gy);
+      const listPair=T[i].list&&T[j].list&&gy>=-0.5&&Math.abs(a.l-b.l)<1; // stacked list rows may touch, like iOS lists
+      if(gap<-0.5) issues.push(`"${T[i].n}" overlaps "${T[j].n}" by ${(-gap).toFixed(1)} px`);
+      else if(gap<MIN_GAP-0.5&&!listPair) issues.push(`"${T[i].n}" and "${T[j].n}" only ${gap.toFixed(1)} px apart (< 8)`);
+    }
+    // text
+    const walker=document.createTreeWalker(dev,NodeFilter.SHOW_TEXT);
+    while(walker.nextNode()){
+      const tn=walker.currentNode, s=tn.textContent; if(!s.trim())continue;
+      const el=tn.parentElement; if(hasModal&&layer(el)!=='modal'&&!el.closest('.title'))continue;
+      if(el.closest('[data-peek]'))continue;
+      const fs=parseFloat(getComputedStyle(el).fontSize);
+      if(fs<MIN_FONT-0.01) issues.push(`text "${s.trim().slice(0,18)}" is ${fs}px (< 12)`);
+      if(GLYPH.test(s)) issues.push(`glyph/emoji in "${s.trim().slice(0,18)}"`);
+      const r=document.createRange(); r.selectNodeContents(tn); const rr=r.getBoundingClientRect();
+      const tb={l:(rr.left-dr.left)/k,t:(rr.top-dr.top)/k,r:(rr.right-dr.left)/k,b:(rr.bottom-dr.top)/k};
+      if(tb.l<-0.5||tb.r>240.5||tb.t<-0.5||tb.b>320.5) issues.push(`text "${s.trim().slice(0,18)}" leaves the screen`);
+      // clipped by its own box (ellipsis) unless allowed
+      let c=el; while(c&&c!==dev){const cs=getComputedStyle(c); if(cs.overflow!=='visible'||cs.textOverflow==='ellipsis'||cs.webkitLineClamp!=='none'){ const cb=box(c); const lines=Math.round((tb.b-tb.t)/parseFloat(getComputedStyle(el).lineHeight||fs*1.2)); const clamp=parseInt(cs.webkitLineClamp)||0;
+          const over=tb.r>cb.r+0.5||tb.l<cb.l-0.5||(clamp&&lines>clamp)||tb.b>cb.b+0.5;
+          if(over&&!c.closest('[data-truncate-ok]')) issues.push(`text "${s.trim().slice(0,18)}" is clipped (needs ${(tb.r-tb.l).toFixed(0)} px, has ${(cb.r-cb.l).toFixed(0)})`); break;} c=c.parentElement;}
+    }
+    const uniq=[...new Set(issues)]; if(uniq.length)fails++;
+    out.push(`<span class="${uniq.length?'bad':'ok'}">${uniq.length?'FAIL':'PASS'}</span>  ${name}  (${T.length} targets)`+uniq.map(x=>'\n      - '+x).join(''));
+  });
+  const rep=document.getElementById('report');
+  rep.innerHTML=`<b>${fails?fails+' screen(s) failing':'All screens pass'}</b>: targets ≥ 44 px, gaps ≥ 8 px (outer focus rings counted; stacked list rows may touch), text ≥ 12 px, nothing clipped or off-screen, no glyphs/emoji.\n\n`+out.join('\n');
+  window.__report={fails,text:rep.innerText};
+})();
+</script>

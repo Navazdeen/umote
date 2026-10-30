@@ -1,0 +1,6 @@
+     8s it=1 NEW BEST fail=['BTN_RIGHT', 'BTN_UP', 'IR', 'VBAT', 'INT', 'SDA', 'BTN_DOWN'] jumpers=14 len=473 drc=0
+    48s it=6 NEW BEST fail=['SDA', 'BTN_DOWN', 'INT', 'K1', 'BTN_OK', 'VBAT'] jumpers=9 len=470 drc=0
+    64s it=8 NEW BEST fail=['BTN_POWER', 'GND', 'SCL', 'IR', 'BTN_UP'] jumpers=10 len=395 drc=0
+   360s it=43 NEW BEST fail=['K1', 'GND', 'INT', 'BTN_LEFT'] jumpers=14 len=376 drc=0
+  1279s it=153 NEW BEST fail=['INT', 'GND', 'VBAT', 'BTN_UP'] jumpers=13 len=385 drc=0
+DONE after 178 iterations

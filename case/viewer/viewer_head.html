@@ -1,0 +1,108 @@
+<title>Umote Case v4</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one-screen workbench. Tool panel on the left, the 3D view fills the rest; stacks on phones. */
+:root {
+  --bg: #eef0f3;  --panel: #ffffff;  --fg: #1d232b;  --muted: #5d6773;  --line: #d5dae1;
+  --stage: #e3e7ec;  --part: #8e9aab;  --part2: #4d5a6c;  --accent: #2f6fd0;
+  --overhang: #d8402f;  --bridge: #e39a17;  --crease: #1d232b;
+  --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #14181d;  --panel: #1b2027;  --fg: #e4e8ee;  --muted: #95a0ad;  --line: #2c333d;
+  --stage: #10141a;  --part: #aab6c6;  --part2: #6c7a8e;  --accent: #6aa0ff;
+  --overhang: #ff6a55;  --bridge: #f2b03a;  --crease: #0b0d10;  color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #14181d;  --panel: #1b2027;  --fg: #e4e8ee;  --muted: #95a0ad;  --line: #2c333d;
+  --stage: #10141a;  --part: #aab6c6;  --part2: #6c7a8e;  --accent: #6aa0ff;
+  --overhang: #ff6a55;  --bridge: #f2b03a;  --crease: #0b0d10;  color-scheme: dark }
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--fg); font-family: var(--sans); font-size: 14px; }
+.app { height: 100%; display: grid; grid-template-columns: 300px 1fr; gap: 0; }
+aside { background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto;
+  padding-block: 18px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: 16px;
+  display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+h1 { font-size: 17px; font-weight: 600; margin: 0; text-wrap: balance; }
+.sub { color: var(--muted); font-size: 12.5px; margin-top: 3px; line-height: 1.45; }
+.label { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 500; margin-bottom: 7px; }
+.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.seg button { font: inherit; font-size: 13px; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--line);
+  background: transparent; color: var(--fg); cursor: pointer; text-align: left; }
+.seg button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); font-weight: 500;
+  box-shadow: inset 0 0 0 1px var(--accent); }
+.seg button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.check { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 3px 0; cursor: pointer; }
+.check input { accent-color: var(--accent); }
+.legend { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.sw { width: 12px; height: 12px; border-radius: 3px; display: inline-block; vertical-align: -1px; margin-right: 8px; }
+dl { display: grid; grid-template-columns: auto 1fr; gap: 5px 12px; margin: 0; font-size: 13px; }
+dt { color: var(--muted); }
+dd { margin: 0; font-family: var(--mono); font-size: 12.5px; font-variant-numeric: tabular-nums; text-align: right; }
+.note { font-size: 12.5px; line-height: 1.5; color: var(--muted); border-top: 1px solid var(--line); padding-top: 14px; }
+.note b { color: var(--fg); font-weight: 500; }
+input[type=range] { width: 100%; accent-color: var(--accent); }
+.stage { position: relative; min-width: 0; background: var(--stage); }
+#view { position: absolute; inset: 0; }
+.hint { position: absolute; right: max(12px, env(safe-area-inset-right, 0px)); bottom: 10px; font-size: 11.5px;
+  color: var(--muted); font-family: var(--mono); pointer-events: none; }
+.status { position: absolute; left: 14px; top: 12px; font-size: 12.5px; color: var(--muted); font-family: var(--mono); }
+@media (max-width: 760px) {
+  .app { grid-template-columns: 1fr; grid-template-rows: 58vh auto; height: auto; }
+  aside { order: 2; border-right: 0; border-top: 1px solid var(--line); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .stage { order: 1; height: 58vh; }
+}
+</style>
+
+<div class="app">
+  <aside>
+    <div>
+      <h1>Umote case v4</h1>
+      <div class="sub">Exported STLs from <span style="font-family:var(--mono)">remote_case.scad</span>, shown as they sit on the print bed (z up).</div>
+    </div>
+    <div>
+      <div class="label">Part</div>
+      <div class="seg" id="parts">
+        <button id="p-shell" data-part="shell" aria-pressed="true">Shell</button>
+        <button id="p-back" data-part="back" aria-pressed="false">Back plate</button>
+        <button id="p-caps" data-part="caps" aria-pressed="false">Caps + spacers</button>
+        <button id="p-ir" data-part="ir_test" aria-pressed="false">IR test coupon</button>
+        <button id="p-usb" data-part="usb_test" aria-pressed="false">USB-C test plate</button>
+        <button id="p-fit" data-part="cap_fit_test" aria-pressed="false">Cap fit test</button>
+        <button id="p-pcb" data-part="board" aria-pressed="false">Button board (print)</button>
+        <button id="p-asm" data-part="asm" aria-pressed="false" style="grid-column: span 2">Assembled (shell, back, caps, board)</button>
+      </div>
+    </div>
+    <div>
+      <div class="label">Show</div>
+      <label class="check"><input type="checkbox" id="c-ovh" checked> Overhangs and bridges</label>
+      <label class="check"><input type="checkbox" id="c-edge" checked> Creases (edges sharper than 40°)</label>
+      <div style="margin-top:10px">
+        <div class="label" style="margin-bottom:4px">Cut along length <span id="cutv" style="font-family:var(--mono); text-transform:none; letter-spacing:0">off</span></div>
+        <input type="range" id="cut" min="0" max="100" value="100">
+      </div>
+    </div>
+    <div>
+      <div class="label">Legend</div>
+      <div class="legend">
+        <div><span class="sw" style="background:var(--overhang)"></span>Overhang steeper than 45°</div>
+        <div><span class="sw" style="background:var(--bridge)"></span>Flat bridge (downward, horizontal)</div>
+        <div><span class="sw" style="background:var(--part)"></span>Prints without support</div>
+      </div>
+    </div>
+    <div>
+      <div class="label">This part</div>
+      <dl id="stats"></dl>
+    </div>
+    <div class="note">
+      <b>About sharp edges.</b> An FDM printer draws outlines, so a crisp vertical corner prints as crisp as the nozzle allows (about 0.2 mm radius). What it can't do is hang material in the air, which the red faces would show. Creases here are where two flat faces meet, such as the 45° bevels and chamfers. They print fine; whether they feel too sharp in the hand is a design choice.
+    </div>
+  </aside>
+  <div class="stage">
+    <div id="view"></div>
+    <div class="status" id="status">Loading…</div>
+    <div class="hint">drag to rotate · right-drag to pan · scroll to zoom</div>
+  </div>
+</div>

@@ -1,0 +1,121 @@
+{
+ "mcp23017_pin": {
+  "BACK": 28,
+  "LEFT": 27,
+  "UP": 26,
+  "OK": 25,
+  "DOWN": 24,
+  "HOME": 23,
+  "VOICE": 22,
+  "RIGHT": 21,
+  "POWER": 1,
+  "VOL_DOWN": 3,
+  "VOL_UP": 4,
+  "CH_DOWN": 5,
+  "MUTE": 7,
+  "CH_UP": 8
+ },
+ "esphome_number": {
+  "BACK": 7,
+  "LEFT": 6,
+  "UP": 5,
+  "OK": 4,
+  "DOWN": 3,
+  "HOME": 2,
+  "VOICE": 1,
+  "RIGHT": 0,
+  "POWER": 8,
+  "VOL_DOWN": 10,
+  "VOL_UP": 11,
+  "CH_DOWN": 12,
+  "MUTE": 14,
+  "CH_UP": 15
+ },
+ "J5_wire_pads": [
+  {
+   "pad": "1",
+   "name": "GND",
+   "net": "GND",
+   "display_pin": "GND"
+  },
+  {
+   "pad": "2",
+   "name": "LED1-",
+   "net": "K1",
+   "display_pin": null
+  },
+  {
+   "pad": "3",
+   "name": "LED2-",
+   "net": "K2",
+   "display_pin": null
+  },
+  {
+   "pad": "4",
+   "name": "IR",
+   "net": "IR",
+   "display_pin": "IO27"
+  },
+  {
+   "pad": "5",
+   "name": "LED+",
+   "net": "VBAT",
+   "display_pin": "VBAT"
+  },
+  {
+   "pad": "6",
+   "name": "VBAT",
+   "net": "VBAT",
+   "display_pin": "VBAT"
+  },
+  {
+   "pad": "7",
+   "name": "3V3",
+   "net": "3V3",
+   "display_pin": "3V3"
+  },
+  {
+   "pad": "8",
+   "name": "INT",
+   "net": "INT",
+   "display_pin": "IO35"
+  },
+  {
+   "pad": "9",
+   "name": "SCL",
+   "net": "SCL",
+   "display_pin": "IO5"
+  },
+  {
+   "pad": "10",
+   "name": "SDA",
+   "net": "SDA",
+   "display_pin": "IO1"
+  }
+ ],
+ "wire_jumpers": [
+  {
+   "net": "INT",
+   "from": [
+    24.41,
+    61.69
+   ],
+   "to": [
+    32.54,
+    108.8
+   ]
+  },
+  {
+   "net": "3V3",
+   "from": [
+    24.41,
+    69.31
+   ],
+   "to": [
+    30.0,
+    108.8
+   ]
+  }
+ ],
+ "unrouted": []
+}

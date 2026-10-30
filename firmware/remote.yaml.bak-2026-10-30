@@ -1,0 +1,339 @@
+# ESPHome firmware: ESP32-32E 2.4" (LCDwiki E32R24P) universal remote
+# Lines marked [CHECK] need a value from your hardware or a quick test.
+#
+# Pin map (display board -> button board J5):
+#   IO1  SDA  (MCP23017)    IO5  SCL  (MCP23017)     IO35 INT  (MCP23017, wakes from sleep)
+#   IO18 MIC SCK            IO19 MIC WS              IO23 MIC SD
+#   IO27 IR transistor      IO34 battery voltage (on board, x2 divider)
+#   IO4  speaker amp enable (held off)                IO21 backlight
+#   IO22/IO16/IO17  on-board RGB LED (common anode, low = on)
+#   Mic (INMP441) is wired straight to the display board: IO18 SCK, IO19 WS, IO23 SD
+
+substitutions:
+  name: tv-remote
+  relay_host: 192.168.31.128     # box running voice_relay.py [CHECK]
+  relay_port: "7777"
+  sleep_after: 30s               # idle time before deep sleep
+
+esphome:
+  name: ${name}
+  on_boot:
+    - priority: 800              # as early as possible: keep the amp off
+      then:
+        - output.turn_on: amp_off
+    - priority: 200              # I2C is up: read which key woke us
+      then:
+        - lambda: |-
+            // INTCAP holds the port state latched at the moment of the press,
+            // so a quick tap that's already released is still seen.
+            uint8_t a = 0xFF, b = 0xFF;
+            id(i2c_bus).read_register(0x20, 0x10, &a, 1);   // INTCAPA
+            id(i2c_bus).read_register(0x20, 0x11, &b, 1);   // INTCAPB
+            id(wake_keys) = (uint16_t)(~((b << 8) | a)) & 0x01FF;
+        - script.execute: handle_wake_key
+        - script.execute: idle_timer
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+logger:
+  baud_rate: 0                   # IO1 is SDA now: no logs over UART, use WiFi logs
+
+api:
+ota:
+  - platform: esphome
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  fast_connect: true             # skip the scan on wake
+  power_save_mode: light
+  manual_ip:                     # static IP avoids DHCP time on every wake [CHECK]
+    static_ip: 192.168.31.60
+    gateway: 192.168.31.1
+    subnet: 255.255.255.0
+
+globals:
+  - id: wake_keys
+    type: uint16_t
+    initial_value: '0'
+
+# ---------------------------------------------------------------- power
+deep_sleep:
+  id: sleeper
+  wakeup_pin:
+    number: GPIO35
+    inverted: true               # MCP23017 INT is active low (open drain, 10k pull-up)
+
+output:
+  - platform: gpio
+    id: amp_off
+    pin: GPIO4                   # high = FM8002E amp disabled [CHECK polarity]
+  - platform: ledc
+    id: backlight_pwm
+    pin: GPIO21
+  - { platform: ledc, id: led_r, pin: { number: GPIO22, inverted: true } }
+  - { platform: ledc, id: led_g, pin: { number: GPIO16, inverted: true } }
+  - { platform: ledc, id: led_b, pin: { number: GPIO17, inverted: true } }
+
+light:
+  - platform: monochromatic
+    id: backlight
+    output: backlight_pwm
+    restore_mode: ALWAYS_ON
+    default_transition_length: 0s
+  - platform: rgb
+    id: status_led
+    red: led_r
+    green: led_g
+    blue: led_b
+    restore_mode: ALWAYS_OFF
+    default_transition_length: 0s
+    effects:
+      - pulse: { name: listening, transition_length: 400ms, update_interval: 400ms }
+      - strobe:
+          name: low_battery
+          colors:
+            - { state: true, red: 100%, green: 0%, blue: 0%, brightness: 40%, duration: 150ms }
+            - { state: false, duration: 2850ms }
+
+sensor:
+  - platform: adc
+    id: battery
+    name: Remote battery
+    pin: GPIO34
+    attenuation: 12db
+    update_interval: 60s
+    filters:
+      - multiply: 2.0            # on-board divider halves the cell voltage
+    on_value_range:
+      - below: 3.45              # roughly 10 % left on a LiPo [CHECK]
+        then:
+          - light.turn_on: { id: status_led, effect: low_battery }
+      - above: 3.55
+        then:
+          - light.turn_off: status_led
+
+script:
+  - id: idle_timer
+    mode: restart
+    then:
+      - delay: ${sleep_after}
+      - script.execute: go_to_sleep
+
+  # LED feedback: short green = IR sent, short blue = sent over WiFi,
+  # amber = still connecting, pulsing blue = listening, red blink = low battery
+  - id: flash_ir
+    mode: restart
+    then:
+      - light.turn_on: { id: status_led, red: 0%, green: 100%, blue: 0%, brightness: 35% }
+      - delay: 60ms
+      - light.turn_off: status_led
+  - id: flash_wifi
+    mode: restart
+    then:
+      - if:
+          condition: api.connected
+          then:
+            - light.turn_on: { id: status_led, red: 0%, green: 0%, blue: 100%, brightness: 35% }
+            - delay: 60ms
+            - light.turn_off: status_led
+          else:
+            - light.turn_on: { id: status_led, red: 100%, green: 55%, blue: 0%, brightness: 30% }
+            - wait_until: { condition: api.connected, timeout: 4s }
+            - light.turn_off: status_led
+
+  - id: go_to_sleep
+    then:
+      - light.turn_off: status_led
+      - light.turn_off: backlight
+      - lambda: |-
+          // keep the IR transistor off and the amp disabled through deep sleep
+          gpio_set_level(GPIO_NUM_27, 0);
+          rtc_gpio_hold_en(GPIO_NUM_27);
+          gpio_set_level(GPIO_NUM_4, 1);
+          rtc_gpio_hold_en(GPIO_NUM_4);
+          // RGB LED pins are not RTC pins; hold them high (off) through deep sleep
+          for (auto p : {GPIO_NUM_22, GPIO_NUM_16, GPIO_NUM_17}) { gpio_set_direction(p, GPIO_MODE_OUTPUT); gpio_set_level(p, 1); gpio_hold_en(p); }
+          gpio_deep_sleep_hold_en();
+          // clear any pending expander interrupt so INT is released
+          uint8_t v;
+          id(i2c_bus).read_register(0x20, 0x12, &v, 1);
+          id(i2c_bus).read_register(0x20, 0x13, &v, 1);
+      - deep_sleep.enter: sleeper
+
+  - id: handle_wake_key
+    then:
+      - lambda: |-
+          rtc_gpio_hold_dis(GPIO_NUM_27);
+          rtc_gpio_hold_dis(GPIO_NUM_4);
+          for (auto p : {GPIO_NUM_22, GPIO_NUM_16, GPIO_NUM_17}) gpio_hold_dis(p);
+          uint16_t k = id(wake_keys);
+          // pin -> function mapping is written by the PCB router into pinmap.json;
+          // the bit numbers below must match it [CHECK]
+          if (k & (1 << 0)) id(key_power).execute();
+
+  # Android TV keys go through HA's Android TV Remote integration
+  - id: tv_key
+    parameters: { command: string }
+    then:
+      - script.execute: flash_wifi
+      - homeassistant.action:
+          action: remote.send_command
+          data:
+            entity_id: remote.android_tv     # [CHECK]
+          data_template:
+            command: "{{ cmd }}"
+          variables:
+            cmd: !lambda 'return command;'
+
+  - id: key_power
+    then:
+      # one press: TV + soundbar + set-top box all off/on
+      - homeassistant.action:
+          action: remote.send_command
+          data: { entity_id: remote.android_tv, command: POWER }
+      - script.execute: flash_ir
+      - remote_transmitter.transmit_sony: { data: 0x540C, nbits: 15 }    # soundbar power [CHECK code]
+      - delay: 60ms
+      - remote_transmitter.transmit_nec: { address: 0x0000, command: 0x0000 }  # set-top box power [CHECK code]
+
+
+# ---------------------------------------------------------------- buttons
+i2c:
+  id: i2c_bus
+  sda: GPIO1
+  scl: GPIO5
+  frequency: 400kHz
+  scan: false
+
+mcp23017:
+  - id: mcp
+    address: 0x20
+    open_drain_interrupt: true   # INTA is wired to IO35 with a 10k pull-up
+
+# Bit numbers: GPA0..7 = 0..7, GPB0 = 8. Set them from pinmap.json [CHECK]
+binary_sensor:
+  - { platform: gpio, id: b_power, name: Power, pin: { mcp23xxx: mcp, number: 8, mode: { input: true, pullup: true }, inverted: true, interrupt: FALLING },
+      on_press: [ script.execute: idle_timer, script.execute: key_power ] }
+  - { platform: gpio, id: b_up,    name: Up,    pin: { mcp23xxx: mcp, number: 0, mode: { input: true, pullup: true }, inverted: true, interrupt: FALLING },
+      on_press: [ script.execute: idle_timer, script.execute: { id: tv_key, command: DPAD_UP } ] }
+  - { platform: gpio, id: b_down,  name: Down,  pin: { mcp23xxx: mcp, number: 1, mode: { input: true, pullup: true }, inverted: true, interrupt: FALLING },
+      on_press: [ script.execute: idle_timer, script.execute: { id: tv_key, command: DPAD_DOWN } ] }
+  - { platform: gpio, id: b_left,  name: Left,  pin: { mcp23xxx: mcp, number: 2, mode: { input: true, pullup: true }, inverted: true, interrupt: FALLING },
+      on_press: [ script.execute: idle_timer, script.execute: { id: tv_key, command: DPAD_LEFT } ] }
+  - { platform: gpio, id: b_right, name: Right, pin: { mcp23xxx: mcp, number: 3, mode: { input: true, pullup: true }, inverted: true, interrupt: FALLING },
+      on_press: [ script.execute: idle_timer, script.execute: { id: tv_key, command: DPAD_RIGHT } ] }
+  - { platform: gpio, id: b_ok,    name: OK,    pin: { mcp23xxx: mcp, number: 4, mode: { input: true, pullup: true }, inverted: true, interrupt: FALLING },
+      on_press: [ script.execute: idle_timer, script.execute: { id: tv_key, command: DPAD_CENTER } ] }
+  - { platform: gpio, id: b_back,  name: Back,  pin: { mcp23xxx: mcp, number: 5, mode: { input: true, pullup: true }, inverted: true, interrupt: FALLING },
+      on_press: [ script.execute: idle_timer, script.execute: { id: tv_key, command: BACK } ] }
+  - { platform: gpio, id: b_home,  name: Home,  pin: { mcp23xxx: mcp, number: 6, mode: { input: true, pullup: true }, inverted: true, interrupt: FALLING },
+      on_press: [ script.execute: idle_timer, script.execute: { id: tv_key, command: HOME } ] }
+  - platform: gpio
+    id: b_voice
+    name: Voice
+    pin: { mcp23xxx: mcp, number: 7, mode: { input: true, pullup: true }, inverted: true, interrupt: CHANGE }
+    on_press:
+      - script.execute: idle_timer
+      - microphone.capture: mic   # starts buffering at once; sent when WiFi is up
+      - light.turn_on: { id: status_led, red: 0%, green: 30%, blue: 100%, brightness: 50%, effect: listening }
+    on_release:
+      - microphone.stop_capture: mic
+      - light.turn_off: status_led
+
+# ---------------------------------------------------------------- IR
+remote_transmitter:
+  pin: GPIO27
+  carrier_duty_percent: 33%
+  non_blocking: true
+
+# ---------------------------------------------------------------- voice
+i2s_audio:
+  - id: i2s_mic
+    i2s_lrclk_pin: GPIO19
+    i2s_bclk_pin: GPIO18
+
+microphone:
+  - platform: i2s_audio
+    id: mic
+    i2s_audio_id: i2s_mic
+    i2s_din_pin: GPIO23
+    adc_type: external
+    pdm: false
+    channel: left                # L/R pin of the INMP441 tied to GND
+    sample_rate: 16000
+    bits_per_sample: 32bit
+    on_data:
+      - udp.write:
+          id: voice_udp
+          data: !lambda 'return x;'
+
+udp:
+  - id: voice_udp
+    addresses: ["${relay_host}"]
+    port: ${relay_port}
+
+# ---------------------------------------------------------------- display + touch
+spi:
+  - id: lcd_spi
+    clk_pin: GPIO14
+    mosi_pin: GPIO13
+  - id: touch_spi
+    clk_pin: GPIO25
+    mosi_pin: GPIO32
+    miso_pin: GPIO39
+
+display:
+  - platform: ili9xxx
+    id: lcd
+    spi_id: lcd_spi
+    model: ST7789V
+    cs_pin: GPIO15
+    dc_pin: GPIO2
+    dimensions: { width: 240, height: 320 }
+    invert_colors: true          # [CHECK] flip if colours look negative
+    color_order: bgr             # [CHECK]
+    transform: { mirror_x: false, mirror_y: false }   # USB-C end faces the tip [CHECK]
+    auto_clear_enabled: false
+    update_interval: never
+
+touchscreen:
+  - platform: xpt2046
+    id: touch
+    spi_id: touch_spi
+    cs_pin: GPIO33
+    interrupt_pin: GPIO36
+    calibration: { x_min: 300, x_max: 3800, y_min: 300, y_max: 3800 }   # [CHECK] calibrate
+    on_touch:
+      - script.execute: idle_timer
+
+lvgl:
+  displays: [lcd]
+  touchscreens: [touch]
+  buffer_size: 25%               # no PSRAM on this board
+  pages:
+    - id: home_page
+      widgets:
+        - label: { align: TOP_MID, y: 8, text: "Living room" }
+        - buttonmatrix:
+            align: CENTER
+            width: 230
+            height: 250
+            rows:
+              - buttons:
+                  - { text: "Vol +", id: bm_volup }
+                  - { text: "Vol -", id: bm_voldn }
+                  - { text: "Mute",  id: bm_mute }
+              - buttons:
+                  - { text: "Ch +",  id: bm_chup }
+                  - { text: "Ch -",  id: bm_chdn }
+                  - { text: "Guide", id: bm_guide }
+              - buttons:
+                  - { text: "Lights", id: bm_lights }
+                  - { text: "Fan",    id: bm_fan }
+                  - { text: "AC",     id: bm_ac }
+            on_press:
+              - script.execute: idle_timer

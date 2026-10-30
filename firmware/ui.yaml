@@ -1,0 +1,390 @@
+# LVGL user interface, shared by remote.yaml (the real device) and sim.yaml
+# (desktop SDL window for screenshots and touch testing).
+#
+# 240 x 320 portrait. Layout, top to bottom:
+#   0..24    status bar          (top layer)
+#   24..44   warning banner      (top layer, hidden unless needed; each tab keeps
+#                                 this strip free so nothing is covered)
+#   24..276  tab content
+#   276..320 tab bar
+#
+# Every button goes through ui_press(k) / ui_voice(active), defined by the including
+# file. Key codes 0..15 are the MCP23017 bit numbers from pcb/fab/pinmap.json, so
+# a touch key and its physical twin run the same code:
+#   0 RIGHT  1 VOICE  2 HOME  3 DOWN  4 OK  5 UP  6 LEFT  7 BACK
+#   8 POWER  10 VOL-  11 VOL+  12 CH-  14 MUTE  15 CH+
+#   20..25 soundbar   30..35 set-top box   50..55 home tiles   90..92 status page
+
+globals:
+  - { id: g_board_ok, type: bool, initial_value: 'false' }   # MCP23017 answered at boot
+  - { id: g_batt_pct, type: int, initial_value: '100' }
+  - { id: g_batt_mv, type: int, initial_value: '0' }
+  - { id: g_mode, type: int, initial_value: '0' }            # 0 normal, 1 ultra saver, 2 critical
+  - { id: g_net, type: int, initial_value: '0' }             # 0 off, 1 connecting, 2 WiFi up, 3 HA connected
+  - { id: g_wake, type: int, initial_value: '0' }            # 0 power-on, 1 key, 2 touch, 3 timer
+  - { id: g_stay, type: bool, initial_value: 'false' }       # "stay awake" is on
+  - { id: g_ssid, type: std::string, initial_value: '""' }   # filled in by the device on connect
+  - { id: g_ip, type: std::string, initial_value: '""' }
+  - { id: g_rssi, type: int, initial_value: '0' }            # dBm, 0 = unknown
+
+lvgl:
+  buffer_size: 25%               # no PSRAM: 38 KB draw buffer, partial redraws only
+  log_level: WARN
+  bg_color: 0x0E1116
+  text_color: 0xE6EAF0
+  text_font: montserrat_14
+  style_definitions:
+    - id: st_key
+      bg_color: 0x262C37
+      bg_opa: COVER
+      radius: 8
+      border_width: 0
+      shadow_width: 0
+      text_color: 0xE6EAF0
+      pad_all: 0
+    - id: st_page
+      bg_color: 0x0E1116
+      bg_opa: COVER
+      border_width: 0
+      pad_all: 0
+      radius: 0
+    - id: st_section
+      text_font: montserrat_12
+      text_color: 0x8B93A1
+    - id: st_row_name
+      text_color: 0x8B93A1
+    - id: st_tile
+      bg_color: 0x1B2029
+      bg_opa: COVER
+      radius: 12
+      border_width: 0
+      shadow_width: 0
+      text_color: 0xE6EAF0
+      pad_all: 0
+
+  top_layer:
+    widgets:
+      - obj:                     # status bar
+          id: status_bar
+          x: 0
+          y: 0
+          width: 240
+          height: 24
+          bg_color: 0x0E1116
+          border_width: 0
+          radius: 0
+          pad_all: 0
+          clickable: false
+          scrollable: false
+          widgets:
+            - label: { id: sb_title, x: 8, align: LEFT_MID, text_color: 0xE6EAF0, text: "Living room" }
+            - label: { id: sb_icons, x: -8, align: RIGHT_MID, text_color: 0xE6EAF0, text: " 100%" }
+      - obj:                     # warning banner
+          id: banner
+          hidden: true
+          x: 0
+          y: 24
+          width: 240
+          height: 20
+          bg_color: 0xF2A33A
+          border_width: 0
+          radius: 0
+          pad_all: 0
+          clickable: false
+          scrollable: false
+          widgets:
+            - label:
+                id: banner_text
+                align: CENTER
+                text_font: montserrat_12
+                text_color: 0x111111
+                text: "No button board - touch only"
+      - obj:                     # toast
+          id: toast
+          hidden: true
+          align: TOP_MID
+          y: 50
+          width: SIZE_CONTENT
+          height: SIZE_CONTENT
+          bg_color: 0x000000
+          bg_opa: 85%
+          border_width: 0
+          radius: 14
+          pad_left: 14
+          pad_right: 14
+          pad_top: 6
+          pad_bottom: 6
+          clickable: false
+          scrollable: false
+          widgets:
+            - label: { id: toast_text, text_color: 0xE6EAF0, text: "" }
+
+  pages:
+    - id: main_page
+      widgets:
+        - tabview:
+            id: tabs
+            y: 24
+            width: 240
+            height: 296
+            position: BOTTOM
+            size: 44
+            bg_color: 0x0E1116
+            tabs:
+              # ------------------------------------------------ TV
+              - name: ""
+                id: tab_tv
+                styles: st_page
+                scrollable: false
+                widgets:
+                  - button: { x: 6, y: 24, width: 52, height: 34, styles: st_key, bg_color: 0xB8362E,
+                      widgets: [ label: { align: CENTER, text: "" } ],
+                      on_click: [ script.execute: { id: ui_press, k: 8 } ] }
+                  - button: { x: 64, y: 24, width: 52, height: 34, styles: st_key,
+                      widgets: [ label: { align: CENTER, text: " Back" } ],
+                      on_click: [ script.execute: { id: ui_press, k: 7 } ] }
+                  - button: { x: 122, y: 24, width: 52, height: 34, styles: st_key,
+                      widgets: [ label: { align: CENTER, text: "" } ],
+                      on_click: [ script.execute: { id: ui_press, k: 2 } ] }
+                  - button:              # hold to talk
+                      id: btn_talk
+                      x: 180
+                      y: 24
+                      width: 54
+                      height: 34
+                      styles: st_key
+                      bg_color: 0x1F4FA3
+                      pressed: { bg_color: 0x3D8BFD }
+                      widgets: [ label: { align: CENTER, text: "Talk" } ]
+                      on_press: [ script.execute: { id: ui_voice, active: true } ]
+                      on_release: [ script.execute: { id: ui_voice, active: false } ]
+                  # D-pad
+                  - button: { x: 86, y: 66, width: 68, height: 40, styles: st_key,
+                      widgets: [ label: { align: CENTER, text: "" } ],
+                      on_click: [ script.execute: { id: ui_press, k: 5 } ] }
+                  - button: { x: 10, y: 110, width: 72, height: 40, styles: st_key,
+                      widgets: [ label: { align: CENTER, text: "" } ],
+                      on_click: [ script.execute: { id: ui_press, k: 6 } ] }
+                  - button: { x: 86, y: 110, width: 68, height: 40, styles: st_key, bg_color: 0x3D8BFD,
+                      widgets: [ label: { align: CENTER, text: "OK" } ],
+                      on_click: [ script.execute: { id: ui_press, k: 4 } ] }
+                  - button: { x: 158, y: 110, width: 72, height: 40, styles: st_key,
+                      widgets: [ label: { align: CENTER, text: "" } ],
+                      on_click: [ script.execute: { id: ui_press, k: 0 } ] }
+                  - button: { x: 86, y: 154, width: 68, height: 40, styles: st_key,
+                      widgets: [ label: { align: CENTER, text: "" } ],
+                      on_click: [ script.execute: { id: ui_press, k: 3 } ] }
+                  # volume (soundbar IR) and channel (set-top box IR)
+                  - button: { x: 6, y: 202, width: 44, height: 44, styles: st_key,
+                      widgets: [ label: { align: CENTER, text: " -" } ],
+                      on_click: [ script.execute: { id: ui_press, k: 10 } ] }
+                  - button: { x: 52, y: 202, width: 44, height: 44, styles: st_key,
+                      widgets: [ label: { align: CENTER, text: " +" } ],
+                      on_click: [ script.execute: { id: ui_press, k: 11 } ] }
+                  - button: { x: 98, y: 202, width: 44, height: 44, styles: st_key,
+                      widgets: [ label: { align: CENTER, text: "" } ],
+                      on_click: [ script.execute: { id: ui_press, k: 14 } ] }
+                  - button: { x: 144, y: 202, width: 44, height: 44, styles: st_key,
+                      widgets: [ label: { align: CENTER, text: "CH-" } ],
+                      on_click: [ script.execute: { id: ui_press, k: 12 } ] }
+                  - button: { x: 190, y: 202, width: 44, height: 44, styles: st_key,
+                      widgets: [ label: { align: CENTER, text: "CH+" } ],
+                      on_click: [ script.execute: { id: ui_press, k: 15 } ] }
+
+              # ------------------------------------------------ soundbar + set-top box
+              - name: ""
+                id: tab_audio
+                styles: st_page
+                scrollable: false
+                widgets:
+                  - label: { x: 8, y: 26, styles: st_section, text: "SOUNDBAR  -  IR" }
+                  - button: { x: 6, y: 44, width: 72, height: 40, styles: st_key, bg_color: 0xB8362E,
+                      widgets: [ label: { align: CENTER, text: "" } ],
+                      on_click: [ script.execute: { id: ui_press, k: 20 } ] }
+                  - button: { x: 84, y: 44, width: 72, height: 40, styles: st_key,
+                      widgets: [ label: { align: CENTER, text: "Input" } ],
+                      on_click: [ script.execute: { id: ui_press, k: 21 } ] }
+                  - button: { x: 162, y: 44, width: 72, height: 40, styles: st_key,
+                      widgets: [ label: { align: CENTER, text: "Mode" } ],
+                      on_click: [ script.execute: { id: ui_press, k: 22 } ] }
+                  - button: { x: 6, y: 90, width: 72, height: 40, styles: st_key,
+                      widgets: [ label: { align: CENTER, text: " -" } ],
+                      on_click: [ script.execute: { id: ui_press, k: 23 } ] }
+                  - button: { x: 84, y: 90, width: 72, height: 40, styles: st_key,
+                      widgets: [ label: { align: CENTER, text: "" } ],
+                      on_click: [ script.execute: { id: ui_press, k: 24 } ] }
+                  - button: { x: 162, y: 90, width: 72, height: 40, styles: st_key,
+                      widgets: [ label: { align: CENTER, text: " +" } ],
+                      on_click: [ script.execute: { id: ui_press, k: 25 } ] }
+                  - label: { x: 8, y: 140, styles: st_section, text: "SET-TOP BOX  -  IR" }
+                  - button: { x: 6, y: 158, width: 72, height: 40, styles: st_key, bg_color: 0xB8362E,
+                      widgets: [ label: { align: CENTER, text: "" } ],
+                      on_click: [ script.execute: { id: ui_press, k: 30 } ] }
+                  - button: { x: 84, y: 158, width: 72, height: 40, styles: st_key,
+                      widgets: [ label: { align: CENTER, text: "Guide" } ],
+                      on_click: [ script.execute: { id: ui_press, k: 31 } ] }
+                  - button: { x: 162, y: 158, width: 72, height: 40, styles: st_key,
+                      widgets: [ label: { align: CENTER, text: " Menu" } ],
+                      on_click: [ script.execute: { id: ui_press, k: 32 } ] }
+                  - button: { x: 6, y: 204, width: 72, height: 40, styles: st_key,
+                      widgets: [ label: { align: CENTER, text: "CH-" } ],
+                      on_click: [ script.execute: { id: ui_press, k: 33 } ] }
+                  - button: { x: 84, y: 204, width: 72, height: 40, styles: st_key, bg_color: 0x3D8BFD,
+                      widgets: [ label: { align: CENTER, text: "OK" } ],
+                      on_click: [ script.execute: { id: ui_press, k: 34 } ] }
+                  - button: { x: 162, y: 204, width: 72, height: 40, styles: st_key,
+                      widgets: [ label: { align: CENTER, text: "CH+" } ],
+                      on_click: [ script.execute: { id: ui_press, k: 35 } ] }
+
+              # ------------------------------------------------ home (mock)
+              - name: ""
+                id: tab_home
+                styles: st_page
+                scrollable: false
+                widgets:
+                  - label: { x: 8, y: 26, styles: st_section, text: "HOME  -  MOCK TILES (NO HA YET)" }
+                  - button: { id: tile_lights, x: 6, y: 44, width: 111, height: 64, styles: st_tile, checkable: true,
+                      checked: { bg_color: 0x3D8BFD },
+                      widgets: [ label: { align: CENTER, text: "\nLights", text_align: CENTER } ],
+                      on_click: [ script.execute: { id: ui_press, k: 50 } ] }
+                  - button: { id: tile_fan, x: 123, y: 44, width: 111, height: 64, styles: st_tile, checkable: true,
+                      checked: { bg_color: 0x3D8BFD },
+                      widgets: [ label: { align: CENTER, text: "\nFan", text_align: CENTER } ],
+                      on_click: [ script.execute: { id: ui_press, k: 51 } ] }
+                  - button: { id: tile_ac, x: 6, y: 114, width: 111, height: 64, styles: st_tile, checkable: true,
+                      checked: { bg_color: 0x3D8BFD },
+                      widgets: [ label: { align: CENTER, text: "\nAC", text_align: CENTER } ],
+                      on_click: [ script.execute: { id: ui_press, k: 52 } ] }
+                  - button: { id: tile_curtains, x: 123, y: 114, width: 111, height: 64, styles: st_tile, checkable: true,
+                      checked: { bg_color: 0x3D8BFD },
+                      widgets: [ label: { align: CENTER, text: "\nCurtains", text_align: CENTER } ],
+                      on_click: [ script.execute: { id: ui_press, k: 53 } ] }
+                  - button: { x: 6, y: 184, width: 111, height: 62, styles: st_tile,
+                      widgets: [ label: { align: CENTER, text: "\nMovie", text_align: CENTER } ],
+                      on_click: [ script.execute: { id: ui_press, k: 54 } ] }
+                  - button: { x: 123, y: 184, width: 111, height: 62, styles: st_tile,
+                      widgets: [ label: { align: CENTER, text: "\nAll off", text_align: CENTER } ],
+                      on_click: [ script.execute: { id: ui_press, k: 55 } ] }
+
+              # ------------------------------------------------ status
+              - name: ""
+                id: tab_status
+                styles: st_page
+                scrollable: false
+                widgets:
+                  - label: { id: st_pct, text_color: 0xE6EAF0, x: 10, y: 28, text_font: montserrat_28, text: "100%" }
+                  - bar: { id: st_bar, x: 100, y: 34, width: 130, height: 14, min_value: 0, max_value: 100, value: 100,
+                      bg_color: 0x262C37, radius: 7, indicator: { bg_color: 0x3FB950, radius: 7 } }
+                  - label: { id: st_volt, x: 100, y: 52, styles: st_section, text: "0.00 V  -  Normal" }
+                  - label: { x: 10, y: 76, styles: st_row_name, text: "WiFi" }
+                  - label: { id: st_wifi, text_color: 0xE6EAF0, x: 96, y: 76, text: "Off (on demand)" }
+                  - label: { x: 10, y: 94, styles: st_row_name, text: "Network" }
+                  - label: { id: st_ssid, text_color: 0xE6EAF0, x: 96, y: 94, width: 138, height: 18, long_mode: DOT, text: "-" }
+                  - label: { x: 10, y: 112, styles: st_row_name, text: "IP" }
+                  - label: { id: st_ip, text_color: 0xE6EAF0, x: 96, y: 112, text: "-" }
+                  - label: { x: 10, y: 130, styles: st_row_name, text: "Board" }
+                  - label: { id: st_board, x: 96, y: 130, text: "-" }
+                  - label: { x: 10, y: 148, styles: st_row_name, text: "Woke by" }
+                  - label: { id: st_wake, text_color: 0xE6EAF0, x: 96, y: 148, text: "-" }
+                  - label: { x: 10, y: 166, styles: st_row_name, text: "Sleep" }
+                  - label: { id: st_sleep, text_color: 0xE6EAF0, x: 96, y: 166, text: "-" }
+                  - button: { x: 6, y: 188, width: 72, height: 44, styles: st_key,
+                      widgets: [ label: { align: CENTER, text: "\nRescan", text_align: CENTER, text_font: montserrat_12 } ],
+                      on_click: [ script.execute: { id: ui_press, k: 90 } ] }
+                  - button: { id: btn_stay, x: 84, y: 188, width: 72, height: 44, styles: st_key, checkable: true,
+                      checked: { bg_color: 0xB07A1E },
+                      widgets: [ label: { align: CENTER, text: "\nAwake 10m", text_align: CENTER, text_font: montserrat_12 } ],
+                      on_click: [ script.execute: { id: ui_press, k: 91 } ] }
+                  - button: { x: 162, y: 188, width: 72, height: 44, styles: st_key,
+                      widgets: [ label: { align: CENTER, text: "\nSleep", text_align: CENTER, text_font: montserrat_12 } ],
+                      on_click: [ script.execute: { id: ui_press, k: 92 } ] }
+
+script:
+  # Repaint everything that depends on state. Cheap: LVGL only redraws labels whose text changed.
+  - id: ui_refresh
+    then:
+      - lambda: |-
+          static const char *const NET[] = {"Off (on demand)", "Connecting...", "WiFi up", "HA connected"};
+          static const char *const WAKE[] = {"Power-on", "Button", "Touch", "Timer"};
+          static const char *const MODE[] = {"Normal", "Ultra saver", "Critical"};
+          int pct = id(g_batt_pct), mode = id(g_mode), net = id(g_net);
+          char buf[64];
+
+          static bool styled = false;   // LVGL 9 tab bar: plain buttons, styled once here
+          if (!styled) {
+            styled = true;
+            lv_obj_t *bar = lv_tabview_get_tab_bar(id(tabs));
+            lv_obj_set_style_bg_color(bar, lv_color_hex(0x0E1116), 0);
+            lv_obj_set_style_bg_opa(bar, LV_OPA_COVER, 0);
+            lv_obj_set_style_border_width(bar, 0, 0);
+            for (uint32_t i = 0; i < lv_obj_get_child_count(bar); i++) {
+              lv_obj_t *b = lv_obj_get_child(bar, i);
+              lv_obj_set_style_bg_opa(b, LV_OPA_TRANSP, 0);
+              lv_obj_set_style_text_color(b, lv_color_hex(0x8B93A1), 0);
+              lv_obj_set_style_text_color(b, lv_color_hex(0x3D8BFD), LV_STATE_CHECKED);
+              lv_obj_set_style_bg_color(b, lv_color_hex(0x161B22), LV_STATE_CHECKED);
+              lv_obj_set_style_bg_opa(b, LV_OPA_COVER, LV_STATE_CHECKED);
+              lv_obj_set_style_border_color(b, lv_color_hex(0x3D8BFD), LV_STATE_CHECKED);
+              lv_obj_set_style_border_width(b, 2, LV_STATE_CHECKED);
+              lv_obj_set_style_border_side(b, LV_BORDER_SIDE_TOP, LV_STATE_CHECKED);
+            }
+            lv_obj_t *content = lv_tabview_get_content(id(tabs));
+            lv_obj_set_style_bg_color(content, lv_color_hex(0x0E1116), 0);
+            lv_obj_set_style_bg_opa(content, LV_OPA_COVER, 0);
+          }
+
+          const char *batt = pct > 80 ? "" : pct > 55 ? "" : pct > 30 ? "" : pct > 10 ? "" : "";
+          snprintf(buf, sizeof buf, "%s%s %d%%", net >= 2 ? "  " : net == 1 ? "...  " : "", batt, pct);
+          lv_label_set_text(id(sb_icons), buf);
+          lv_obj_set_style_text_color(id(sb_icons), lv_color_hex(mode ? 0xFF6B5E : 0xE6EAF0), 0);
+
+          // banner: battery warnings outrank the missing-board warning
+          if (mode == 2) {
+            lv_label_set_text(id(banner_text), "Battery critical - IR only");
+            lv_obj_set_style_bg_color(id(banner), lv_color_hex(0xE5484D), 0);
+          } else if (mode == 1) {
+            lv_label_set_text(id(banner_text), id(g_board_ok) ? "Ultra power saver - battery low"
+                                                              : "Ultra saver - no button board");
+            lv_obj_set_style_bg_color(id(banner), lv_color_hex(0xE5484D), 0);
+          } else {
+            lv_label_set_text(id(banner_text), "No button board - touch only");
+            lv_obj_set_style_bg_color(id(banner), lv_color_hex(0xF2A33A), 0);
+          }
+          if (mode || !id(g_board_ok)) lv_obj_remove_flag(id(banner), LV_OBJ_FLAG_HIDDEN);
+          else lv_obj_add_flag(id(banner), LV_OBJ_FLAG_HIDDEN);
+
+          snprintf(buf, sizeof buf, "%d%%", pct);
+          lv_label_set_text(id(st_pct), buf);
+          lv_bar_set_value(id(st_bar), pct, LV_ANIM_OFF);
+          lv_obj_set_style_bg_color(id(st_bar), lv_color_hex(mode == 2 ? 0xE5484D : mode ? 0xF2A33A : 0x3FB950), LV_PART_INDICATOR);
+          snprintf(buf, sizeof buf, "%d.%02d V  -  %s", id(g_batt_mv) / 1000, id(g_batt_mv) % 1000 / 10, MODE[mode]);
+          lv_label_set_text(id(st_volt), buf);
+          lv_label_set_text(id(st_wifi), NET[net]);
+          if (net >= 2) {
+            int r = id(g_rssi);
+            snprintf(buf, sizeof buf, "%ddBm %s", r, id(g_ssid).c_str());
+            lv_label_set_text(id(st_ssid), buf);
+            lv_obj_set_style_text_color(id(st_ssid), lv_color_hex(r >= -72 ? 0xE6EAF0 : 0xF2A33A), 0);
+            lv_label_set_text(id(st_ip), id(g_ip).c_str());
+          } else {
+            lv_label_set_text(id(st_ssid), "-");
+            lv_label_set_text(id(st_ip), "-");
+          }
+          lv_label_set_text(id(st_board), id(g_board_ok) ? "MCP23017 found" : "Missing (probing)");
+          lv_obj_set_style_text_color(id(st_board), lv_color_hex(id(g_board_ok) ? 0x3FB950 : 0xF2A33A), 0);
+          lv_label_set_text(id(st_wake), WAKE[id(g_wake)]);
+          snprintf(buf, sizeof buf, "%s, %s", id(g_stay) ? "held off" : mode ? "8 s" : "20 s",
+                   id(g_board_ok) ? "key+touch" : "touch only");
+          lv_label_set_text(id(st_sleep), buf);
+          if (id(g_stay)) lv_obj_add_state(id(btn_stay), LV_STATE_CHECKED);
+          else lv_obj_remove_state(id(btn_stay), LV_STATE_CHECKED);
+
+  - id: ui_toast
+    mode: restart
+    parameters: { text: string }
+    then:
+      - lambda: |-
+          lv_label_set_text(id(toast_text), text.c_str());
+          lv_obj_remove_flag(id(toast), LV_OBJ_FLAG_HIDDEN);
+      - delay: 1200ms
+      - lvgl.widget.hide: toast

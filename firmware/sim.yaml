@@ -1,0 +1,59 @@
+# Desktop simulator: runs ui.yaml in an SDL window on Linux, so the screens can be
+# tried and screenshotted without the remote. Buttons only log and show a toast.
+#   esphome run sim.yaml
+# Pick the state and tab with environment variables:
+#   SIM_STATE = normal | noboard | saver | critical     SIM_TAB = 0..3   SIM_TOAST = text
+# SDL2 must be installed (sdl2-config on PATH).
+
+esphome:
+  name: remote-sim
+  on_boot:
+    priority: -100
+    then:
+      - lambda: |-
+          const char *s = getenv("SIM_STATE");
+          std::string st = s ? s : "normal";
+          id(g_board_ok) = st == "normal";
+          id(g_batt_pct) = st == "critical" ? 4 : st == "saver" ? 18 : st == "noboard" ? 64 : 82;
+          id(g_batt_mv) = st == "critical" ? 3480 : st == "saver" ? 3660 : st == "noboard" ? 3830 : 3990;
+          id(g_mode) = st == "critical" ? 2 : st == "saver" ? 1 : 0;
+          id(g_net) = st == "normal" ? 3 : 0;
+          id(g_ssid) = "HomeNet"; id(g_ip) = "192.168.31.60"; id(g_rssi) = -58;
+          id(g_wake) = st == "normal" ? 1 : 2;
+          const char *t = getenv("SIM_TAB");
+          if (t) lv_tabview_set_active(id(tabs), atoi(t), LV_ANIM_OFF);
+      - script.execute: ui_refresh
+      - lambda: |-
+          const char *m = getenv("SIM_TOAST");
+          if (m) id(ui_toast).execute(std::string(m));
+
+host:
+
+logger:
+  level: INFO
+
+display:
+  - platform: sdl
+    id: lcd
+    dimensions: { width: 240, height: 320 }
+    auto_clear_enabled: false
+    update_interval: never
+
+touchscreen:
+  - platform: sdl
+    display: lcd
+
+packages:
+  ui: !include ui.yaml
+
+script:
+  - id: ui_press
+    parameters: { k: int }
+    then:
+      - lambda: |-
+          ESP_LOGI("sim", "key %d", k);
+          id(ui_toast).execute("Key " + std::to_string(k));
+  - id: ui_voice
+    parameters: { active: bool }
+    then:
+      - lambda: 'id(ui_toast).execute(active ? "Listening..." : "Sent");'

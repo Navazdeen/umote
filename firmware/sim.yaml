@@ -7,6 +7,8 @@
 
 esphome:
   name: remote-sim
+  includes:
+    - sim_dump.h
   on_boot:
     priority: -100
     then:
@@ -26,6 +28,20 @@ esphome:
       - lambda: |-
           const char *m = getenv("SIM_TOAST");
           if (m) id(ui_toast).execute(std::string(m));
+      # SIM_DUMP=<path>: write the visible widget tree for tools/check_ui.py, then exit.
+      - if:
+          condition:
+            lambda: 'return getenv("SIM_DUMP") != nullptr;'
+          then:
+            - script.execute: sim_names
+            - delay: 1500ms
+            - lambda: |-
+                const char *fx = getenv("SIM_FIXTURE");
+                const char *st = getenv("SIM_STATE");
+                std::string screen = fx ? fx : (std::string(st ? st : "normal") + "_tab" + (getenv("SIM_TAB") ? getenv("SIM_TAB") : "0"));
+                sim_dump(getenv("SIM_DUMP"), screen.c_str());
+                ESP_LOGI("sim", "dumped %s", screen.c_str());
+                exit(0);
 
 host:
 
@@ -46,6 +62,7 @@ touchscreen:
 packages:
   assets: !include assets.yaml
   ui: !include ui.yaml
+  names: !include sim_names.yaml
 
 script:
   - id: ui_press

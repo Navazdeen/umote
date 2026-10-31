@@ -39,6 +39,10 @@ substitutions:
   relay_host: 192.168.31.128     # box running voice_relay.py [CHECK]
   relay_port: "7777"
   static_ip: 192.168.31.60       # [CHECK]
+  ha_host: 192.168.31.91
+  # Settings > Wi-Fi falls back to these when joining another network fails
+  wifi_ssid_fallback: !secret wifi_ssid
+  wifi_password_fallback: !secret wifi_password
   stb_nec_address: "0x0000"      # set-top box NEC address [CHECK: capture]
   key_mask: "0xDDFF"             # the 14 key bits used in pinmap.json
 
@@ -191,6 +195,16 @@ light:
       - pulse: { name: listening, transition_length: 400ms, update_interval: 400ms }
 
 sensor:
+  - platform: homeassistant
+    id: ha_duration
+    entity_id: media_player.navazdeen
+    attribute: media_duration
+    on_value: [ lambda: 'ui::tv.duration = std::isnan(x) ? 0 : x;' ]
+  - platform: homeassistant
+    id: ha_position
+    entity_id: media_player.navazdeen
+    attribute: media_position
+    on_value: [ lambda: 'ui::tv.position = std::isnan(x) ? 0 : x; ui::tv.position_ms = millis();', script.execute: ui_render_tv ]
   - platform: adc
     id: batt_v
     name: Battery voltage
@@ -232,12 +246,97 @@ sensor:
     accuracy_decimals: 0
     update_interval: never
 
+# ---------------------------------------------------------------- Home Assistant data
+# sensor.umote_sources / sensor.umote_home / image.umote_artwork come from the umote integration (ha/).
 text_sensor:
+  - platform: homeassistant
+    id: ha_txt_3
+    entity_id: sensor.umote_sources
+    attribute: sources
+    on_value: [ lambda: 'ui::parse_sources(x); ui::render_sources_sheet();', script.execute: ui_render_tv ]
+  - platform: homeassistant
+    id: ha_txt_4
+    entity_id: sensor.umote_sources
+    attribute: quick
+    on_value: [ lambda: 'ui::tv.quick = ui::parse_ids(x);', script.execute: ui_render_tv ]
+  - platform: homeassistant
+    id: ha_txt_5
+    entity_id: sensor.umote_sources
+    attribute: more
+    on_value: [ lambda: 'ui::tv.more = ui::parse_ids(x);' ]
+  - platform: homeassistant
+    id: ha_txt_6
+    entity_id: sensor.umote_sources
+    attribute: current
+    on_value: [ lambda: 'ui::tv.current = x;', script.execute: ui_render_tv ]
+  - platform: homeassistant
+    id: ha_txt_7
+    entity_id: sensor.umote_home
+    attribute: tiles
+    on_value: [ lambda: 'ui::parse_tiles(x); ui::hp.updated_ms = millis(); ui::render_home();' ]
+  - platform: homeassistant
+    id: ha_txt_8
+    entity_id: remote.navazdeen
+    on_value: [ lambda: 'ui::tv.tv_on = x == "on";', script.execute: ui_render_tv ]
+  - platform: homeassistant
+    id: ha_txt_9
+    entity_id: remote.navazdeen
+    attribute: current_activity
+    on_value: [ lambda: 'ui::tv.activity = x;', script.execute: ui_render_tv ]
+  - platform: homeassistant
+    id: ha_txt_10
+    entity_id: media_player.navazdeen
+    on_value: [ lambda: 'ui::tv.cast_state = x; ui::tv.playing = x == "playing";', script.execute: ui_render_tv ]
+  - platform: homeassistant
+    id: ha_txt_11
+    entity_id: media_player.navazdeen
+    attribute: media_title
+    on_value: [ lambda: 'ui::tv.title = x;', script.execute: ui_render_tv ]
+  - platform: homeassistant
+    id: ha_txt_12
+    entity_id: media_player.navazdeen
+    attribute: app_name
+    on_value: [ lambda: 'ui::tv.app_name = x;', script.execute: ui_render_tv ]
+  - platform: homeassistant
+    id: art_picture
+    entity_id: image.umote_artwork
+    attribute: entity_picture
+    on_value:
+      - lambda: 'ui::tv.has_art = false;'
+      - script.execute: art_load
   - platform: template
     id: power_mode
     name: Power mode
     entity_category: diagnostic
     update_interval: never
+
+http_request:
+  verify_ssl: false
+  timeout: 5s
+
+# Artwork from image.umote_artwork (212x76 baseline JPEG). The URL carries HA's rotating token,
+# so the remote never stores one. Only fetched while the TV page shows; freed otherwise.
+online_image:
+  - id: art_img
+    url: http://${ha_host}:8123/
+    format: JPEG
+    type: RGB565
+    resize: 212x76
+    buffer_size: 16384
+    on_download_finished:
+      - lambda: |-
+          lv_image_set_src(ui::tvp.art, id(art_img)->get_lv_image_dsc());
+          ui::tv.has_art = true;
+      - script.execute: ui_render_tv
+    on_error:
+      - lambda: 'ui::tv.has_art = false;'
+      - script.execute: ui_render_tv
+
+button:
+  - platform: wake_on_lan
+    id: tv_wol
+    name: TV wake
+    target_mac_address: <tv_mac>
 
 # ---------------------------------------------------------------- session
 script:
@@ -278,9 +377,9 @@ script:
       - script.stop: go_to_sleep
       - lambda: |-
           bool full = id(g_touched) || id(g_wake) != 1;       // a key wake gets a dim glance only
-          float b = id(g_mode) ? 0.25f : 0.7f;                  // [CHECK] to taste
+          float b = id(g_mode) ? std::min(0.25f, id(g_brightness)) : id(g_brightness);   // Settings > Brightness
           id(g_bright) = full ? b : std::min(b, 0.2f);
-          id(g_idle_ms) = !full ? 6000 : id(g_mode) ? 8000 : 20000;
+          id(g_idle_ms) = !full ? 6000 : id(g_mode) ? 8000 : id(g_sleep_s) * 1000;     // Settings > Sleep after
           if (!id(g_fast)) { esp_pm_lock_acquire(id(g_pm_lock)); id(g_fast) = true; }
       - light.turn_on: { id: backlight, brightness: !lambda 'return id(g_bright);' }
       - delay: 1500ms
@@ -352,87 +451,195 @@ script:
       - deep_sleep.enter: sleeper    # LCD gets SLPIN in the powerdown hook
 
   # Shared by every key: 0..15 are MCP23017 bit numbers (pinmap.json), the rest are touch-only.
+  # Every physical key: umote::route (logic.h) decides per page where it goes.
+  # k = MCP23017 bit (pcb/fab/pinmap.json); 16 = OK held.
   - id: press
     parameters: { k: int }
     then:
       - script.execute: idle_timer
       - lambda: |-
-          auto tv = [](const char *cmd, const char *label) {
-            id(ui_toast).execute(std::string(label));
-            id(tv_key).execute(std::string(cmd));
-          };
-          // Sony SIRC 15-bit (soundbar) and NEC (set-top box). 0 = not captured yet.
-          // Capture real codes with remote_receiver dump: all [CHECK]
-          auto sb = [](int code, const char *label) {
-            id(ui_toast).execute(std::string(code ? label : "Soundbar code not captured yet"));
-            if (code) id(sb_ir).execute(code);
-          };
-          auto stb = [](int code, const char *label) {
-            id(ui_toast).execute(std::string(code ? label : "Set-top box code not captured yet"));
-            if (code) id(stb_ir).execute(code);
-          };
-          auto home = [](const char *name) {
-            ESP_LOGI("home", "mock tile: %s", name);
-            id(ui_toast).execute(std::string("Mock: ") + name);
-          };
-          switch (k) {
-            case 0:  tv("DPAD_RIGHT", ""); break;
-            case 1:  id(voice_start).execute(); break;
-            case 2:  tv("HOME", " Home"); break;
-            case 3:  tv("DPAD_DOWN", ""); break;
-            case 4:  tv("DPAD_CENTER", "OK"); break;
-            case 5:  tv("DPAD_UP", ""); break;
-            case 6:  tv("DPAD_LEFT", ""); break;
-            case 7:  tv("BACK", " Back"); break;
-            case 8:  id(ui_toast).execute(std::string(" Power all")); id(key_power).execute(); break;
-            case 10: case 23: sb(0x640C, " Vol -"); break;
-            case 11: case 25: sb(0x240C, " Vol +"); break;
-            case 14: case 24: sb(0x140C, " Mute"); break;
-            case 20: sb(0x540C, " Soundbar"); break;
-            case 21: sb(0, "Input"); break;
-            case 22: sb(0, "Sound mode"); break;
-            case 12: case 33: stb(0, "CH -"); break;
-            case 15: case 35: stb(0, "CH +"); break;
-            case 30: stb(0, " Set-top box"); break;
-            case 31: stb(0, "Guide"); break;
-            case 32: stb(0, "Menu"); break;
-            case 34: stb(0, "OK"); break;
-            case 50: home("Lights"); break;
-            case 51: home("Fan"); break;
-            case 52: home("AC"); break;
-            case 53: home("Curtains"); break;
-            case 54: home("Movie scene"); break;
-            case 55: home("All off"); break;
-            case 90:
-              if ([] { uint8_t r = 0x00, v;   // IODIRA: a real read, not an empty write
-              return id(i2c_bus).write_readv(0x20, &r, 1, &v, 1) == i2c::ERROR_OK; }()) { id(board_found).execute(); }
-              else id(ui_toast).execute(std::string("Still no MCP23017 at 0x20"));
-              break;
-            case 91:
-              id(g_stay) = !id(g_stay);
-              id(g_awake_until) = id(g_stay) ? millis() + 600000 : 0;
-              if (id(g_stay)) id(net_up).execute();
-              id(ui_toast).execute(std::string(id(g_stay) ? "Awake 10 min, WiFi on" : "Sleep allowed"));
-              id(ui_refresh).execute();
-              break;
-            case 92:
-              id(g_stay) = false;
-              id(g_awake_until) = 0;
-              id(go_to_sleep).execute();
+          using umote::Key; using umote::Target;
+          static const std::map<int, Key> KEYS = {
+            {0, Key::RIGHT}, {1, Key::VOICE}, {2, Key::HOME}, {3, Key::DOWN}, {4, Key::OK}, {5, Key::UP},
+            {6, Key::LEFT}, {7, Key::BACK}, {8, Key::POWER}, {10, Key::VOL_DOWN}, {11, Key::VOL_UP},
+            {12, Key::CH_DOWN}, {14, Key::MUTE}, {15, Key::CH_UP}, {16, Key::OK_HOLD}};
+          auto it = KEYS.find(k);
+          if (it == KEYS.end()) return;
+          auto page = (umote::Page) ui::pg.current;
+          auto a = umote::route(page, it->second, id(g_vol_to_tv), ui::sheet_open());
+          std::string code = a.code;
+          switch (a.target) {
+            case Target::TV_KEY: id(tv_key).execute(code); break;
+            case Target::SOUNDBAR_IR: id(soundbar_ir).execute(code); break;
+            case Target::FOCUS_MOVE: ui::home_move(a.code); break;
+            case Target::FOCUS_TOGGLE: ui::home_toggle_focus(); break;
+            case Target::FOCUS_OPTIONS: ui::open_options(ui::hp.focus); break;
+            case Target::CLOSE_SHEET: ui::close_sheets(); break;
+            case Target::LIST_MOVE: case Target::LIST_SELECT: ui::settings_key(a.code); break;
+            case Target::PAGE_SCROLL: ui::home_scroll(code == "UP"); break;
+            case Target::POWER: id(key_power).execute(); break;
+            case Target::NONE:
+              if (page == umote::Page::SETTINGS && it->second == Key::BACK) ui::settings_key("BACK");
               break;
           }
 
-  # Touch entry points used by ui.yaml
-  - id: ui_press
-    parameters: { k: int }
+  # ---- hooks called by the UI (ui.yaml / ui_lv.h) ----
+  - id: ui_launch
+    parameters: { source: string }
     then:
-      - lambda: 'if (id(g_armed)) id(press).execute(k);'
-  - id: ui_voice
-    parameters: { active: bool }
+      - lambda: 'if (!id(g_armed)) return;'
+      - if:
+          condition:
+            lambda: 'return !ui::tv.tv_on;'
+          then:
+            - script.execute: tv_wake
+      - script.execute: net_up
+      - wait_until: { condition: api.connected, timeout: 6s }
+      - homeassistant.action:
+          action: umote.launch
+          data_template: { source_id: "{{ s }}" }
+          variables: { s: !lambda 'return source;' }
+  - id: ui_power
+    then:
+      - script.execute: key_power
+  - id: ui_tv_key
+    parameters: { code: string }
+    then:
+      - script.execute: { id: tv_key, command: !lambda 'return code;' }
+  - id: ui_seek
+    parameters: { seconds: float }
+    then:
+      - script.execute: net_up
+      - wait_until: { condition: api.connected, timeout: 6s }
+      - homeassistant.action:
+          action: media_player.media_seek
+          data: { entity_id: media_player.navazdeen }
+          data_template: { seek_position: "{{ p }}" }
+          variables: { p: !lambda 'return seconds;' }
+  - id: ui_name_source
+    parameters: { port: int, name: string, go: bool }
+    then:
+      - homeassistant.action:
+          action: umote.name_source
+          data_template: { port: "{{ p }}", name: "{{ n }}" }
+          variables: { p: !lambda 'return port;', n: !lambda 'return name;' }
+      - lambda: 'if (go) id(ui_launch).execute("hdmi" + std::to_string(port));'
+  - id: ui_sb_ir
+    parameters: { code: string }
+    then:
+      - script.execute: { id: soundbar_ir, code: !lambda 'return code;' }
+  # Home tiles and the options sheet. kind: on | off | toggle | fan_pct | timer.
+  - id: ui_ha
+    mode: queued
+    parameters: { kind: string, entities: string, value: string }
+    then:
+      - script.execute: net_up
+      - wait_until: { condition: api.connected, timeout: 6s }
+      - if:
+          condition:
+            lambda: 'return kind == "fan_pct";'
+          then:
+            - homeassistant.action:
+                action: fan.set_percentage
+                data_template: { entity_id: "{{ e }}", percentage: "{{ v }}" }
+                variables: { e: !lambda 'return entities;', v: !lambda 'return value;' }
+      - if:
+          condition:
+            lambda: 'return kind == "timer";'
+          then:
+            - homeassistant.action:
+                action: select.select_option
+                data_template: { entity_id: "{{ e }}", option: "{{ o }}" }
+                variables:
+                  e: !lambda 'return entities;'
+                  o: !lambda 'int h = atoi(value.c_str()); return h == 0 ? std::string("Off") : h == 1 ? std::string("1 hour") : std::to_string(h) + " hours";'
+      - if:
+          condition:
+            lambda: 'return kind == "on";'
+          then:
+            - homeassistant.action:
+                action: homeassistant.turn_on
+                data_template: { entity_id: "{{ e }}" }
+                variables: { e: !lambda 'return entities;' }
+      - if:
+          condition:
+            lambda: 'return kind == "off";'
+          then:
+            - homeassistant.action:
+                action: homeassistant.turn_off
+                data_template: { entity_id: "{{ e }}" }
+                variables: { e: !lambda 'return entities;' }
+      - if:
+          condition:
+            lambda: 'return kind == "toggle";'
+          then:
+            - homeassistant.action:
+                action: homeassistant.toggle
+                data_template: { entity_id: "{{ e }}" }
+                variables: { e: !lambda 'return entities;' }
+  - id: ui_wifi_scan
+    then:
+      - script.execute: net_up
+      - wait_until: { condition: wifi.connected, timeout: 8s }
+      - lambda: 'wifi::global_wifi_component->start_scanning();'
+      - delay: 6s
+      - lambda: |-
+          std::vector<ui::Net> nets;
+          for (auto &r : wifi::global_wifi_component->get_scan_result())
+            if (!r.get_is_hidden()) nets.push_back({std::string(r.get_ssid().c_str()), r.get_rssi(), r.get_with_auth()});
+          ui::set_wifi_scan(nets);
+  # Join: save the new network; if it isn't up in 20 s, put the built-in one back.
+  - id: ui_wifi_join
+    mode: single
+    parameters: { ssid: string, password: string }
     then:
       - lambda: |-
-          if (!id(g_armed)) return;
-          if (active) id(voice_start).execute(); else id(voice_stop).execute();
+          ui::toast("Joining " + ssid);
+          wifi::global_wifi_component->save_wifi_sta(ssid, password);
+      - delay: 2s
+      - wait_until: { condition: wifi.connected, timeout: 20s }
+      - lambda: |-
+          char cur[wifi::SSID_BUFFER_SIZE];
+          bool ok = wifi::global_wifi_component->is_connected() &&
+                    std::string(wifi::global_wifi_component->wifi_ssid_to(cur)) == ssid;
+          if (ok) { ui::toast("Joined"); return; }
+          ui::toast("Couldn't join");
+          wifi::global_wifi_component->save_wifi_sta("${wifi_ssid_fallback}", "${wifi_password_fallback}");
+  - id: ui_settings_changed
+    parameters: { restart: bool }
+    then:
+      - script.execute: idle_timer      # applies brightness and sleep at once
+      - if:
+          condition:
+            lambda: 'return restart;'
+          then:
+            - lambda: 'ui::toast("Restarting");'
+            - delay: 1200ms
+            - lambda: 'App.safe_reboot();'
+  # TV, Home and Settings need data: bring WiFi up. Log free heap on every page change.
+  - id: ui_page_shown
+    parameters: { page: int }
+    then:
+      - lambda: |-
+          size_t heap = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+          if (heap < 40 * 1024) ESP_LOGW("heap", "page %d: free internal heap %u B (< 40 KB)", page, (unsigned) heap);
+          else ESP_LOGI("heap", "page %d: free internal heap %u B", page, (unsigned) heap);
+          if (page != 1) id(net_up).execute();
+      - script.execute: art_load
+
+  - id: art_load
+    mode: restart
+    then:
+      - if:
+          condition:
+            lambda: 'return ui::pg.current == 0 && ui::tv.tv_on && id(art_picture).state.rfind("/api/", 0) == 0;'
+          then:
+            - online_image.set_url:
+                id: art_img
+                url: !lambda 'return "http://${ha_host}:8123" + id(art_picture).state;'
+          else:
+            - lambda: 'id(art_img).release(); ui::tv.has_art = false;'
+            - script.execute: ui_render_tv
 
   # Bring WiFi up once; it then stays up until sleep.
   - id: net_up
@@ -470,7 +677,7 @@ script:
                   - homeassistant.action:
                       action: remote.send_command
                       data:
-                        entity_id: remote.android_tv     # [CHECK]
+                        entity_id: remote.navazdeen
                       data_template:
                         command: "{{ cmd }}"
                       variables:
@@ -479,12 +686,41 @@ script:
                 else:
                   - script.execute: { id: ui_toast, text: "TV unreachable (no HA link)" }
 
+  # TV power: Wake-on-LAN when it is off (HA can't wake it), remote.turn_off when on.
+  # The soundbar follows by IR, as before.
   - id: key_power
     then:
-      # one press: TV + soundbar + set-top box all off/on
-      - script.execute: { id: tv_key, command: POWER }
-      - script.execute: { id: sb_ir, code: 0x540C }      # soundbar power [CHECK code]
-      # set-top box power: add its NEC command here once captured [CHECK]
+      - script.execute: { id: soundbar_ir, code: POWER }
+      - if:
+          condition:
+            lambda: 'return ui::tv.tv_on;'
+          then:
+            - script.execute: net_up
+            - wait_until: { condition: api.connected, timeout: 6s }
+            - homeassistant.action:
+                action: remote.turn_off
+                data: { entity_id: remote.navazdeen }
+          else:
+            - script.execute: tv_wake
+
+  - id: tv_wake
+    mode: single
+    then:
+      - script.execute: net_up
+      - wait_until: { condition: wifi.connected, timeout: 6s }
+      - button.press: tv_wol
+      - script.execute: flash_wifi
+
+  # Soundbar IR by name. Sony SIRC 15-bit; codes from the RMT-AH103U (Task 14 fills the rest).
+  - id: soundbar_ir
+    parameters: { code: string }
+    then:
+      - lambda: |-
+          static const std::map<std::string, int> SIRC = {
+            {"POWER", 0x540C}, {"VOL_UP", 0x240C}, {"VOL_DOWN", 0x640C}, {"MUTE", 0x140C}};   // [CHECK: capture]
+          auto it = SIRC.find(code);
+          if (it == SIRC.end()) { ui::toast("Code not captured"); return; }
+          id(sb_ir).execute(it->second);
 
   - id: sb_ir
     mode: queued
@@ -562,6 +798,7 @@ interval:
   - interval: 2s                 # only while awake
     then:
       - lambda: |-
+          if (id(g_net) == 3) ui::tv.updated_ms = millis();   // connected = fresh; "Last seen" after 30 s without
           if (id(g_net) >= 2) {      // keep the signal reading fresh; redraw only on a real change
             int r = wifi::global_wifi_component->wifi_rssi();
             if (abs(r - id(g_rssi)) >= 3) { id(g_rssi) = r; id(ui_refresh).execute(); }
@@ -615,8 +852,13 @@ binary_sensor:
       filters: [ lambda: 'if (!id(g_board_ok)) return {}; return x;', delayed_on: 10ms ], on_press: [ script.execute: { id: press, k: 2 } ] }
   - { platform: gpio, id: k_down, pin: { mcp23xxx: mcp, number: 3, mode: { input: true, pullup: true }, inverted: true, interrupt: CHANGE },
       filters: [ lambda: 'if (!id(g_board_ok)) return {}; return x;', delayed_on: 10ms ], on_press: [ script.execute: { id: press, k: 3 } ] }
-  - { platform: gpio, id: k_ok, pin: { mcp23xxx: mcp, number: 4, mode: { input: true, pullup: true }, inverted: true, interrupt: CHANGE },
-      filters: [ lambda: 'if (!id(g_board_ok)) return {}; return x;', delayed_on: 10ms ], on_press: [ script.execute: { id: press, k: 4 } ] }
+  - platform: gpio
+    id: k_ok
+    pin: { mcp23xxx: mcp, number: 4, mode: { input: true, pullup: true }, inverted: true, interrupt: CHANGE }
+    filters: [ lambda: 'if (!id(g_board_ok)) return {}; return x;', delayed_on: 10ms ]
+    on_click:   # short = OK, held = OK_HOLD (Home: options sheet)
+      - { min_length: 10ms, max_length: 500ms, then: [ script.execute: { id: press, k: 4 } ] }
+      - { min_length: 500ms, max_length: 5s, then: [ script.execute: { id: press, k: 16 } ] }
   - { platform: gpio, id: k_up, pin: { mcp23xxx: mcp, number: 5, mode: { input: true, pullup: true }, inverted: true, interrupt: CHANGE },
       filters: [ lambda: 'if (!id(g_board_ok)) return {}; return x;', delayed_on: 10ms ], on_press: [ script.execute: { id: press, k: 5 } ] }
   - { platform: gpio, id: k_left, pin: { mcp23xxx: mcp, number: 6, mode: { input: true, pullup: true }, inverted: true, interrupt: CHANGE },

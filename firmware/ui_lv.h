@@ -899,8 +899,9 @@ inline void build_options() {
   lv_obj_t *plus = nm(button(s, 172, 84, 56, 44, CARD, LV_OPA_COVER, 12, [] { set_speed(1); }), "opt_speed_plus");
   icon(plus, "plus", 20, 18, 12, WHITE);
   text(s, 12, 138, 0, R.f12s, WHITE, "Timer", LV_TEXT_ALIGN_LEFT, 184);
-  static const char *const T[] = {"Off", "1 h", "2 h", "4 h"};
-  static const int H[] = {0, 1, 2, 4};
+  // Atomberg timer options: Off, 1, 2, 3, 6 hours
+  static const char *const T[] = {"Off", "1 h", "3 h", "6 h"};
+  static const int H[] = {0, 1, 3, 6};
   for (int i = 0; i < 4; i++) {
     int hours = H[i];
     lv_obj_t *b = nm(text_button(s, 12 + 56 * i, 156, 48, 44, T[i], CARD, LV_OPA_COVER, 12, WHITE, [i, hours] {
@@ -1264,7 +1265,7 @@ inline void kb_paint() {
   if (n) lv_label_set_text(kb.last, kb.pw.substr(n - 1).c_str());
   lv_obj_set_x(kb.last, 11 + x);
   lv_obj_update_layout(plain ? kb.full : kb.last);
-  int cx = plain ? 11 + std::min(lv_obj_get_width(kb.full), 136) : 11 + x + (n ? lv_obj_get_width(kb.last) + 2 : 0);
+  int cx = plain ? 11 + std::min((int) lv_obj_get_width(kb.full), 136) : 11 + x + (n ? lv_obj_get_width(kb.last) + 2 : 0);
   lv_obj_set_x(kb.caret, cx);
   set_icon(kb.eye_icon, "eye", 20);
   lv_obj_set_style_image_recolor(kb.eye_icon, lv_color_hex(kb.show_pw ? LINK : WHITE), 0);

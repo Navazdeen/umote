@@ -2,6 +2,8 @@
 
 A battery-powered remote built around the **LCDwiki E32R24P** (ESP32-32E, 2.4" ST7789, XPT2046 resistive touch, from MakerBazar). It replaces three remotes (Android TV, Sony soundbar on optical, set-top box) and adds whole-home control through Home Assistant.
 
+> **Latest (2026-11-01):** remote UI + Home Assistant integration shipped and running on the remote. See [`docs/HANDOFF-2026-11-01-remote-ui.md`](docs/HANDOFF-2026-11-01-remote-ui.md); it supersedes the firmware rows below.
+
 ## Status at a glance
 
 | Piece | State | Notes |

@@ -61,7 +61,7 @@ esphome:
 host:
 
 logger:
-  level: INFO
+  level: DEBUG
 
 display:
   - platform: sdl

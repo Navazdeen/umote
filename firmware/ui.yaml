@@ -87,7 +87,9 @@ lvgl:
           v.push_back(s); return v; };
         ui::sb_inputs = split("${sb_inputs}");
         ui::sb_modes = split("${sb_modes}");
+        size_t before = ui::heap_free();
         ui::build(id(pages), {id(page_tv), id(page_sb), id(page_home), id(page_set)});
+        ESP_LOGI("ui", "UI built: %u bytes of heap used, %u free", (unsigned) (before - ui::heap_free()), (unsigned) ui::heap_free());
     - script.execute: ui_refresh
 
 packages:

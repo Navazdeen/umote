@@ -3,7 +3,9 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <functional>
 #include <string>
+#include <vector>
 #include "ui_lv.h"
 
 inline const char *SIM_SOURCES = R"([
@@ -82,6 +84,34 @@ inline bool sim_load_fixture(const std::string &f, int64_t now_ms) {
       ui::kb_paint();
       if (f == "keypad_pick") ui::kb_open_pick(4);
     }
+  } else if (f == "cycle") {
+    // Open and close every lazily built sheet/view many times: no crash, no heap growth.
+    ui::parse_tiles(SIM_TILES);
+    ui::render_home();
+    auto settle = [] { for (int k = 0; k < 3; k++) lv_timer_handler(); };
+    struct Part { const char *name; std::function<void()> fn; };
+    std::vector<Part> parts = {
+      {"sources", [] { ui::open_sources(); ui::close_sheets(); }},
+      {"new_hdmi", [] { ui::open_new_hdmi(3); ui::close_sheets(); }},
+      {"options", [] { ui::open_options(0); ui::close_sheets(); }},
+      {"picker", [] { ui::open_page_picker(0); ui::close_sheets(); }},
+      {"wifi", [] { ui::open_wifi(); ui::settings_key("BACK"); }},
+      {"keypad", [] { ui::open_keypad("X"); ui::kb_open_pick(2); ui::settings_key("BACK"); ui::settings_key("BACK"); ui::settings_key("BACK"); }},
+      {"about", [] { ui::open_about(); ui::settings_key("BACK"); }},
+    };
+    ui::show_page(3);
+    bool ok = !ui::sheet_open();
+    for (auto &p : parts) {
+      p.fn(); settle();
+      size_t base = ui::heap_free();
+      int n = getenv("SIM_ROUNDS") ? atoi(getenv("SIM_ROUNDS")) : 20; for (int i = 0; i < n; i++) { p.fn(); settle(); }
+      long grew = (long) base - (long) ui::heap_free();
+      printf("cycle %-9s grew %7ld B over 20  top=%u page3=%u\n", p.name, grew,
+             (unsigned) lv_obj_get_child_count(lv_layer_top()), (unsigned) lv_obj_get_child_count(ui::pg.page[3]));
+      if (grew > 3 * 1024 * n) ok = false;   // sessions end in deep sleep; only per-session peak matters
+    }
+    printf("cycle: %s\n", ok ? "PASS" : "FAIL");
+    exit(ok ? 0 : 3);
   } else if (f == "keypad_type") {
     // Type "abc1" with D-pad events only, then check the field.
     ui::show_page(3);

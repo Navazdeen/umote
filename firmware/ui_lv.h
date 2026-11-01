@@ -12,9 +12,25 @@
 #include <string>
 #include <vector>
 #include "lvgl.h"
+#include "esphome/core/log.h"
 #include "logic.h"
 
+#ifdef USE_ESP32
+#include <esp_heap_caps.h>
+#else
+#include <malloc.h>
+#endif
+
 namespace ui {
+
+// Free heap (device) or a stand-in that falls as memory is used (host), for build-time logging.
+inline size_t heap_free() {
+#ifdef USE_ESP32
+  return heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+#else
+  return ((size_t) 1 << 30) - mallinfo2().uordblks;
+#endif
+}
 
 // ---- resources and names -------------------------------------------------------------------------
 struct Res {
@@ -40,6 +56,9 @@ inline std::map<const lv_obj_t *, std::string> &names() {
 }
 inline lv_obj_t *nm(lv_obj_t *o, const std::string &n) {
 #ifdef USE_HOST
+  if (!names().count(o))
+    lv_obj_add_event_cb(o, [](lv_event_t *e) { names().erase((lv_obj_t *) lv_event_get_target(e)); },
+                        LV_EVENT_DELETE, nullptr);
   names()[o] = n;
 #endif
   return o;
@@ -536,11 +555,32 @@ inline bool sheet_open() {
     if (!lv_obj_has_flag(m, LV_OBJ_FLAG_HIDDEN)) return true;
   return false;
 }
+// Sheets and dialogs are built when they open and freed when they close: with no PSRAM the
+// hidden copies would cost ~40 KB of heap. Deletion is async because the tap that closes a
+// sheet usually comes from a button inside it.
+inline void drop_modal(lv_obj_t *&m) {
+  if (!m) return;
+  auto &v = modals();
+  v.erase(std::remove(v.begin(), v.end(), m), v.end());
+  lv_obj_delete_async(m);
+  m = nullptr;
+}
+inline void destroy_sheets();
+inline void destroy_options();
+inline void destroy_picker();
 inline void close_sheets() {
   for (auto *m : modals()) show(m, false);
+  destroy_sheets();
+  destroy_options();
+  destroy_picker();
+}
+inline void build_sheets();
+inline void ensure_sheets() {
+  if (!sh.src) build_sheets();
 }
 
 inline void open_new_hdmi(int port) {
+  ensure_sheets();
   sh.hdmi_port = port;
   sh.hdmi_choice.clear();
   lv_label_set_text_fmt(sh.hdmi_title, "New on HDMI %d", port);
@@ -553,6 +593,7 @@ inline bool more_open = false;
 
 inline void render_sources_sheet() {
   lv_obj_t *g = sh.src_grid;
+  if (!g) return;   // only while the sheet exists
   lv_obj_clean(g);
   int y = 0;
   auto cap = [&](const char *t) {
@@ -611,9 +652,17 @@ inline void render_sources_sheet() {
 }
 
 inline void open_sources() {
+  ensure_sheets();
   more_open = false;
   render_sources_sheet();
   show(sh.src, true);
+}
+
+inline void destroy_sheets() {
+  if (!sh.src) return;
+  drop_modal(sh.src);
+  drop_modal(sh.hdmi);
+  sh = Sheets{};
 }
 
 inline void build_sheets() {
@@ -853,8 +902,15 @@ inline lv_obj_t *toggle(lv_obj_t *row) {
   return t;
 }
 
+inline void build_options();
+inline void destroy_options() {
+  if (!op.root) return;
+  drop_modal(op.root);
+  op = OptSheet{};
+}
 inline void open_options(int i) {
   if (i < 0 || i >= (int) hp.tiles.size() || hp.tiles[i].kind != "fan") return;
+  if (!op.root) build_options();
   op.tile = i;
   const Tile &t = hp.tiles[i];
   lv_label_set_text(op.title, t.name.c_str());
@@ -942,7 +998,7 @@ inline void build_picker() {
   static const char *const ID[] = {"row_pp_tv", "row_pp_sb", "row_pp_home", "row_pp_settings"};
   for (int i = 0; i < 4; i++) {
     lv_obj_t *r = nm(button(card, 0, 44 * i, 164, 44, 0x3A3A3C, LV_OPA_TRANSP, 0, [i] {
-                       show(pk.root, false);
+                       close_sheets();
                        show_page(i, true);
                      }), ID[i]);
     icon(r, I[i], 20, 12, 12, WHITE);
@@ -952,7 +1008,13 @@ inline void build_picker() {
   }
 }
 
+inline void destroy_picker() {
+  if (!pk.root) return;
+  drop_modal(pk.root);
+  pk = Picker{};
+}
 inline void open_page_picker(int current) {
+  if (!pk.root) build_picker();
   for (int i = 0; i < 4; i++) {
     lv_obj_set_style_bg_opa(pk.rows[i], i == current ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
     show(pk.checks[i], i == current);
@@ -1112,7 +1174,21 @@ inline void build_settings(lv_obj_t *page) {
   sp.v_awake = row_value(aw, "", false);
   box(sp.list, 0, 308, 1, 4, WHITE, LV_OPA_TRANSP);   // bottom padding for scrolling
 
-  // Wi-Fi list view
+}
+
+struct Keypad {
+  lv_obj_t *title, *field, *dots, *last, *caret, *full, *eye_icon;
+  lv_obj_t *pick_root, *pick_cap;
+  std::vector<lv_obj_t *> keys, key_main, key_sub, picks;
+  int layout = 0;          // 0 abc, 1 ABC, 2 123, 3 #+=
+  int key_focus = 4, pick_focus = 0, pick_group = -1;
+  bool show_pw = false;
+  std::string ssid, pw;
+};
+inline Keypad kb;
+
+inline void build_wifi_view() {
+  lv_obj_t *page = sp.page;
   sp.wifi = box(page, 0, 0, 240, 320, BG, LV_OPA_COVER);
   lv_obj_t *back = nm(button(sp.wifi, 4, 0, 130, 44, WHITE, LV_OPA_TRANSP, 9, [] { show_settings_view(sp.list); }),
                       "wifi_back");
@@ -1121,8 +1197,10 @@ inline void build_settings(lv_obj_t *page) {
   sp.wifi_list = box(sp.wifi, 0, 52, 240, 268, WHITE, LV_OPA_TRANSP);
   lv_obj_add_flag(sp.wifi_list, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_set_scrollbar_mode(sp.wifi_list, LV_SCROLLBAR_MODE_OFF);
+}
 
-  // About view
+inline void build_about_view() {
+  lv_obj_t *page = sp.page;
   sp.about_view = box(page, 0, 0, 240, 320, BG, LV_OPA_COVER);
   lv_obj_t *ab_back = nm(button(sp.about_view, 4, 0, 130, 44, WHITE, LV_OPA_TRANSP, 9,
                                 [] { show_settings_view(sp.list); }), "about_back");
@@ -1134,15 +1212,27 @@ inline void build_settings(lv_obj_t *page) {
     text(r, 14, 12, 0, R.f15, WHITE, A[i]);
     sp.about_vals.push_back(row_value(r, "", false));
   }
-  show(sp.wifi, false);
-  show(sp.about_view, false);
 }
 
 inline void show_settings_view(lv_obj_t *v) {
+  // Only the shown view exists; the others are freed (async: the tap may come from inside them).
+  auto drop = [v](lv_obj_t *&o) {
+    if (o && o != v) {
+      lv_obj_delete_async(o);
+      o = nullptr;
+    }
+  };
+  if (sp.wifi != v) sp.wifi_list = nullptr;
+  if (sp.about_view != v) sp.about_vals.clear();
+  drop(sp.wifi);
+  drop(sp.about_view);
+  if (sp.kb && sp.kb != v) {
+    drop_modal(kb.pick_root);
+    drop(sp.kb);
+    kb = Keypad{};
+  }
   show(sp.list, v == sp.list);
-  show(sp.wifi, v == sp.wifi);
-  show(sp.about_view, v == sp.about_view);
-  if (sp.kb) show(sp.kb, v == sp.kb);
+  if (v) show(v, true);
   if (v == sp.list) {
     std::vector<lv_obj_t *> rows;
     for (uint32_t i = 0; i < lv_obj_get_child_count(sp.list); i++) rows.push_back(lv_obj_get_child(sp.list, i));
@@ -1153,6 +1243,7 @@ inline void show_settings_view(lv_obj_t *v) {
 
 inline void render_wifi() {
   lv_obj_t *l = sp.wifi_list;
+  if (!l) return;   // scan results can land after the view closed
   lv_obj_clean(l);
   std::vector<lv_obj_t *> rows;
   int y = 0;
@@ -1204,12 +1295,14 @@ inline void set_wifi_scan(std::vector<Net> nets) {
 }
 
 inline void open_wifi() {
+  if (!sp.wifi) build_wifi_view();
   render_wifi();
   show_settings_view(sp.wifi);
   if (hooks.wifi_scan) hooks.wifi_scan();
 }
 
 inline void open_about() {
+  if (!sp.about_view) build_about_view();
   char buf[48];
   snprintf(buf, sizeof buf, "%d%%, %d.%02d V", about.batt_pct, about.batt_mv / 1000, about.batt_mv % 1000 / 10);
   lv_label_set_text(sp.about_vals[0], buf);
@@ -1224,16 +1317,6 @@ inline void open_about() {
 }
 
 // ---- keypad (Wi-Fi password) ---------------------------------------------------------------------------
-struct Keypad {
-  lv_obj_t *title, *field, *dots, *last, *caret, *full, *eye_icon;
-  lv_obj_t *pick_root, *pick_cap;
-  std::vector<lv_obj_t *> keys, key_main, key_sub, picks;
-  int layout = 0;          // 0 abc, 1 ABC, 2 123, 3 #+=
-  int key_focus = 4, pick_focus = 0, pick_group = -1;
-  bool show_pw = false;
-  std::string ssid, pw;
-};
-inline Keypad kb;
 
 inline const std::vector<std::string> &kb_groups(int layout) {
   static const std::vector<std::string> L[4] = {
@@ -1374,6 +1457,7 @@ inline void build_keypad(lv_obj_t *page) {
 }
 
 inline void open_keypad(const std::string &ssid) {
+  if (!sp.kb) build_keypad(sp.page);
   kb.ssid = ssid;
   kb.pw.clear();
   kb.layout = 0;
@@ -1463,17 +1547,24 @@ inline void build(lv_obj_t *view, std::array<lv_obj_t *, 4> pages) {
       }
   }, LV_EVENT_VALUE_CHANGED, nullptr);
   open_picker = [] { open_page_picker(pg.current); };
+  size_t h = heap_free();
+  auto step = [&h](const char *what) {   // heap per part, so memory growth is visible in the log
+    size_t now = heap_free();
+    ESP_LOGD("ui", "%-10s %6u B", what, (unsigned) (h - now));
+    h = now;
+  };
   build_tv(pg.page[0]);
+  step("tv");
   build_soundbar(pg.page[1]);
+  step("soundbar");
   build_home(pg.page[2]);
+  step("home");
   build_settings(pg.page[3]);
+  step("settings");
   build_status();
-  build_sheets();
-  build_options();
-  build_picker();
-  build_keypad(pg.page[3]);
   show_settings_view(sp.list);
   build_overlays();
+  step("overlays");
 }
 
 }  // namespace ui

@@ -12,6 +12,9 @@ substitutions:
   sb_inputs: "TV,Bluetooth,Music"
   sb_modes: "Cinema,Voice,Night"
   fw_version: "1.0"
+  # Hash of logic.h + ui_lv.h, stamped by deploy_to_ha.sh. The builder only rebuilds when the YAML
+  # changes, so without this a header-only change re-flashes the old code.
+  ui_rev: "dev"
 
 esphome:
   includes:
@@ -122,7 +125,7 @@ script:
           ui::about.ssid = id(g_net) >= 2 ? id(g_ssid) : "";
           ui::about.ip = id(g_net) >= 2 ? id(g_ip) : "";
           ui::about.rssi = id(g_rssi);
-          ui::about.firmware = "v${fw_version}";
+          ui::about.firmware = "v${fw_version} (${ui_rev})";
           ui::refresh_settings();
 
   - id: ui_toast

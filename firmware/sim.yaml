@@ -3,7 +3,7 @@
 #   PATH=../.sdl/bin:$PATH esphome run sim.yaml
 # Environment variables:
 #   SIM_STATE = normal | noboard | saver | critical     SIM_PAGE = 0..3     SIM_TOAST = text
-#   SIM_FIXTURE = art | noart_ps5 | off | live | long_title | stale | sheet | new_hdmi |
+#   SIM_FIXTURE = boot | art | noart_ps5 | off | live | long_title | stale | sheet | new_hdmi |
 #                 soundbar | home | home_focus_each | options_fan | picker
 #   SIM_TEXT = large    the Large text size
 #   SIM_DUMP = <path>   write the visible widget tree for tools/check_ui.py, then exit

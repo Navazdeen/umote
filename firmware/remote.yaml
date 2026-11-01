@@ -201,6 +201,13 @@ light:
       - pulse: { name: listening, transition_length: 400ms, update_interval: 400ms }
 
 sensor:
+  - platform: debug
+    free:
+      name: Free heap
+      entity_category: diagnostic
+    block:
+      name: Largest free block
+      entity_category: diagnostic
   - platform: homeassistant
     id: ha_duration
     entity_id: media_player.navazdeen
@@ -292,7 +299,7 @@ text_sensor:
   - platform: homeassistant
     id: ha_txt_8
     entity_id: remote.navazdeen
-    on_value: [ lambda: 'ui::tv.tv_on = x == "on";', script.execute: ui_render_tv ]
+    on_value: [ lambda: 'ui::tv.tv_on = x == "on"; ui::tv.has_data = true;', script.execute: ui_render_tv ]
   - platform: homeassistant
     id: ha_txt_9
     entity_id: remote.navazdeen
@@ -319,6 +326,10 @@ text_sensor:
     on_value:
       - lambda: 'ui::tv.has_art = false;'
       - script.execute: art_load
+  - platform: debug
+    reset_reason:
+      name: Reset reason
+      entity_category: diagnostic
   - platform: template
     id: power_mode
     name: Power mode
@@ -352,6 +363,10 @@ button:
     id: tv_wol
     name: TV wake
     target_mac_address: <tv_mac>
+
+# Reset reason and free heap, reported to HA and logged every 30 s (diagnosing reboots).
+debug:
+  update_interval: 30s
 
 # ---------------------------------------------------------------- session
 script:
@@ -653,7 +668,11 @@ script:
     then:
       - if:
           condition:
-            lambda: 'return ui::pg.current == 0 && ui::tv.tv_on && id(art_picture).state.rfind("/api/", 0) == 0;'
+            lambda: |-
+              // only while something plays: otherwise HA has no image and answers 500
+              return ui::pg.current == 0 && ui::tv.tv_on && !ui::tv.title.empty() &&
+                     (ui::tv.cast_state == "playing" || ui::tv.cast_state == "paused") &&
+                     id(art_picture).state.rfind("/api/", 0) == 0;
           then:
             - online_image.set_url:
                 id: art_img

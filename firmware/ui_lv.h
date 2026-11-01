@@ -191,6 +191,7 @@ struct TvData {
   std::vector<std::string> quick, more;
   std::string current, cast_state, title, app_name, activity;
   bool tv_on = false, has_art = false, playing = false, seekable = true;
+  bool has_data = false;     // false until HA has sent anything: the page shows "Connecting…"
   float duration = 0, position = 0;
   int64_t position_ms = 0;   // millis() when position was received
   int64_t updated_ms = 0;    // millis() of the last HA update
@@ -201,6 +202,7 @@ inline void parse_sources(const std::string &json) {
   JsonDocument doc;
   if (deserializeJson(doc, json)) return;
   tv.sources.clear();
+  tv.has_data = true;
   for (JsonObject s : doc.as<JsonArray>()) {
     Source src;
     src.id = s["id"] | "";
@@ -299,12 +301,13 @@ inline lv_obj_t *source_tile(lv_obj_t *parent, const Source &s, int x, int y, in
     if (c == '.') c = '_';
   const lv_image_dsc_t *d = s.kind == "app" ? R.get(app) : nullptr;
   int radius = size * 12 / 44;
-  lv_obj_t *t = box(parent, x, y, size, size, d ? BG : s.color, d ? LV_OPA_TRANSP : LV_OPA_COVER, radius);
+  // A big tile holds the 44 px app icon on the app's colour; a 44 px tile is the icon itself.
+  bool framed = d && size > 44;
+  lv_obj_t *t = box(parent, x, y, size, size, d && !framed ? BG : s.color, d && !framed ? LV_OPA_TRANSP : LV_OPA_COVER, radius);
   lv_obj_set_style_clip_corner(t, true, 0);
   if (d) {
     lv_obj_t *im = lv_image_create(t);
-    lv_image_set_src(im, d);
-    if (size != 44) lv_image_set_scale(im, 256 * size / 44);
+    lv_image_set_src(im, d);   // never scaled: LVGL can't transform RGB565+alpha, it logs and skips it
     lv_obj_center(im);
     lv_obj_remove_flag(im, LV_OBJ_FLAG_CLICKABLE);
   } else if (s.icon == "tv") {
@@ -323,7 +326,7 @@ inline void open_sources();
 
 // ---- TV page -------------------------------------------------------------------------------------------
 struct TvPage {
-  lv_obj_t *root, *np, *noart, *off, *quick;
+  lv_obj_t *root, *np, *noart, *off, *quick, *loading;
   lv_obj_t *art, *title, *app, *sub, *scrub, *track, *fill, *knob, *pos, *rem, *play, *play_icon, *back10, *fwd10;
   lv_obj_t *na_tile_holder, *na_name, *na_sub;
   lv_obj_t *off_power;
@@ -433,6 +436,10 @@ inline void build_tv(lv_obj_t *page) {
   icon(tvp.off_power, "power", 34, 43, 11, 0x000000);
 
   tvp.quick = build_quick_row(page);
+
+  // Until HA has sent data, only this shows (the three views above would otherwise overlap).
+  tvp.loading = nm(text(page, 14, 140, 212, R.f15, WHITE, "Connecting\xE2\x80\xA6", LV_TEXT_ALIGN_CENTER, 199), "tv_loading");
+  for (lv_obj_t *o : {tvp.np, tvp.noart, tvp.off}) show(o, false);
 }
 
 inline void render_quick() {
@@ -505,6 +512,11 @@ inline void render_tv(int64_t now_ms) {
   auto view = umote::select_view(tv.tv_on, tv.cast_state.c_str(), !tv.title.empty(), tv.has_art,
                                  tv.activity.c_str());
   const Source *cur = find_source(tv.current);
+  show(tvp.loading, !tv.has_data);
+  if (!tv.has_data) {
+    for (lv_obj_t *o : {tvp.np, tvp.noart, tvp.off}) show(o, false);
+    return;
+  }
   show(tvp.off, view == umote::TvView::OFF);
   show(tvp.np, view == umote::TvView::PLAYING_ART);
   if (large_text) show(tvp.art, false);

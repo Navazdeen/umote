@@ -21,7 +21,9 @@ fi
 "${SSH[@]}" "mkdir -p $D/tv-remote"
 sed -e 's#ui: !include ui.yaml#ui: !include tv-remote/ui.yaml#' \
     -e 's#assets: !include assets.yaml#assets: !include tv-remote/assets.yaml#' remote.yaml | "${SSH[@]}" "cat > $D/tv-remote.yaml"
-sed -e 's#^    - logic.h#    - tv-remote/logic.h#' -e 's#^    - ui_lv.h#    - tv-remote/ui_lv.h#' ui.yaml | "${SSH[@]}" "cat > $D/tv-remote/ui.yaml"
+REV=$(cat logic.h ui_lv.h | md5sum | cut -c1-8)
+sed -e 's#^    - logic.h#    - tv-remote/logic.h#' -e 's#^    - ui_lv.h#    - tv-remote/ui_lv.h#' \
+    -e "s#^  ui_rev: \"dev\"#  ui_rev: \"$REV\"#" ui.yaml | "${SSH[@]}" "cat > $D/tv-remote/ui.yaml"
 sed 's#file: assets/#file: tv-remote/assets/#' assets.yaml | "${SSH[@]}" "cat > $D/tv-remote/assets.yaml"
 tar -czf - ui_res.yaml logic.h ui_lv.h assets | "${SSH[@]}" "rm -rf $D/tv-remote/assets && tar -xzf - -C $D/tv-remote"
 "${SSH[@]}" "ls -la $D/tv-remote.yaml $D/tv-remote

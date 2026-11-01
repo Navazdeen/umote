@@ -33,6 +33,7 @@ inline const char *SIM_TILES = R"([
 
 // Returns false for an unknown fixture name.
 inline bool sim_load_fixture(const std::string &f, int64_t now_ms) {
+  if (f == "boot") return true;   // nothing from HA yet
   ui::parse_sources(SIM_SOURCES);
   ui::tv.quick = {"hdmi1", "com.netflix.ninja", "com.google.android.youtube.tv", "in.startv.hotstar"};
   ui::tv.more = {"org.videolan.vlc", "nl.giejay.android.tv.immich"};

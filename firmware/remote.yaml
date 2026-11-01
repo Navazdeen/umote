@@ -477,6 +477,9 @@ script:
           gpio_reset_pin(GPIO_NUM_23);
           gpio_set_pull_mode(GPIO_NUM_23, GPIO_FLOATING);
           gpio_deep_sleep_hold_en();
+          // IO16/IO17 (LED green/blue) live on VDD_SDIO, which deep sleep powers down: the held
+          // "off" level then collapses and the LED lights green. Keeping VDD_SDIO up costs a few uA.
+          esp_sleep_pd_config(ESP_PD_DOMAIN_VDDSDIO, ESP_PD_OPTION_ON);
           esp_deep_sleep_disable_rom_logging();
           if (id(g_board_ok)) {      // reading GPIOA/B clears a pending INT so IO35 is high
             uint8_t v;

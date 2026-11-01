@@ -605,6 +605,15 @@ script:
           if (ok) { ui::toast("Joined"); return; }
           ui::toast("Couldn't join");
           wifi::global_wifi_component->save_wifi_sta("${wifi_ssid_fallback}", "${wifi_password_fallback}");
+  # Settings > Keep awake: WiFi on and no sleep for 10 minutes, so "Install wirelessly" can reach the remote.
+  - id: ui_keep_awake
+    then:
+      - lambda: |-
+          id(g_stay) = !id(g_stay);
+          id(g_awake_until) = id(g_stay) ? millis() + 600000 : 0;
+          if (id(g_stay)) id(net_up).execute();
+          ui::toast(id(g_stay) ? "Awake 10 min, WiFi on" : "Sleep allowed");
+      - script.execute: ui_refresh
   - id: ui_settings_changed
     parameters: { restart: bool }
     then:

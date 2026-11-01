@@ -59,6 +59,7 @@ struct Hooks {
   std::function<void()> wifi_scan;
   std::function<void(const std::string &, const std::string &)> wifi_join;   // ssid, password
   std::function<void()> settings_changed;                                    // ui::cfg was edited
+  std::function<void()> keep_awake;   // toggle: WiFi on, no sleep for 10 min (for wireless updates)
   std::function<void(const std::string &)> log;
 };
 inline Hooks hooks;
@@ -974,7 +975,7 @@ struct Net {
 };
 struct About {
   int batt_pct = 0, batt_mv = 0, rssi = 0, free_kb = 0;
-  bool board = false;
+  bool board = false, awake = false;
   std::string ssid, ip, firmware;
 };
 inline About about;
@@ -1022,7 +1023,7 @@ inline HSlider *hslider(lv_obj_t *parent, int x, int y, int w, std::function<voi
 
 struct SetPage {
   lv_obj_t *page, *list, *wifi, *wifi_list, *about_view, *kb;
-  lv_obj_t *v_wifi, *v_buttons, *v_sleep, *v_text, *v_about;
+  lv_obj_t *v_wifi, *v_buttons, *v_sleep, *v_text, *v_about, *v_awake;
   HSlider *bright;
   std::vector<lv_obj_t *> rows;   // focusable rows of the visible list
   int focus = -1;
@@ -1058,6 +1059,7 @@ inline void refresh_settings() {
   lv_label_set_text_fmt(sp.v_sleep, "%d s", cfg.sleep_s);
   lv_label_set_text(sp.v_text, cfg.text_large ? "Large" : "Default");
   lv_label_set_text_fmt(sp.v_about, "%d%%, %s", about.batt_pct, about.firmware.c_str());
+  lv_label_set_text(sp.v_awake, about.awake ? "10 min" : "Off");
   hslider_set(sp.bright, cfg.brightness);
 }
 
@@ -1104,6 +1106,11 @@ inline void build_settings(lv_obj_t *page) {
   sp.v_text = row_value(ts, "");
   lv_obj_t *ab = list_row(sp.list, 220, "row_set_about", "About", [] { open_about(); });
   sp.v_about = row_value(ab, "");
+  lv_obj_t *aw = list_row(sp.list, 264, "row_set_awake", "Keep awake", [] {
+    if (hooks.keep_awake) hooks.keep_awake();
+  });
+  sp.v_awake = row_value(aw, "", false);
+  box(sp.list, 0, 308, 1, 4, WHITE, LV_OPA_TRANSP);   // bottom padding for scrolling
 
   // Wi-Fi list view
   sp.wifi = box(page, 0, 0, 240, 320, BG, LV_OPA_COVER);

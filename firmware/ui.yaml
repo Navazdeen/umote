@@ -5,7 +5,7 @@
 # The including file defines the hook scripts:
 #   ui_launch(source_id)  ui_power()  ui_tv_key(code)  ui_seek(seconds)  ui_name_source(port, name, go)
 #   ui_page_shown(page)  ui_sb_ir(code)  ui_ha(kind, entities, value)
-#   ui_wifi_scan()  ui_wifi_join(ssid, password)  ui_settings_changed()
+#   ui_wifi_scan()  ui_wifi_join(ssid, password)  ui_settings_changed()  ui_keep_awake()
 
 substitutions:
   # Soundbar buttons: the remote's labels; IR codes are the upper-case names (Task 14 fills them).
@@ -64,6 +64,7 @@ lvgl:
         ui::large_text = id(g_text_large);
         if (ui::large_text) ui::enlarge_fonts();
         ui::hooks.wifi_scan = []() { id(ui_wifi_scan).execute(); };
+        ui::hooks.keep_awake = []() { id(ui_keep_awake).execute(); };
         ui::hooks.wifi_join = [](const std::string &s, const std::string &p) { id(ui_wifi_join).execute(s, p); };
         ui::hooks.settings_changed = []() {
           id(g_vol_to_tv) = ui::cfg.vol_to_tv;
@@ -115,6 +116,7 @@ script:
           ui::about.batt_pct = id(g_batt_pct);
           ui::about.batt_mv = id(g_batt_mv);
           ui::about.board = id(g_board_ok);
+          ui::about.awake = id(g_stay);
           ui::about.ssid = id(g_net) >= 2 ? id(g_ssid) : "";
           ui::about.ip = id(g_net) >= 2 ? id(g_ip) : "";
           ui::about.rssi = id(g_rssi);

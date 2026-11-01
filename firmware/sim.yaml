@@ -116,6 +116,10 @@ script:
     parameters: { ssid: string, password: string }
     then:
       - lambda: 'ui::toast("Join " + ssid);'
+  - id: ui_keep_awake
+    then:
+      - lambda: 'id(g_stay) = !id(g_stay);'
+      - script.execute: ui_refresh
   - id: ui_settings_changed
     parameters: { restart: bool }
     then:

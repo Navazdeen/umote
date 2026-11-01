@@ -116,7 +116,8 @@ api:
     - lambda: 'id(g_net) = 3;'
     - script.execute: ui_refresh
   on_client_disconnected:
-    - lambda: 'id(g_net) = id(g_net) ? 2 : 0;'
+    # several clients can be connected (HA, log viewers): only HA leaving drops us to "WiFi up"
+    - lambda: 'if (!api::global_api_server->is_connected_with_state_subscription()) id(g_net) = id(g_net) ? 2 : 0;'
     - script.execute: ui_refresh
 
 ota:
@@ -838,7 +839,8 @@ interval:
   - interval: 2s                 # only while awake
     then:
       - lambda: |-
-          if (id(g_net) == 3) ui::tv.updated_ms = millis();   // connected = fresh; "Last seen" after 30 s without
+          // HA connected (a state subscriber, not a log viewer) = fresh; "Last seen" after 30 s without
+          if (api::global_api_server->is_connected_with_state_subscription()) ui::tv.updated_ms = millis();
           if (id(g_net) >= 2) {      // keep the signal reading fresh; redraw only on a real change
             int r = wifi::global_wifi_component->wifi_rssi();
             if (abs(r - id(g_rssi)) >= 3) { id(g_rssi) = r; id(ui_refresh).execute(); }

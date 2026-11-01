@@ -1,6 +1,7 @@
 // Host tests for logic.h: g++ -std=c++17 -Wall -Werror firmware/test/test_logic.cpp -o /tmp/tl && /tmp/tl
 #include <cassert>
 #include <cstdio>
+#include <cmath>
 #include <cstring>
 #include "../logic.h"
 
@@ -78,6 +79,15 @@ static void ellipsize_counts_characters() {
   assert(ellipsize("\xC3\xA9\xC3\xA9\xC3\xA9", 2) == "\xC3\xA9\xE2\x80\xA6");
 }
 
+static void backlight_never_goes_dark() {
+  assert(backlight_level(0.0f) == 0.3f && backlight_level(0.1f) == 0.3f && backlight_level(-1.0f) == 0.3f);
+  assert(backlight_level(0.7f) == 0.7f && backlight_level(2.0f) == 1.0f);
+  assert(backlight_level(std::nanf("")) == 0.6f);           // a corrupt saved value falls back to the default
+  assert(slider_to_backlight(0.0f) == 0.3f && slider_to_backlight(1.0f) == 1.0f);
+  assert(slider_to_backlight(0.5f) > 0.64f && slider_to_backlight(0.5f) < 0.66f);
+  assert(backlight_to_slider(0.3f) == 0.0f && backlight_to_slider(1.0f) == 1.0f);
+}
+
 int main() {
   tv_volume_goes_to_soundbar_by_default();
   tv_dpad_and_channels_go_to_tv();
@@ -90,6 +100,7 @@ int main() {
   stale();
   sanitize_drops_unsupported_codepoints();
   ellipsize_counts_characters();
+  backlight_never_goes_dark();
   std::puts("all logic tests passed");
   return 0;
 }

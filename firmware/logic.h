@@ -117,6 +117,21 @@ inline Progress progress(float duration, float position, int64_t position_update
 
 inline bool is_stale(int64_t last_update_ms, int64_t now_ms) { return now_ms - last_update_ms > 30000; }
 
+// Backlight: never below 30 % (lower is unreadable on this panel and can't be undone by touch).
+constexpr float BACKLIGHT_MIN = 0.3f, BACKLIGHT_DEFAULT = 0.6f;
+inline float backlight_level(float setting) {
+  if (std::isnan(setting)) return BACKLIGHT_DEFAULT;
+  return setting < BACKLIGHT_MIN ? BACKLIGHT_MIN : setting > 1.0f ? 1.0f : setting;
+}
+// The Settings slider spans the usable range: 0 -> 30 %, 1 -> 100 %.
+inline float slider_to_backlight(float f) {
+  f = f < 0 ? 0 : f > 1 ? 1 : f;
+  return BACKLIGHT_MIN + f * (1.0f - BACKLIGHT_MIN);
+}
+inline float backlight_to_slider(float level) {
+  return (backlight_level(level) - BACKLIGHT_MIN) / (1.0f - BACKLIGHT_MIN);
+}
+
 // Decode one UTF-8 code point at s[i]; returns its length (0 for an invalid byte).
 inline size_t utf8_next(const std::string &s, size_t i, uint32_t &cp) {
   unsigned char c = s[i];

@@ -1137,7 +1137,7 @@ inline void refresh_settings() {
   lv_label_set_text(sp.v_text, cfg.text_large ? "Large" : "Default");
   lv_label_set_text_fmt(sp.v_about, "%d%%, %s", about.batt_pct, about.firmware.c_str());
   lv_label_set_text(sp.v_awake, about.awake ? "10 min" : "Off");
-  hslider_set(sp.bright, cfg.brightness);
+  hslider_set(sp.bright, umote::backlight_to_slider(cfg.brightness));
 }
 
 inline void show_settings_view(lv_obj_t *v);
@@ -1160,7 +1160,7 @@ inline void build_settings(lv_obj_t *page) {
   lv_obj_t *br = nm(box(sp.list, 0, 44, 240, 44, CARD, LV_OPA_TRANSP), "row_set_brightness");
   text(br, 14, 12, 0, R.f15, WHITE, "Brightness");
   sp.bright = hslider(br, 118, 0, 110, [changed](float f) {
-    cfg.brightness = std::max(0.1f, f);
+    cfg.brightness = umote::slider_to_backlight(f);
     changed();
   });
   lv_obj_t *bt = list_row(sp.list, 88, "row_set_buttons", "Buttons", [changed] {
@@ -1524,7 +1524,7 @@ inline void settings_key(const char *what) {
   if (!strcmp(what, "UP")) sp.focus = std::max(0, sp.focus - 1);
   else if (!strcmp(what, "DOWN")) sp.focus = std::min(n - 1, sp.focus + 1);
   else if (sp.focus >= 0 && sp.rows[sp.focus] == lv_obj_get_parent(sp.bright->hit)) {   // brightness row
-    cfg.brightness = std::max(0.1f, std::min(1.0f, cfg.brightness + (!strcmp(what, "LEFT") ? -0.1f : 0.1f)));
+    cfg.brightness = umote::backlight_level(cfg.brightness + (!strcmp(what, "LEFT") ? -0.1f : 0.1f));
     refresh_settings();
     if (hooks.settings_changed) hooks.settings_changed();
   }

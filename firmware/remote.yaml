@@ -383,7 +383,8 @@ script:
       - script.stop: go_to_sleep
       - lambda: |-
           bool full = id(g_touched) || id(g_wake) != 1;       // a key wake gets a dim glance only
-          float b = id(g_mode) ? std::min(0.25f, id(g_brightness)) : id(g_brightness);   // Settings > Brightness
+          float b = umote::backlight_level(id(g_brightness));   // Settings > Brightness, never below 30 %
+          if (id(g_mode)) b = umote::BACKLIGHT_MIN;                  // saver modes: dimmest usable level
           id(g_bright) = full ? b : std::min(b, 0.2f);
           id(g_idle_ms) = !full ? 6000 : id(g_mode) ? 8000 : id(g_sleep_s) * 1000;     // Settings > Sleep after
           if (!id(g_fast)) { esp_pm_lock_acquire(id(g_pm_lock)); id(g_fast) = true; }

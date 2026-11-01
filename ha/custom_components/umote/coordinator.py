@@ -18,14 +18,19 @@ from .const import (CMD_HDMI, CMD_PACKAGES, CMD_TV_INPUT, DOMAIN, HOME_SETTLE_S,
                     SCAN_INTERVAL_S, SYSTEM_PACKAGES, TV_ADB, TV_PLAYER, TV_REMOTE, USE_AFTER_S,
                     WAKE_TIMEOUT_S)
 from .sources import build_sources, source_id_for_activity
-from .tvparse import parse_apps, parse_current_input, parse_inputs
+from .tvparse import App, Input, parse_apps, parse_current_input, parse_inputs
 
 _LOGGER = logging.getLogger(__name__)
 OFF_STATES = ("off", "standby", "unavailable", "unknown")
 
 
+PUBLISHED = ("id", "kind", "name", "port", "color", "icon")   # what the remote reads
+
+
 def fit_attributes(data: dict) -> dict:
-    """Keep the published JSON under MAX_ATTR_BYTES by dropping collapsed apps' details first."""
+    """Keep the published JSON under MAX_ATTR_BYTES: only the fields the remote reads,
+    then drop collapsed apps' details, then apps from the end."""
+    data = {**data, "sources": [{k: s[k] for k in PUBLISHED} for s in data["sources"]]}
     if len(json.dumps(data)) <= MAX_ATTR_BYTES:
         return data
     more = set(data["more"])
@@ -43,6 +48,7 @@ class UmoteCoordinator(DataUpdateCoordinator[dict]):
                          update_interval=timedelta(seconds=SCAN_INTERVAL_S))
         self._names_store: Store = Store(hass, 1, "umote.names")
         self._usage_store: Store = Store(hass, 1, "umote.usage")
+        self._tv_store: Store = Store(hass, 1, "umote.tv")   # last inputs/apps, for when the TV sleeps
         self.names: dict[int, str] = {}
         self.usage: dict[str, list] = {}
         self._inputs: list = []
@@ -53,6 +59,12 @@ class UmoteCoordinator(DataUpdateCoordinator[dict]):
     async def async_load(self) -> None:
         self.names = {int(k): v for k, v in ((await self._names_store.async_load()) or {}).items()}
         self.usage = (await self._usage_store.async_load()) or {}
+        tv = (await self._tv_store.async_load()) or {}
+        self._inputs = [Input(**i) for i in tv.get("inputs", [])]
+        self._apps = [App(a) for a in tv.get("apps", [])]
+
+    def tv_snapshot(self) -> dict:
+        return {"inputs": [vars(i) for i in self._inputs], "apps": [a.package for a in self._apps]}
 
     @callback
     def async_track(self) -> callback:
@@ -85,6 +97,7 @@ class UmoteCoordinator(DataUpdateCoordinator[dict]):
                 self._apps = parse_apps(pkgs, SYSTEM_PACKAGES) or self._apps
                 self._current_input = parse_current_input(hdmi)
                 self._seed_usage()
+                self._tv_store.async_delay_save(self.tv_snapshot, 5)
             else:
                 tv_on = False    # standby closes ADB; keep the last lists
         return self._publish(tv_on)
@@ -106,6 +119,7 @@ class UmoteCoordinator(DataUpdateCoordinator[dict]):
         usage = {k: (int(v[0]), float(v[1])) for k, v in self.usage.items()}
         out = build_sources(self._inputs, self._apps, self.names, usage, time.time(),
                             self._current() if tv_on else None)
+        self.all_sources = out["sources"]
         return {**fit_attributes(out), "tv_on": tv_on, "updated": dt_util.utcnow().isoformat()}
 
     # ---- usage ------------------------------------------------------------------------------
@@ -145,7 +159,7 @@ class UmoteCoordinator(DataUpdateCoordinator[dict]):
 
     # ---- services ---------------------------------------------------------------------------
     async def async_launch(self, source_id: str) -> None:
-        src = next((s for s in (self.data or {}).get("sources", []) if s["id"] == source_id), None)
+        src = next((s for s in getattr(self, "all_sources", []) if s["id"] == source_id), None)
         if src is None:
             raise ServiceValidationError(translation_domain=DOMAIN, translation_key="unknown_source",
                                          translation_placeholders={"source_id": source_id})

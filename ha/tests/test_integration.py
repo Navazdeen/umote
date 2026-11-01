@@ -113,10 +113,10 @@ async def test_usage_counted_and_persisted(hass, mock_adb, hass_storage):
     await hass.services.async_call(DOMAIN, "launch", {"source_id": "hdmi2"}, blocking=True)
     await hass.services.async_call(DOMAIN, "name_source", {"port": 2, "name": "Fire TV"}, blocking=True)
     st = hass.states.get("sensor.umote_sources")
-    hdmi2 = next(s for s in st.attributes["sources"] if s["id"] == "hdmi2")
-    assert hdmi2["uses"] == 1 and hdmi2["name"] == "Fire TV"
-    assert hass_storage["umote.names"]["data"] == {"2": "Fire TV"}
     coord = hass.config_entries.async_loaded_entries(DOMAIN)[0].runtime_data
+    assert next(s for s in st.attributes["sources"] if s["id"] == "hdmi2")["name"] == "Fire TV"
+    assert next(s for s in coord.all_sources if s["id"] == "hdmi2")["uses"] == 1
+    assert hass_storage["umote.names"]["data"] == {"2": "Fire TV"}
     await coord._usage_store.async_save(coord.usage)
     assert hass_storage["umote.usage"]["data"]["hdmi2"][0] == 1
 
@@ -152,3 +152,29 @@ async def test_artwork_entity_unavailable_without_art(hass, mock_adb):
     hass.states.async_set(TV_CAST, "off", {})
     await setup(hass)
     assert hass.states.get("image.umote_artwork").state == "unavailable"
+
+
+async def test_sources_survive_restart_with_tv_off(hass, mock_adb, hass_storage):
+    entry = await setup(hass)
+    coord = entry.runtime_data
+    await coord._tv_store.async_save(coord.tv_snapshot())
+    saved = hass_storage["umote.tv"]["data"]
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    mock_adb.go_unavailable()
+    hass_storage["umote.tv"] = {"version": 1, "key": "umote.tv", "data": saved}
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    st = hass.states.get("sensor.umote_sources")
+    assert st.attributes["tv_on"] is False
+    assert st.attributes["sources"][0]["name"] == "PlayStation 5"
+
+
+async def test_every_app_published_within_3kb(hass, mock_adb):
+    from custom_components.umote.tvparse import parse_apps
+    from custom_components.umote.const import SYSTEM_PACKAGES
+    await setup(hass)
+    st = hass.states.get("sensor.umote_sources")
+    apps = [s for s in st.attributes["sources"] if s["kind"] == "app"]
+    assert len(apps) == len(parse_apps(fx("packages.txt"), SYSTEM_PACKAGES))
+    assert set(apps[0]) == {"id", "kind", "name", "port", "color", "icon"}
+    assert len(json.dumps({k: st.attributes[k] for k in ("sources", "quick", "more", "current")})) <= 3072

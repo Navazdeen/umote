@@ -153,6 +153,24 @@ inline bool sim_load_fixture(const std::string &f, int64_t now_ms) {
     for (auto &c : calls) printf("  %s\n", c.c_str());
     printf("fan_reorder: %s\n", ok ? "PASS" : "FAIL");
     exit(ok ? 0 : 3);
+  } else if (f == "wake_cache") {
+    // Data cached before deep sleep is shown at once on wake, marked as not yet confirmed.
+    ui::cache_put(ui::CACHE_SOURCES, SIM_SOURCES);
+    ui::cache_put(ui::CACHE_QUICK, "[\"tuner\",\"com.netflix.ninja\"]");
+    ui::cache_put(ui::CACHE_CURRENT, "com.netflix.ninja");
+    ui::cache_put(ui::CACHE_TV_ON, "on");
+    ui::cache_put(ui::CACHE_TILES, SIM_TILES);
+    ui::tv = ui::TvData{};                       // a fresh boot
+    ui::hp.tiles.clear();
+    bool restored = ui::cache_restore(now_ms);
+    ui::render_tv(now_ms);
+    bool ok = restored && ui::tv.has_data && ui::tv.cached && ui::tv.sources.size() == 12 &&
+              ui::tv.current == "com.netflix.ninja" && ui::hp.tiles.size() == 6 &&
+              std::string(lv_label_get_text(ui::tvp.na_name)) == "Netflix" &&
+              std::string(lv_label_get_text(ui::tvp.na_sub)) == "Updating\xE2\x80\xA6";
+    printf("wake_cache: %s (sources %u, tiles %u, sub '%s')\n", ok ? "PASS" : "FAIL", (unsigned) ui::tv.sources.size(),
+           (unsigned) ui::hp.tiles.size(), lv_label_get_text(ui::tvp.na_sub));
+    exit(ok ? 0 : 3);
   } else if (f == "keypad_type") {
     // Type "abc1" with D-pad events only, then check the field.
     ui::show_page(3);

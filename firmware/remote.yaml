@@ -276,31 +276,31 @@ text_sensor:
     id: ha_txt_3
     entity_id: sensor.umote_sources
     attribute: sources
-    on_value: [ lambda: 'ui::parse_sources(x); ui::render_sources_sheet();', script.execute: ui_render_tv ]
+    on_value: [ lambda: 'ui::parse_sources(x); ui::cache_put(ui::CACHE_SOURCES, x); ui::render_sources_sheet();', script.execute: ui_render_tv ]
   - platform: homeassistant
     id: ha_txt_4
     entity_id: sensor.umote_sources
     attribute: quick
-    on_value: [ lambda: 'ui::tv.quick = ui::parse_ids(x);', script.execute: ui_render_tv ]
+    on_value: [ lambda: 'ui::tv.quick = ui::parse_ids(x); ui::cache_put(ui::CACHE_QUICK, x);', script.execute: ui_render_tv ]
   - platform: homeassistant
     id: ha_txt_5
     entity_id: sensor.umote_sources
     attribute: more
-    on_value: [ lambda: 'ui::tv.more = ui::parse_ids(x);' ]
+    on_value: [ lambda: 'ui::tv.more = ui::parse_ids(x); ui::cache_put(ui::CACHE_MORE, x);' ]
   - platform: homeassistant
     id: ha_txt_6
     entity_id: sensor.umote_sources
     attribute: current
-    on_value: [ lambda: 'ui::tv.current = x;', script.execute: ui_render_tv ]
+    on_value: [ lambda: 'ui::tv.current = x; ui::cache_put(ui::CACHE_CURRENT, x);', script.execute: ui_render_tv ]
   - platform: homeassistant
     id: ha_txt_7
     entity_id: sensor.umote_home
     attribute: tiles
-    on_value: [ lambda: 'ui::parse_tiles(x); ui::hp.updated_ms = millis(); ui::render_home();' ]
+    on_value: [ lambda: 'ui::parse_tiles(x); ui::cache_put(ui::CACHE_TILES, x); ui::hp.updated_ms = millis(); ui::render_home();' ]
   - platform: homeassistant
     id: ha_txt_8
     entity_id: remote.navazdeen
-    on_value: [ lambda: 'ui::tv.tv_on = x == "on"; ui::tv.has_data = true;', script.execute: ui_render_tv ]
+    on_value: [ lambda: 'ui::tv.tv_on = x == "on"; ui::tv.has_data = true; ui::cache_put(ui::CACHE_TV_ON, x);', script.execute: ui_render_tv ]
   - platform: homeassistant
     id: ha_txt_9
     entity_id: remote.navazdeen
@@ -412,6 +412,9 @@ script:
           if (id(g_mode)) b = umote::BACKLIGHT_MIN;                  // saver modes: dimmest usable level
           id(g_bright) = full ? b : std::min(b, 0.2f);
           id(g_idle_ms) = !full ? 6000 : id(g_mode) ? 8000 : id(g_sleep_s) * 1000;     // Settings > Sleep after
+          // WiFi + HA take ~10 s after a wake: stay on until they can show live data
+          if (full && !id(g_mode) && !api::global_api_server->is_connected_with_state_subscription())
+            id(g_idle_ms) = std::max<uint32_t>(id(g_idle_ms), 15000);
           if (!id(g_fast)) { esp_pm_lock_acquire(id(g_pm_lock)); id(g_fast) = true; }
       - light.turn_on: { id: backlight, brightness: !lambda 'return id(g_bright);' }
       - delay: 1500ms
@@ -840,7 +843,10 @@ interval:
     then:
       - lambda: |-
           // HA connected (a state subscriber, not a log viewer) = fresh; "Last seen" after 30 s without
-          if (api::global_api_server->is_connected_with_state_subscription()) ui::tv.updated_ms = millis();
+          if (api::global_api_server->is_connected_with_state_subscription()) {
+            ui::tv.updated_ms = millis();
+            if (ui::tv.cached) { ui::tv.cached = false; ui::tick_tv(millis()); }   // cached data now confirmed
+          }
           if (id(g_net) >= 2) {      // keep the signal reading fresh; redraw only on a real change
             int r = wifi::global_wifi_component->wifi_rssi();
             if (abs(r - id(g_rssi)) >= 3) { id(g_rssi) = r; id(ui_refresh).execute(); }

@@ -192,6 +192,7 @@ struct TvData {
   std::string current, cast_state, title, app_name, activity;
   bool tv_on = false, has_art = false, playing = false, seekable = true;
   bool has_data = false;     // false until HA has sent anything: the page shows "Connecting…"
+  bool cached = false;       // showing data kept across deep sleep, not yet confirmed by HA
   float duration = 0, position = 0;
   int64_t position_ms = 0;   // millis() when position was received
   int64_t updated_ms = 0;    // millis() of the last HA update
@@ -482,12 +483,12 @@ inline void tick_tv(int64_t now_ms) {
     lv_label_set_text(tvp.pos, mmss(p.pos_s).c_str());
     lv_label_set_text(tvp.rem, mmss(p.remaining_s, true).c_str());
   }
-  bool stale = umote::is_stale(tv.updated_ms, now_ms);
+  bool stale = tv.cached || umote::is_stale(tv.updated_ms, now_ms);
   lv_opa_t opa = stale ? LV_OPA_50 : LV_OPA_COVER;
   for (lv_obj_t *o : {tvp.np, tvp.noart}) lv_obj_set_style_opa(o, opa, 0);
   if (stale) {
     int ago = (int) ((now_ms - tv.updated_ms) / 1000);
-    std::string s = "Last seen " + mmss(ago) + " ago";
+    std::string s = tv.cached ? std::string("Updating\xE2\x80\xA6") : "Last seen " + mmss(ago) + " ago";
     lv_label_set_text(tvp.sub, (" \xC2\xB7 " + s).c_str());
     lv_label_set_text(tvp.na_sub, s.c_str());
   }
@@ -1556,6 +1557,62 @@ inline void settings_key(const char *what) {
     if (hooks.settings_changed) hooks.settings_changed();
   }
   paint_set_focus();
+}
+
+// ---- data kept across deep sleep -------------------------------------------------------------------------
+// Every wake is a fresh boot, and WiFi + HA take longer to come back than the screen stays on. The last
+// HA data is kept in RTC memory (survives deep sleep, ~5.7 KB of 8 KB) and shown at once, marked
+// "Updating…" until HA confirms it.
+enum CacheField { CACHE_SOURCES, CACHE_QUICK, CACHE_MORE, CACHE_CURRENT, CACHE_TV_ON, CACHE_TILES, CACHE_N };
+constexpr uint32_t CACHE_MAGIC = 0x756d6f31;   // "umo1"
+struct RtcCache {
+  uint32_t magic;
+  char sources[3200], quick[192], more[192], current[64], tv_on[8], tiles[2048];
+};
+#ifdef USE_ESP32
+static RTC_NOINIT_ATTR RtcCache rtc_cache;   // header is compiled into one translation unit (main.cpp)
+#else
+static RtcCache rtc_cache;
+#endif
+
+inline char *cache_slot(CacheField f, size_t &cap) {
+  RtcCache &c = rtc_cache;
+  switch (f) {
+    case CACHE_SOURCES: cap = sizeof c.sources; return c.sources;
+    case CACHE_QUICK: cap = sizeof c.quick; return c.quick;
+    case CACHE_MORE: cap = sizeof c.more; return c.more;
+    case CACHE_CURRENT: cap = sizeof c.current; return c.current;
+    case CACHE_TV_ON: cap = sizeof c.tv_on; return c.tv_on;
+    default: cap = sizeof c.tiles; return c.tiles;
+  }
+}
+
+inline void cache_put(CacheField f, const std::string &value) {
+  if (rtc_cache.magic != CACHE_MAGIC) {   // power-on: RTC memory holds garbage
+    memset(&rtc_cache, 0, sizeof rtc_cache);
+    rtc_cache.magic = CACHE_MAGIC;
+  }
+  size_t cap;
+  char *slot = cache_slot(f, cap);
+  if (value.size() < cap) memcpy(slot, value.c_str(), value.size() + 1);
+  else slot[0] = 0;   // too big to keep: better nothing than half a JSON document
+}
+
+inline bool cache_restore(int64_t now_ms) {
+  RtcCache &c = rtc_cache;
+  if (c.magic != CACHE_MAGIC || !c.sources[0]) return false;
+  c.sources[sizeof c.sources - 1] = c.quick[sizeof c.quick - 1] = c.more[sizeof c.more - 1] = 0;
+  c.current[sizeof c.current - 1] = c.tv_on[sizeof c.tv_on - 1] = c.tiles[sizeof c.tiles - 1] = 0;
+  parse_sources(c.sources);
+  tv.quick = parse_ids(c.quick);
+  tv.more = parse_ids(c.more);
+  tv.current = c.current;
+  tv.tv_on = !strcmp(c.tv_on, "on");
+  if (c.tiles[0]) parse_tiles(c.tiles);
+  tv.has_data = true;
+  tv.cached = true;
+  tv.updated_ms = now_ms;
+  return true;
 }
 
 // ---- pages -------------------------------------------------------------------------------------------------

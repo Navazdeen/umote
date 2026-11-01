@@ -93,6 +93,10 @@ lvgl:
         size_t before = ui::heap_free();
         ui::build(id(pages), {id(page_tv), id(page_sb), id(page_home), id(page_set)});
         ESP_LOGI("ui", "UI built: %u bytes of heap used, %u free", (unsigned) (before - ui::heap_free()), (unsigned) ui::heap_free());
+        if (ui::cache_restore(millis())) {   // last data from before deep sleep
+          ui::render_tv(millis());
+          ui::render_home();
+        }
     - script.execute: ui_refresh
 
 packages:

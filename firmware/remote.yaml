@@ -255,6 +255,15 @@ sensor:
 # ---------------------------------------------------------------- Home Assistant data
 # sensor.umote_sources / sensor.umote_home / image.umote_artwork come from the umote integration (ha/).
 text_sensor:
+  - platform: wifi_info
+    scan_results:
+      id: wifi_scan_results
+      internal: true
+      on_value:
+        - lambda: |-
+            std::vector<ui::Net> nets;
+            for (auto &n : umote::parse_scan_text(x)) nets.push_back({n.first, n.second, true});
+            ui::set_wifi_scan(nets);
   - platform: homeassistant
     id: ha_txt_3
     entity_id: sensor.umote_sources
@@ -584,17 +593,13 @@ script:
                 action: homeassistant.toggle
                 data_template: { entity_id: "{{ e }}" }
                 variables: { e: !lambda 'return entities;' }
+  # Settings > Wi-Fi: ask for a scan; results arrive through the wifi_info scan_results sensor
+  # (get_scan_result() reads empty while the radio is retrying a network it can't join).
   - id: ui_wifi_scan
     then:
       - script.execute: net_up
-      - wait_until: { condition: wifi.connected, timeout: 8s }
+      - delay: 2s
       - lambda: 'wifi::global_wifi_component->start_scanning();'
-      - delay: 6s
-      - lambda: |-
-          std::vector<ui::Net> nets;
-          for (auto &r : wifi::global_wifi_component->get_scan_result())
-            if (!r.get_is_hidden()) nets.push_back({std::string(r.get_ssid().c_str()), r.get_rssi(), r.get_with_auth()});
-          ui::set_wifi_scan(nets);
   # Join: save the new network; if it isn't up in 20 s, put the built-in one back.
   - id: ui_wifi_join
     mode: single

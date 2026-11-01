@@ -88,6 +88,14 @@ static void backlight_never_goes_dark() {
   assert(backlight_to_slider(0.3f) == 0.0f && backlight_to_slider(1.0f) == 1.0f);
 }
 
+static void scan_text_is_parsed() {
+  auto r = parse_scan_text("NavazAirFiber_EXT: -33dB\nCafe: Guest: -79dB\nJio-5G: -74dB\n");
+  assert(r.size() == 3);
+  assert(r[0].first == "NavazAirFiber_EXT" && r[0].second == -33);
+  assert(r[1].first == "Cafe: Guest" && r[1].second == -79);    // SSIDs may contain ": "
+  assert(parse_scan_text("").empty() && parse_scan_text("garbage\n").empty());
+}
+
 int main() {
   tv_volume_goes_to_soundbar_by_default();
   tv_dpad_and_channels_go_to_tv();
@@ -101,6 +109,7 @@ int main() {
   sanitize_drops_unsupported_codepoints();
   ellipsize_counts_characters();
   backlight_never_goes_dark();
+  scan_text_is_parsed();
   std::puts("all logic tests passed");
   return 0;
 }

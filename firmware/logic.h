@@ -4,8 +4,11 @@
 
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace umote {
 
@@ -116,6 +119,26 @@ inline Progress progress(float duration, float position, int64_t position_update
 }
 
 inline bool is_stale(int64_t last_update_ms, int64_t now_ms) { return now_ms - last_update_ms > 30000; }
+
+// Wi-Fi scan as published by ESPHome's wifi_info scan_results sensor: "SSID: -60dB" per line.
+inline std::vector<std::pair<std::string, int>> parse_scan_text(const std::string &text) {
+  std::vector<std::pair<std::string, int>> out;
+  size_t start = 0;
+  while (start < text.size()) {
+    size_t end = text.find('\n', start);
+    if (end == std::string::npos) end = text.size();
+    std::string line = text.substr(start, end - start);
+    start = end + 1;
+    size_t sep = line.rfind(": ");
+    if (sep == std::string::npos || line.size() < sep + 4 || line.compare(line.size() - 2, 2, "dB") != 0) continue;
+    std::string num = line.substr(sep + 2, line.size() - sep - 4);
+    char *rest = nullptr;
+    long rssi = strtol(num.c_str(), &rest, 10);
+    if (rest == num.c_str() || *rest) continue;
+    out.emplace_back(line.substr(0, sep), (int) rssi);
+  }
+  return out;
+}
 
 // Backlight: never below 30 % (lower is unreadable on this panel and can't be undone by touch).
 constexpr float BACKLIGHT_MIN = 0.3f, BACKLIGHT_DEFAULT = 0.6f;

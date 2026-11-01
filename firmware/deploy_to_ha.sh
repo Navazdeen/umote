@@ -5,7 +5,6 @@
 #   /config/esphome/tv-remote/          <- ui.yaml, ui_res.yaml, assets.yaml, logic.h, ui_lv.h, assets/
 #                                          (a subfolder so the dashboard doesn't list them as devices;
 #                                          paths that ESPHome resolves from the config dir are rewritten)
-#   /config/esphome/tv-remote-diag.yaml <- diag.yaml (USB-serial-log build for bring-up, same device)
 # Refuses to overwrite an existing tv-remote.yaml unless FORCE=1.
 # Checks that secrets.yaml defines wifi_ssid and wifi_password (prints only yes/no, never values).
 set -euo pipefail
@@ -25,8 +24,7 @@ sed -e 's#ui: !include ui.yaml#ui: !include tv-remote/ui.yaml#' \
 sed -e 's#^    - logic.h#    - tv-remote/logic.h#' -e 's#^    - ui_lv.h#    - tv-remote/ui_lv.h#' ui.yaml | "${SSH[@]}" "cat > $D/tv-remote/ui.yaml"
 sed 's#file: assets/#file: tv-remote/assets/#' assets.yaml | "${SSH[@]}" "cat > $D/tv-remote/assets.yaml"
 tar -czf - ui_res.yaml logic.h ui_lv.h assets | "${SSH[@]}" "rm -rf $D/tv-remote/assets && tar -xzf - -C $D/tv-remote"
-sed 's#base: !include remote.yaml#base: !include tv-remote.yaml#' diag.yaml | "${SSH[@]}" "cat > $D/tv-remote-diag.yaml"
-"${SSH[@]}" "ls -la $D/tv-remote.yaml $D/tv-remote $D/tv-remote-diag.yaml
+"${SSH[@]}" "ls -la $D/tv-remote.yaml $D/tv-remote
   for k in wifi_ssid wifi_password; do
     if grep -q \"^\$k:\" $D/secrets.yaml 2>/dev/null; then echo \"secrets.yaml has \$k: yes\"; else echo \"secrets.yaml has \$k: NO - add it\"; fi
   done"

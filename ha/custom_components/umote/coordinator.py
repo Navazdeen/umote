@@ -68,7 +68,22 @@ class UmoteCoordinator(DataUpdateCoordinator[dict]):
 
     @callback
     def async_track(self) -> callback:
-        return async_track_state_change_event(self.hass, [TV_REMOTE], self._on_remote_change)
+        unsub_remote = async_track_state_change_event(self.hass, [TV_REMOTE], self._on_remote_change)
+        unsub_adb = async_track_state_change_event(self.hass, [TV_ADB], self._on_adb_change)
+
+        def unsub() -> None:
+            unsub_remote()
+            unsub_adb()
+        return unsub
+
+    @callback
+    def _on_adb_change(self, event: Event) -> None:
+        """ADB usually comes back a little after the TV wakes: read the TV then."""
+        old, new = event.data.get("old_state"), event.data.get("new_state")
+        was_down = old is None or old.state in ("unavailable", "unknown", "off")
+        if new is not None and new.state not in ("unavailable", "unknown", "off") and was_down:
+            # not the debounced request: it usually lands inside the cooldown of the remote's refresh
+            self.hass.async_create_task(self.async_refresh())
 
     # ---- reading the TV -------------------------------------------------------------------
     def tv_on(self) -> bool:

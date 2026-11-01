@@ -178,3 +178,17 @@ async def test_every_app_published_within_3kb(hass, mock_adb):
     assert len(apps) == len(parse_apps(fx("packages.txt"), SYSTEM_PACKAGES))
     assert set(apps[0]) == {"id", "kind", "name", "port", "color", "icon"}
     assert len(json.dumps({k: st.attributes[k] for k in ("sources", "quick", "more", "current")})) <= 3072
+
+
+async def test_refreshes_when_adb_comes_back(hass, mock_adb):
+    mock_adb.go_unavailable()
+    await setup(hass)
+    assert hass.states.get("sensor.umote_sources").attributes["tv_on"] is False
+    mock_adb.up = True
+    hass.states.async_set(TV_REMOTE, "on", {"current_activity": "com.netflix.ninja"})
+    await hass.async_block_till_done()
+    assert hass.states.get("sensor.umote_sources").attributes["tv_on"] is False   # ADB still down
+    hass.states.async_set(TV_ADB, "idle", {})
+    await hass.async_block_till_done()
+    st = hass.states.get("sensor.umote_sources")
+    assert st.attributes["tv_on"] is True and st.attributes["sources"][0]["id"] == "hdmi1"

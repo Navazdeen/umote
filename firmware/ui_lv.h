@@ -83,6 +83,10 @@ struct Hooks {
 };
 inline Hooks hooks;
 
+// False until build() has run. The device calls into the UI before LVGL exists (on_boot at
+// priority 800, the battery sensor, toasts from start_session), so every entry point checks it.
+inline bool ready = false;
+
 // ---- colours ---------------------------------------------------------------------------------------
 constexpr uint32_t BG = 0x0B0B0C, SHEET = 0x1C1C1E, CARD = 0x2C2C2E, GREY = 0x3A3A3C, BLUE = 0x0A84FF,
                    LINK = 0x64A8FF, YELLOW = 0xFFD60A, WHITE = 0xFFFFFF;
@@ -244,6 +248,7 @@ inline lv_timer_t *toast_timer;
 
 // Battery / button-board warning replaces the status icons; empty text hides it.
 inline void set_status(int batt_pct, bool wifi_up, const char *warning, uint32_t warn_color) {
+  if (!ready) return;
   lv_label_set_text_fmt(chrome.batt, "%d%%", batt_pct);
   bool warn = warning && *warning;
   show(chrome.wifi, wifi_up && !warn);
@@ -265,6 +270,7 @@ inline void build_overlays() {
 }
 
 inline void toast(const std::string &t) {
+  if (!ready) return;
   lv_label_set_text(toast_text, t.c_str());
   show(toast_box, true);
   lv_obj_move_foreground(toast_box);
@@ -458,6 +464,7 @@ inline std::string mmss(int s, bool neg = false) {
 
 // Called every second and on every HA update.
 inline void tick_tv(int64_t now_ms) {
+  if (!ready) return;
   if (tvp.scrubbing) return;
   auto p = umote::progress(tv.duration, tv.position, tv.position_ms, now_ms, tv.playing);
   for (lv_obj_t *o : {tvp.scrub, tvp.pos, tvp.rem}) show(o, p.show && tv.seekable);
@@ -494,6 +501,7 @@ inline uint32_t darken(uint32_t c, int pct) {
 }
 
 inline void render_tv(int64_t now_ms) {
+  if (!ready) return;
   auto view = umote::select_view(tv.tv_on, tv.cast_state.c_str(), !tv.title.empty(), tv.has_art,
                                  tv.activity.c_str());
   const Source *cur = find_source(tv.current);
@@ -652,6 +660,7 @@ inline void render_sources_sheet() {
 }
 
 inline void open_sources() {
+  if (!ready) return;
   ensure_sheets();
   more_open = false;
   render_sources_sheet();
@@ -832,6 +841,7 @@ inline void toggle_tile(int i) {
 }
 
 inline void render_home() {
+  if (!ready) return;
   lv_obj_clean(hp.grid);
   hp.objs.clear();
   for (size_t i = 0; i < hp.tiles.size(); i++) {
@@ -873,6 +883,7 @@ inline void build_home(lv_obj_t *page) {
 
 // D-pad on the Home page: left/right by one, up/down by a row.
 inline void home_move(const char *dir) {
+  if (!ready) return;
   int n = (int) hp.tiles.size();
   if (!n) return;
   int d = !strcmp(dir, "LEFT") ? -1 : !strcmp(dir, "RIGHT") ? 1 : !strcmp(dir, "UP") ? -2 : 2;
@@ -881,7 +892,9 @@ inline void home_move(const char *dir) {
   paint_focus();
 }
 inline void home_scroll(bool up) { lv_obj_scroll_by(hp.grid, 0, up ? 154 : -154, LV_ANIM_ON); }
-inline void home_toggle_focus() { toggle_tile(hp.focus); }
+inline void home_toggle_focus() {
+  if (!ready) return;
+  toggle_tile(hp.focus); }
 
 // ---- device options sheet (fans) -------------------------------------------------------------------------
 struct OptSheet {
@@ -909,6 +922,7 @@ inline void destroy_options() {
   op = OptSheet{};
 }
 inline void open_options(int i) {
+  if (!ready) return;
   if (i < 0 || i >= (int) hp.tiles.size() || hp.tiles[i].kind != "fan") return;
   if (!op.root) build_options();
   op.tile = i;
@@ -1116,6 +1130,7 @@ inline void paint_set_focus() {
 }
 
 inline void refresh_settings() {
+  if (!ready) return;
   lv_label_set_text(sp.v_wifi, about.ssid.empty() ? "Not connected" : about.ssid.c_str());
   lv_label_set_text(sp.v_buttons, cfg.vol_to_tv ? "Volume: TV" : "Volume: Soundbar");
   lv_label_set_text_fmt(sp.v_sleep, "%d s", cfg.sleep_s);
@@ -1473,6 +1488,7 @@ inline bool keypad_open() { return sp.kb && !lv_obj_has_flag(sp.kb, LV_OBJ_FLAG_
 
 // D-pad, OK and Back on the Settings page (lists, keypad and its picker).
 inline void settings_key(const char *what) {
+  if (!ready) return;
   bool ok = !strcmp(what, "OK"), back = !strcmp(what, "BACK");
   if (keypad_open()) {
     if (kb.pick_group >= 0) {
@@ -1565,6 +1581,7 @@ inline void build(lv_obj_t *view, std::array<lv_obj_t *, 4> pages) {
   show_settings_view(sp.list);
   build_overlays();
   step("overlays");
+  ready = true;
 }
 
 }  // namespace ui

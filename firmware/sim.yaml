@@ -17,6 +17,15 @@ esphome:
     - priority: 800
       then:
         - lambda: 'id(g_text_large) = getenv("SIM_TEXT") && std::string(getenv("SIM_TEXT")) == "large";'
+        # The device calls into the UI this early (on_boot 800, battery sensor, toasts): before LVGL exists.
+        - script.execute: ui_refresh
+        - lambda: |-
+            ui::toast("early");
+            ui::tick_tv(0);
+            ui::render_tv(0);
+            ui::render_home();
+            ui::render_sources_sheet();
+            ui::refresh_settings();
     - priority: -100
       then:
         - lambda: |-

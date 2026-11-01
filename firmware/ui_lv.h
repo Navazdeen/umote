@@ -136,7 +136,7 @@ inline void on_tap(lv_obj_t *o, Tap fn) {
 inline lv_obj_t *button(lv_obj_t *parent, int x, int y, int w, int h, uint32_t bg, lv_opa_t opa, int radius,
                         Tap fn) {
   lv_obj_t *b = box(parent, x, y, w, h, bg, opa, radius);
-  lv_obj_set_style_bg_opa(b, opa > LV_OPA_50 ? LV_OPA_70 : (lv_opa_t) (opa + 30), LV_STATE_PRESSED);
+  lv_obj_set_style_bg_opa(b, opa > LV_OPA_50 ? (lv_opa_t) LV_OPA_70 : (lv_opa_t) (opa + 30), LV_STATE_PRESSED);
   on_tap(b, std::move(fn));
   return b;
 }
@@ -430,7 +430,7 @@ inline void render_quick() {
 }
 
 inline std::string mmss(int s, bool neg = false) {
-  char buf[16];
+  char buf[32];
   if (s >= 3600) snprintf(buf, sizeof buf, "%s%d:%02d:%02d", neg ? "\xE2\x88\x92" : "", s / 3600, s / 60 % 60, s % 60);
   else snprintf(buf, sizeof buf, "%s%d:%02d", neg ? "\xE2\x88\x92" : "", s / 60, s % 60);
   return buf;
@@ -745,7 +745,8 @@ inline void parse_tiles(const std::string &json) {
     tile.icon = t["icon"] | "plug";
     tile.state = t["state"] | "off";
     tile.label = t["label"] | "";
-    for (JsonVariant e : t["entities"].as<JsonArray>()) {
+    JsonArray entities = t["entities"];
+    for (JsonVariant e : entities) {
       if (!tile.entities.empty()) tile.entities += ",";
       tile.entities += e.as<std::string>();
     }

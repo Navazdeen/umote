@@ -541,9 +541,12 @@ inline std::vector<lv_obj_t *> &modals() {
   static std::vector<lv_obj_t *> m;
   return m;
 }
-inline lv_obj_t *dim_layer(const std::string &id) {
+inline void close_sheets();
+// Dimmed backdrop of a sheet. It swallows taps meant for the page behind, and a tap on it closes
+// the sheet: touch-only remotes have no Back key, so this is the way out.
+inline lv_obj_t *dim_layer(const std::string &id, Tap outside = [] { close_sheets(); }) {
   lv_obj_t *d = nm(box(lv_layer_top(), 0, 0, 240, 320, 0x000000, 140), id);
-  lv_obj_add_flag(d, LV_OBJ_FLAG_CLICKABLE);   // swallow taps behind the sheet
+  on_tap(d, std::move(outside));
   show(d, false);
   modals().push_back(d);
   return d;
@@ -900,9 +903,16 @@ inline void home_toggle_focus() {
 struct OptSheet {
   lv_obj_t *root, *title, *power_tog, *speed, *of, *led_tog, *led_row;
   std::vector<lv_obj_t *> timers;
-  int tile = -1, speed_val = 0;
+  std::string tile_id;   // by id: HA re-sorts the tiles (on first) while the sheet is open
+  int speed_val = 0;
 };
 inline OptSheet op;
+
+inline Tile *opt_tile() {
+  for (auto &t : hp.tiles)
+    if (!op.tile_id.empty() && t.id == op.tile_id) return &t;
+  return nullptr;
+}
 
 inline void paint_toggle(lv_obj_t *tog, bool on) {
   lv_obj_set_style_bg_color(tog, lv_color_hex(on ? 0x34C759 : GREY), 0);
@@ -925,7 +935,7 @@ inline void open_options(int i) {
   if (!ready) return;
   if (i < 0 || i >= (int) hp.tiles.size() || hp.tiles[i].kind != "fan") return;
   if (!op.root) build_options();
-  op.tile = i;
+  op.tile_id = hp.tiles[i].id;
   const Tile &t = hp.tiles[i];
   lv_label_set_text(op.title, t.name.c_str());
   paint_toggle(op.power_tog, t.state == "on");
@@ -939,8 +949,9 @@ inline void open_options(int i) {
 }
 
 inline void set_speed(int d) {
-  if (op.tile < 0) return;
-  Tile &t = hp.tiles[op.tile];
+  Tile *tp = opt_tile();
+  if (!tp) return;
+  Tile &t = *tp;
   int n = std::max(1, t.speed_count);
   op.speed_val = std::max(0, std::min(n, op.speed_val + d));
   lv_label_set_text_fmt(op.speed, "%d", op.speed_val);
@@ -954,8 +965,9 @@ inline void build_options() {
   lv_obj_add_flag(s, LV_OBJ_FLAG_CLICKABLE);
   box(s, 102, 6, 36, 5, WHITE, 77, 2);
   lv_obj_t *pw = nm(button(s, 0, 14, 240, 44, WHITE, LV_OPA_TRANSP, 0, [] {
-                      if (op.tile < 0) return;
-                      Tile &t = hp.tiles[op.tile];
+                      Tile *tp = opt_tile();
+                      if (!tp) return;
+                      Tile &t = *tp;
                       bool on = t.state != "on";
                       if (hooks.ha) hooks.ha(on ? "on" : "off", t.entities, "");
                       t.state = on ? "on" : "off";
@@ -979,14 +991,14 @@ inline void build_options() {
     lv_obj_t *b = nm(text_button(s, 12 + 56 * i, 156, 48, 44, T[i], CARD, LV_OPA_COVER, 12, WHITE, [i, hours] {
                        for (int k = 0; k < 4; k++)
                          lv_obj_set_style_bg_color(op.timers[k], lv_color_hex(k == i ? BLUE : CARD), 0);
-                       if (op.tile >= 0 && hooks.ha) hooks.ha("timer", hp.tiles[op.tile].timer, std::to_string(hours));
+                       if (opt_tile() && hooks.ha) hooks.ha("timer", opt_tile()->timer, std::to_string(hours));
                      }), "opt_timer_" + std::to_string(i));
     op.timers.push_back(b);
   }
   lv_obj_set_style_bg_color(op.timers[0], lv_color_hex(BLUE), 0);
   op.led_row = nm(button(s, 0, 210, 240, 44, WHITE, LV_OPA_TRANSP, 0, [] {
-                    if (op.tile < 0) return;
-                    if (hooks.ha) hooks.ha("toggle", hp.tiles[op.tile].led, "");
+                    if (!opt_tile()) return;
+                    if (hooks.ha) hooks.ha("toggle", opt_tile()->led, "");
                     lv_obj_t *t = op.led_tog;
                     paint_toggle(t, lv_obj_get_x(lv_obj_get_child(t, 0)) == 2);
                   }), "row_opt_led");
@@ -1456,7 +1468,10 @@ inline void build_keypad(lv_obj_t *page) {
     }
   }
   // letter picker
-  kb.pick_root = dim_layer("kb_pick_dim");
+  kb.pick_root = dim_layer("kb_pick_dim", [] {   // closes just the letter picker
+    show(kb.pick_root, false);
+    kb.pick_group = -1;
+  });
   lv_obj_t *card = nm(box(kb.pick_root, 4, 136, 232, 92, SHEET, LV_OPA_COVER, 14), "kb_pick");
   lv_obj_add_flag(card, LV_OBJ_FLAG_CLICKABLE);
   kb.pick_cap = text(card, 12, 8, 0, R.f12s, WHITE, "", LV_TEXT_ALIGN_LEFT, 184);

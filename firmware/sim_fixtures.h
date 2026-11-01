@@ -112,6 +112,46 @@ inline bool sim_load_fixture(const std::string &f, int64_t now_ms) {
     }
     printf("cycle: %s\n", ok ? "PASS" : "FAIL");
     exit(ok ? 0 : 3);
+  } else if (f == "outside_tap") {
+    // A tap on the dimmed area around any sheet closes it (touch-only remotes have no Back key).
+    ui::parse_tiles(SIM_TILES);
+    ui::render_home();
+    auto tap_dim = [] {
+      for (auto *m : ui::modals())
+        if (!lv_obj_has_flag(m, LV_OBJ_FLAG_HIDDEN)) lv_obj_send_event(m, LV_EVENT_CLICKED, nullptr);
+      for (int k = 0; k < 3; k++) lv_timer_handler();
+    };
+    bool ok = true;
+    ui::open_options(0); tap_dim(); ok &= !ui::sheet_open();
+    ui::open_page_picker(2); tap_dim(); ok &= !ui::sheet_open();
+    ui::open_sources(); tap_dim(); ok &= !ui::sheet_open();
+    ui::open_new_hdmi(3); tap_dim(); ok &= !ui::sheet_open();
+    ui::show_page(3); ui::open_keypad("X"); ui::kb_open_pick(4); tap_dim();
+    ok &= !ui::sheet_open() && ui::kb.pick_group == -1 && ui::keypad_open();
+    printf("outside_tap: %s\n", ok ? "PASS" : "FAIL");
+    exit(ok ? 0 : 3);
+  } else if (f == "fan_reorder") {
+    // The options sheet must keep acting on its fan when HA re-sorts the tiles under it.
+    static std::vector<std::string> calls;
+    ui::hooks.ha = [](const std::string &k, const std::string &e, const std::string &v) { calls.push_back(k + " " + e + " " + v); };
+    std::string tiles = SIM_TILES;
+    ui::parse_tiles(tiles);
+    ui::render_home();
+    ui::open_options(0);                        // TV fan, Speed 3 of 6
+    ui::set_speed(1);                           // -> 4
+    // HA reports the change and moves another tile to the front
+    std::string moved = tiles;
+    size_t a = moved.find("{\"id\":\"c_display\"");
+    std::string disp = moved.substr(a, moved.find("},", a) + 2 - a);
+    moved.erase(a, disp.size());
+    moved.insert(2, disp);
+    ui::parse_tiles(moved);
+    ui::render_home();
+    ui::set_speed(1);                           // -> 5, still the TV fan
+    bool ok = calls.size() == 2 && calls[0] == "fan_pct fan.tv_fan 66" && calls[1] == "fan_pct fan.tv_fan 83";
+    for (auto &c : calls) printf("  %s\n", c.c_str());
+    printf("fan_reorder: %s\n", ok ? "PASS" : "FAIL");
+    exit(ok ? 0 : 3);
   } else if (f == "keypad_type") {
     // Type "abc1" with D-pad events only, then check the field.
     ui::show_page(3);

@@ -1,6 +1,8 @@
 """sensor.umote_sources and sensor.umote_home."""
 from __future__ import annotations
 
+import json
+
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.const import EVENT_STATE_CHANGED
 from homeassistant.core import Event, HomeAssistant, callback
@@ -11,6 +13,10 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import AREA
 from .coordinator import UmoteCoordinator
 from .home import build_tiles
+
+
+def _json(value) -> str:
+    return json.dumps(value, separators=(",", ":"), ensure_ascii=False)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities: AddConfigEntryEntitiesCallback) -> None:
@@ -33,7 +39,10 @@ class SourcesSensor(CoordinatorEntity[UmoteCoordinator], SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict:
-        return dict(self.coordinator.data)
+        # HA sends attributes to ESPHome as str(value), so lists go out as JSON text.
+        d = self.coordinator.data
+        return {"sources": _json(d["sources"]), "quick": _json(d["quick"]), "more": _json(d["more"]),
+                "current": d["current"] or "", "tv_on": d["tv_on"], "updated": d["updated"]}
 
 
 class HomeSensor(SensorEntity):
@@ -89,4 +98,4 @@ class HomeSensor(SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict:
-        return {"tiles": self._tiles}
+        return {"tiles": _json(self._tiles)}

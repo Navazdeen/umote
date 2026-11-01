@@ -70,11 +70,11 @@ async def test_config_flow_creates_single_entry(hass):
 async def test_sources_sensor_publishes_json(hass, mock_adb):
     await setup(hass)
     st = hass.states.get("sensor.umote_sources")
-    assert st.attributes["sources"][0]["id"] == "hdmi1"
-    assert st.attributes["sources"][0]["name"] == "PlayStation 5"
+    assert json.loads(st.attributes["sources"])[0]["id"] == "hdmi1"
+    assert json.loads(st.attributes["sources"])[0]["name"] == "PlayStation 5"
     assert st.attributes["tv_on"] is True and st.attributes["current"] == "com.netflix.ninja"
-    assert len(json.dumps({k: st.attributes[k] for k in ("sources", "quick", "more", "current")})) <= 3072
-    assert int(st.state) == len(st.attributes["sources"])
+    assert len("".join(str(st.attributes[k]) for k in ("sources", "quick", "more", "current"))) <= 3072
+    assert int(st.state) == len(json.loads(st.attributes["sources"]))
 
 
 async def test_coordinator_keeps_last_sources_when_adb_unavailable(hass, mock_adb, caplog):
@@ -83,7 +83,7 @@ async def test_coordinator_keeps_last_sources_when_adb_unavailable(hass, mock_ad
     await refresh(hass)
     st = hass.states.get("sensor.umote_sources")
     assert st.state != "unavailable"
-    assert st.attributes["sources"] and st.attributes["tv_on"] is False
+    assert json.loads(st.attributes["sources"]) and st.attributes["tv_on"] is False
     assert "ERROR" not in caplog.text
 
 
@@ -114,7 +114,7 @@ async def test_usage_counted_and_persisted(hass, mock_adb, hass_storage):
     await hass.services.async_call(DOMAIN, "name_source", {"port": 2, "name": "Fire TV"}, blocking=True)
     st = hass.states.get("sensor.umote_sources")
     coord = hass.config_entries.async_loaded_entries(DOMAIN)[0].runtime_data
-    assert next(s for s in st.attributes["sources"] if s["id"] == "hdmi2")["name"] == "Fire TV"
+    assert next(s for s in json.loads(st.attributes["sources"]) if s["id"] == "hdmi2")["name"] == "Fire TV"
     assert next(s for s in coord.all_sources if s["id"] == "hdmi2")["uses"] == 1
     assert hass_storage["umote.names"]["data"] == {"2": "Fire TV"}
     await coord._usage_store.async_save(coord.usage)
@@ -141,11 +141,11 @@ async def test_home_sensor_lists_living_room_tiles(hass, mock_adb):
         hass.states.async_set(e["entity_id"], "off", {"percentage_step": 16.67} if dom == "fan" else {})
     await setup(hass)
     st = hass.states.get("sensor.umote_home")
-    assert {t["name"] for t in st.attributes["tiles"]} == {
+    assert {t["name"] for t in json.loads(st.attributes["tiles"])} == {
         "TV fan", "Fridge fan", "Clock fan", "Cabinet lights", "Cabinet power", "Matrix clock"}
     hass.states.async_set("fan.tv_fan", "on", {"percentage": 50, "percentage_step": 16.67})
     await hass.async_block_till_done()
-    assert hass.states.get("sensor.umote_home").attributes["tiles"][0]["label"] == "Speed 3"
+    assert json.loads(hass.states.get("sensor.umote_home").attributes["tiles"])[0]["label"] == "Speed 3"
 
 
 async def test_artwork_entity_unavailable_without_art(hass, mock_adb):
@@ -166,7 +166,7 @@ async def test_sources_survive_restart_with_tv_off(hass, mock_adb, hass_storage)
     await hass.async_block_till_done()
     st = hass.states.get("sensor.umote_sources")
     assert st.attributes["tv_on"] is False
-    assert st.attributes["sources"][0]["name"] == "PlayStation 5"
+    assert json.loads(st.attributes["sources"])[0]["name"] == "PlayStation 5"
 
 
 async def test_every_app_published_within_3kb(hass, mock_adb):
@@ -174,10 +174,10 @@ async def test_every_app_published_within_3kb(hass, mock_adb):
     from custom_components.umote.const import SYSTEM_PACKAGES
     await setup(hass)
     st = hass.states.get("sensor.umote_sources")
-    apps = [s for s in st.attributes["sources"] if s["kind"] == "app"]
+    apps = [s for s in json.loads(st.attributes["sources"]) if s["kind"] == "app"]
     assert len(apps) == len(parse_apps(fx("packages.txt"), SYSTEM_PACKAGES))
     assert set(apps[0]) == {"id", "kind", "name", "port", "color", "icon"}
-    assert len(json.dumps({k: st.attributes[k] for k in ("sources", "quick", "more", "current")})) <= 3072
+    assert len("".join(str(st.attributes[k]) for k in ("sources", "quick", "more", "current"))) <= 3072
 
 
 async def test_refreshes_when_adb_comes_back(hass, mock_adb):
@@ -191,4 +191,16 @@ async def test_refreshes_when_adb_comes_back(hass, mock_adb):
     hass.states.async_set(TV_ADB, "idle", {})
     await hass.async_block_till_done()
     st = hass.states.get("sensor.umote_sources")
-    assert st.attributes["tv_on"] is True and st.attributes["sources"][0]["id"] == "hdmi1"
+    assert st.attributes["tv_on"] is True and json.loads(st.attributes["sources"])[0]["id"] == "hdmi1"
+
+
+async def test_attributes_reach_esphome_as_json(hass, mock_adb):
+    """HA forwards attributes to ESPHome as str(value): lists must already be JSON text."""
+    await setup(hass)
+    st = hass.states.get("sensor.umote_sources")
+    for key in ("sources", "quick", "more"):
+        json.loads(str(st.attributes[key]))
+    assert json.loads(str(st.attributes["sources"]))[0]["id"] == "hdmi1"
+    assert str(st.attributes["current"]) == "com.netflix.ninja"
+    home = hass.states.get("sensor.umote_home")
+    assert isinstance(json.loads(str(home.attributes["tiles"])), list)

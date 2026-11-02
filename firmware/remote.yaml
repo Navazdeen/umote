@@ -363,7 +363,7 @@ button:
   - platform: wake_on_lan
     id: tv_wol
     name: TV wake
-    target_mac_address: <tv_mac>
+    target_mac_address: !secret tv_mac
 
 # Reset reason and free heap, reported to HA and logged every 30 s (diagnosing reboots).
 debug:

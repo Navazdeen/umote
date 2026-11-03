@@ -982,7 +982,8 @@ display:
     dimensions: { width: 240, height: 320 }
     invert_colors: true          # [CHECK] flip if colours look negative
     color_order: bgr             # [CHECK]
-    transform: { mirror_x: false, mirror_y: false }   # USB-C end faces the tip [CHECK]
+    # Mounted USB-C end up (2026-11-03): panel turned 180 deg from its native portrait.
+    transform: { mirror_x: true, mirror_y: true }
     auto_clear_enabled: false
     update_interval: never
 
@@ -994,9 +995,10 @@ touchscreen:
     interrupt_pin:               # only read the panel when PENIRQ says it's touched
       number: GPIO36
       allow_other_uses: true
-    # Measured 2026-10-30 (corner taps): raw X falls left->right, so X is mirrored; Y is normal.
+    # Measured 2026-10-30 (corner taps, USB-C down): raw X fell left->right, Y was normal.
+    # Mounted USB-C up, both axes flip 180 deg with the display.
     calibration: { x_min: 280, x_max: 3720, y_min: 300, y_max: 3850 }
-    transform: { mirror_x: true }
+    transform: { mirror_x: false, mirror_y: true }
     on_touch:
       - lambda: |-
           id(g_touched) = true;

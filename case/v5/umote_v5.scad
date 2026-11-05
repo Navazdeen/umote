@@ -5,6 +5,8 @@ part = "params";
 $fn = 64;
 include <params.scad>
 include <profile.scad>
+include <head_half.scad>
+include <collar.scad>
 
 // every value the checks need, as one JSON line
 P = [["W", W], ["wall", wall], ["tip_wall", tip_wall], ["T", T], ["L", L], ["theta", theta], ["clr", clr],
@@ -26,4 +28,39 @@ function jo(p, i) = i >= len(p) ? "" : str("\"", p[i][0], "\":", jv(p[i][1]), i 
 if (part == "params") { echo(str("PARAMS {", jo(P, 0), "}")); cube(0.01); }
 else if (part == "envelope") envelope();
 else if (part == "envelope_bent") union() { ycut(y_key_start, L + 1) envelope(); head_xf() ycut(-1, y_head_end) envelope(); }
+else if (part == "snap_test") snap_test();
+else if (part == "roller_test") roller_test();
+else if (part == "asm_collar_core") collar_core();
+else if (part == "asm_wheel") translate([whl_x, cy, axle_z]) wheel();
+else if (part == "asm_cradle") cradle();
+else if (part == "asm_ec11") ec11_envelope();
 else assert(false, str("unknown part ", part));
+
+// ---------- test prints ----------
+// snap_test: the head's tip corner (back down) and the panel's tip corner (face down), side by side.
+// Tip-wall snaps with undercuts 0.3 / 0.4 / 0.5 (1 / 2 / 3 dots inside the panel) and one side-wall snap (0.4).
+st_uc = [0.3, 0.4, 0.5];  st_x = [4, 10.5, 17];
+module st_box() { translate([-3, -1, -1]) cube([29.5, 15, 30]); }
+module snap_test() {
+  intersection() { st_box(); difference() {
+    envelope(); head_cavity(); panel_zone(0);
+    for (i = [0 : 2]) translate([st_x[i], tip_snap_y, snap_root_z]) rotate(-90) catch(st_uc[i]);
+    translate([side_snap_x, 6.0, snap_root_z]) catch(0.4, gap = 1.0);
+  } }
+  translate([0, 40, T]) mirror([0, 0, 1]) difference() {
+    union() {
+      intersection() { st_box(); panel_zone(pcl); }
+      for (i = [0 : 2]) translate([st_x[i], tip_snap_y, snap_root_z]) rotate(-90) snap(st_uc[i]);
+      translate([side_snap_x, 6.0, snap_root_z]) snap(0.4, gap = 1.0);
+    }
+    for (i = [0 : 2]) for (k = [0 : i]) translate([st_x[i] - 2 + k * 1.6, 9, pz0 - 0.1]) cylinder(d = 0.9, h = 0.5, $fn = 16);
+  }
+}
+// roller_test: the collar without its fork and slots (standing on its key face), the wheel and the cradle.
+// the collar prints standing on its key-side face (assembled +y points down)
+module collar_print() translate([0, 0, y_key_start]) rotate([-90, 0, 0]) children();
+module roller_test() {
+  collar_print() collar_core();
+  translate([0, 45, whl_w / 2]) rotate([0, 90, 0]) wheel();
+  translate([0, 30 - 85, -cr_z0]) cradle();
+}

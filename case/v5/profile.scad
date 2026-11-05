@@ -9,7 +9,7 @@ module rr2d(w, l, r) { offset(r = r) square([w - 2 * r, l - 2 * r], center = tru
 
 // plan inset of the outer surface at height z: a 45 deg foot, the lower quarter ellipse into the
 // flat back, the straight band, then the upper roll round the face panel
-function e_in(z) = z < bed_ch ? 1.82 + (bed_ch - z)
+function e_in(z) = z < bed_ch ? 1.82 + 0.9 * (bed_ch - z)        // 42 deg, just under the 45 deg limit
   : z < eb ? ea * (1 - sqrt(1 - pow((eb - z) / eb, 2)))
   : z < roll_z ? 0 : roll * pow((z - roll_z) / (T - roll_z), 2);
 

@@ -98,11 +98,39 @@ static void scan_text_is_parsed() {
 
 static void roll_decoder_counts_detents() {
   RollDecoder d; int s = 0;
-  for (uint8_t ab : {1, 3, 2, 0}) s += d.feed(ab);        // one CW detent (4 quarter steps)
+  assert(d.feed(3) == 0);                                  // first reading seeds it (EC11 rests at A=B=1)
+  for (uint8_t ab : {2, 0, 1, 3}) s += d.feed(ab);         // one CW detent, back at rest
   assert(s == 1);
-  for (uint8_t ab : {2, 3, 1, 0}) s += d.feed(ab);        // one CCW detent
+  for (uint8_t ab : {1, 0, 2, 3}) s += d.feed(ab);         // one CCW detent
   assert(s == 0);
-  assert(d.feed(3) == 0);                                 // 0 -> 3 skips a state: ignored
+  for (int k = 0; k < 3; k++) for (uint8_t ab : {2, 0, 1, 3}) s += d.feed(ab);   // three more CW: one each
+  assert(s == 3);
+}
+
+static void roll_half_click_does_nothing() {
+  RollDecoder d; int s = 0;
+  d.feed(3);
+  for (uint8_t ab : {2, 0, 2, 3}) s += d.feed(ab);         // half a click and back
+  assert(s == 0);
+  for (uint8_t ab : {2, 0, 1, 3}) s += d.feed(ab);         // the next real detent still counts once
+  assert(s == 1);
+}
+
+static void roll_boot_publishes_one_pin_at_a_time() {
+  // at boot ESPHome publishes A (=1) while B still reads 0, then B: the decoder sees 2, then 3
+  RollDecoder d; int s = 0;
+  s += d.feed(2); s += d.feed(3);
+  assert(s == 0);
+  int mid = 0;
+  for (uint8_t ab : {2, 0, 1}) mid += d.feed(ab);         // part way through a CW detent: nothing yet
+  assert(mid == 0);
+  assert(d.feed(3) == 1);                                  // the detent completes at rest: exactly one
+}
+
+static void roll_skipped_state_is_ignored() {
+  RollDecoder d;
+  d.feed(3);
+  assert(d.feed(0) == 0);                                  // 3 -> 0 skips a state
 }
 
 static void roll_routes_by_page() {
@@ -128,6 +156,9 @@ int main() {
   backlight_never_goes_dark();
   scan_text_is_parsed();
   roll_decoder_counts_detents();
+  roll_half_click_does_nothing();
+  roll_boot_publishes_one_pin_at_a_time();
+  roll_skipped_state_is_ignored();
   roll_routes_by_page();
   std::puts("all logic tests passed");
   return 0;

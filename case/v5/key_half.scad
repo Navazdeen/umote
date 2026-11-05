@@ -11,6 +11,7 @@ clip_y = [bb_y0 + 20, bb_y0 + 100];  clip_w = 6;
 stop_y = bb_y0 + bb_l + 0.1;
 key_snaps = [[22.3, 198.0, 0], [22.3, 205.0, 0], [-22.3, 198.0, 180], [-22.3, 205.0, 180]];   // releasable, as the head's side snaps; clear of the eyelet pillar
 door_y1 = batt_end + 0.3;           // the battery door window's bottom end (the bottom zone's floor is solid)
+door_win_y0 = batt_y0 - 0.4;        // the window starts just before the battery: the prongs' pillars stand on the floor before it
 
 
 module key_cavity() { union() {
@@ -32,9 +33,10 @@ module key_body() { difference() {
         translate([-17, end_block_y, bz_top - 0.01]) cube([34, 10, 13.4 - bz_top]);                    // end block: pads + magnets
         translate([-30, 208.5, bz_top - 0.01]) cube([30 - 17.5, 10, 12 - bz_top]);                     // eyelet pillar (-x corner)
       } }
-    prongs(y_key_start, -1);
+    prongs(y_key_start, -1, 3.0, bb_z0 - smd_h - 0.2);   // short and low: the battery wires pass over, the board's SMDs above
   }
   door_window();
+  plate_recess();                    // the door's tabs run on over the floor strip to the collar
   door_detents(0.1);
   for (s = key_snaps) translate([s[0], s[1], snap_root_z]) rotate(s[2]) catch(gap = 0.6);
   for (sx = [-1, 1]) {
@@ -47,7 +49,7 @@ module key_body() { difference() {
 
 // battery door window through the back: 46.6 wide, so the battery goes in from the back
 door_w = batt[0] + 0.6;
-module door2d(grow = 0.15) translate([-door_w / 2 - grow, y_key_start - 1]) square([door_w + 2 * grow, door_y1 - y_key_start + 1 + grow]);
+module door2d(grow = 0.15) translate([-door_w / 2 - grow, door_win_y0 - grow]) square([door_w + 2 * grow, door_y1 - door_win_y0 + 2 * grow]);
 module door_window() translate([0, 0, -1]) linear_extrude(floor_t + 1.01) door2d();
 
 // ---------- key face panel ----------

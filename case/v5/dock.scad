@@ -8,20 +8,18 @@ det_x = 12;  det = [3, 0.35];       // detent bumps: x positions, [width, protru
 module door_key_part() intersection() {
   envelope();
   translate([0, 0, -1]) linear_extrude(floor_t + 1 - 0.0) door2d(0);
-  translate([-50, y_key_start, -1]) cube([100, door_y1 - y_key_start, 30]);
+  translate([-50, door_win_y0, -1]) cube([100, door_y1 - door_win_y0, 30]);
 }
-module door_collar_part() intersection() {
+module door_collar_part() intersection() {   // the two tabs, 0.8 thick, hooked under the collar's ramp
   translate([0, 0, -0.01]) hull() {
-    translate([-50, plate_y0, 0]) cube([100, y_key_start - plate_y0 + 0.01, plate_d]);
-    translate([-50, plate_y0 - plate_d, 0]) cube([100, y_key_start - plate_y0 + plate_d + 0.01, 0.01]);
+    translate([-50, plate_y0, 0]) cube([100, door_win_y0 - plate_y0 + 0.01, plate_d]);
+    translate([-50, plate_y0 - plate_d, 0]) cube([100, door_win_y0 - plate_y0 + plate_d + 0.01, 0.01]);
   }
-  translate([0, 0, -1]) linear_extrude(3) plate2d();
+  translate([0, 0, -1]) linear_extrude(3) tab2d();
 }
 module door_detents(grow = 0) for (sx = [-1, 1]) translate([sx * det_x - det[0] / 2 - grow, door_y1, 0.8]) rotate([0, 90, 0])
   linear_extrude(det[0] + 2 * grow) polygon([[0.45 + grow, -0.01], [0, det[1] + grow], [-0.45 - grow, -0.01]]);
-// relief under the roller wheel: it is nearly as tall as the body and dips when pressed
-module door_wheel_relief() translate([whl_x - whl_w / 2 - 0.6, cy - 5, 0.4]) cube([whl_w + 1.2, 10, 1]);
-module magnet_plate() difference() { union() { door_key_part(); door_collar_part(); door_detents(); } door_wheel_relief(); }
+module magnet_plate() union() { door_key_part(); door_collar_part(); door_detents(); }
 
 // ---------- dock ----------
 // Holds the remote upright on its bottom end, leaning back dock_lean, screen towards the user. Two

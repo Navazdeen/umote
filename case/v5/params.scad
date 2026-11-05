@@ -111,7 +111,7 @@ ec11 = [11.7, 12.0, 6.5];           // body: height across the shaft (z), length
 ec11_shaft_d = 6.0;                 // D-shaft [CHECK]
 ec11_detent_steps = 4;              // quadrature steps per detent [CHECK]
 whl_d = 16;  whl_w = 9;
-whl_proud = 1.0;                    // 1.2 asked; 1.0 is the spec's first fallback (skin over the EC11 >= 0.8)
+whl_proud = 1.1;                    // 1.2 asked; 1.1 keeps the skin over the EC11 >= 0.8 and the pressed wheel 0.3 off the back
 skin_min = 0.8;  ec11_gap = 0.2;
 cradle_t = 1.0;  cradle_travel = 0.3;
 tact = [6, 6, 3.5];                 // 6x6 tact switch beside the encoder
@@ -136,8 +136,9 @@ L = bb_y0 + bb_l + bottom_zone + end_wall;
 front_in = T - pan_t;
 touch_z  = front_in - 0.3;
 db_top = touch_z - db_front;  db_z0 = db_top - db_pcb;
-batt_z0 = floor_t + foam;
-bb_z0  = batt_z0 + batt[2] + smd_h;  bb_top = bb_z0 + bb_pcb;
+batt_foam = 0.2;                    // under the battery: 0.3 less than foam, so the pouch clears the button board's SMDs by 0.3
+batt_z0 = floor_t + batt_foam;
+bb_z0  = floor_t + foam + batt[2] + smd_h;  bb_top = bb_z0 + bb_pcb;
 act_top = bb_top + sw_total;
 pz0 = T - pan_t;
 cy = (db_end + bb_y0) / 2;          // wheel axle y

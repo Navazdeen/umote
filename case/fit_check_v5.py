@@ -12,7 +12,6 @@ import trimesh
 # designed contacts: (component, case part) or (component, component) pairs that touch on purpose
 SKIP = {
     ("display PCB", "head body"),                      # sits on its 4 posts
-    ("USB-C plug overmold", "head body"),               # stops on the notch floor (v4)
     ("button PCB", "key panel"),                        # clipped to the panel
     ("button PCB", "key body"),                          # rests on the prongs' top (0.2 clear) / bottom stops
     ("IR LED L", "head panel"), ("IR LED R", "head panel"),     # in their clips
@@ -26,7 +25,10 @@ SKIP = {
     ("copper-side SMDs", "battery 46x105"),
     ("wire BAT", "battery 46x105"), ("wire BAT", "display back parts"),
     ("wire roller", "EC11"), ("wire roller", "MCP23017 DIP-28"),
+    ("wire boards", "display back parts"), ("wire boards", "MCP23017 DIP-28"),
 }
+# spec-maximum sizes already: checked exactly, not grown
+EXACT = {"USB-C plug overmold", "USB-C plug metal"}
 CASE = {"head body": "asm_head_body", "head panel": "asm_head_panel", "collar": "asm_collar",
         "key body": "asm_key_body", "key panel": "asm_key_panel", "wheel": "asm_wheel", "cradle": "asm_cradle",
         "caps": "caps_asm", "dpad ring": "asm_dpad_ring", "magnet plate": "asm_magnet_plate",
@@ -121,9 +123,15 @@ def components(P):
     # wires: the battery pair beside the boards' +x edges, under the display PCB's level in the head;
     # the roller's three over the button board's +x edge to the MCP23017's pins 2 and 6
     hp = lambda p: trimesh.transform_points([p], H)[0]
-    comp["wire BAT"] = wire([[20, P["batt_y0"] - 0.4, 5.0], [22.6, P["batt_y0"] - 2.0, 6.2], [22.6, P["bb_y0"] + 1.7, 8.8],
+    comp["wire BAT"] = wire([[20, P["batt_y0"] - 0.6, 4.3], [22.6, P["batt_y0"] - 1.5, 5.0], [22.6, P["y_key_start"] + 3.6, 8.8], [22.6, P["bb_y0"] + 1.7, 8.8],
                              [22.6, P["y_head_end"] + 2, 8.8], hp([22.6, P["y_head_end"] - 1.5, 8.8]), hp([22.6, 70, 6.0]),
                              hp([22.6, 20, 6.0]), hp([18, 18, 6.0])], 1.6)
+    # the inter-board set (I2C, INT, 3V3, GND, VBAT, IR: 7-9 x 30 AWG, as a 1.6 mm bundle) has no room
+    # under the button board (the battery fills it), so it runs over the board's top along the -x edge,
+    # inside the board clips, to the MCP23017's legs and Q1; in the head under the display PCB's level
+    comp["wire boards"] = wire([hp([-18, 40, 6.0]), hp([-22.6, 40, 6.0]), hp([-22.6, 70, 6.0]), hp([-22.6, P["y_head_end"] - 1.5, 8.8]),
+                                [-22.6, P["y_head_end"] + 2, 8.8], [-22.6, P["y_key_start"] - 1, 8.8], [-22.6, P["bb_y0"] + 9, 8.8],
+                                [-22.6, P["bb_y0"] + 11, 10.6], [-20.6, P["bb_y0"] + 15, 10.6], [-20.6, cyy - 6, 10.6], [-16.5, cyy - 4.6, 10.6]], 1.6)
     comp["wire roller"] = wire([[13.5, P["cy"], 6.0], [20.4, P["cy"] + 4, 10.5], [20.4, P["bb_y0"] + 2, 10.8],
                                 [20.2, cyy - 3.8, 10.8]], 1.6)
     return comp, set(head), set(key)
@@ -155,7 +163,7 @@ def main(argv):
     for (a, ma), (b, mb) in itertools.product(comp.items(), case.items()):
         if (a, b) in SKIP or (a.startswith("stem") and b == "caps") or (a.startswith("switch") and b == "key panel"):
             continue
-        h = hit(ma, mb, grow)
+        h = hit(ma, mb, 0.0 if a in EXACT else grow)
         if h is not None:
             lo, hi = np.round(h.bounds, 2); bad.append(f"{a} x {b} {h.volume:.3f} mm3 x[{lo[0]},{hi[0]}] y[{lo[1]},{hi[1]}] z[{lo[2]},{hi[2]}]")
     print("Components vs each other (exact):")

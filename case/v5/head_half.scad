@@ -38,32 +38,35 @@ module head_cavity() { intersection() {
 } }
 
 // ---------- head body ----------
-// prongs: blocks merged into the side walls that reach prong[1] into the collar and sit on its
-// thickened floor; an M2 from the back (under the magnet plate) threads up into each
+// prongs: a pillar standing on the own body's floor (merged into its side wall), and a reach that
+// goes prong[1] into the collar and sits on its thickened floor; an M2 from the back (under the
+// battery door's tabs) threads up into each reach. root_len: the pillar's length inside the own body.
 prong_x = 19.5;  prong = [5.7, 4.0, 4.3];    // [x width from 17.8 to the wall, y reach, z height]
-module prongs(y0, dir) {                     // dir +1: reach +y from y0 (head), -1: reach -y (key)
+module prongs(y0, dir, root_len, root_top = 99) {   // dir +1: reach +y from y0 (head), -1: reach -y (key); root_top caps the pillar
   zb = floor_t + 1.8;
-  for (sx = [-1, 1]) mirror([sx > 0 ? 0 : 1, 0, 0]) translate([17.8, dir > 0 ? y0 - 1 : y0 - prong[1], zb]) difference() {
+  for (sx = [-1, 1]) mirror([sx > 0 ? 0 : 1, 0, 0]) difference() {
     union() {
-      translate([0, dir > 0 ? 0 : prong[1], 0]) cube([in_w / 2 - 17.8 + 0.5, 1, prong[2]]);      // root, into the own wall
-      translate([0, dir > 0 ? 1 : 0, 0]) cube([in_w / 2 - 17.8 - 0.1, prong[1], prong[2]]);       // reach, inside the collar
+      translate([17.8, dir > 0 ? y0 - root_len : y0 + 0.02, floor_t - 0.01]) cube([in_w / 2 - 17.8 + 0.5, root_len - 0.02, min(zb + prong[2], root_top) - floor_t + 0.01]);   // 0.02 off the joint face
+      translate([17.8, dir > 0 ? y0 - 0.5 : y0 - prong[1], zb]) cube([in_w / 2 - 17.8 - 0.1, prong[1] + 0.5, prong[2]]);   // reaches 0.5 back into the pillar
     }
-    translate([prong_x - 17.8, dir > 0 ? prong[1] / 2 + 1 : prong[1] / 2, -1]) cylinder(d = 1.7, h = prong[2] - 0.6, $fn = 24);
+    translate([prong_x, y0 + dir * prong[1] / 2, zb - 1]) cylinder(d = 1.7, h = prong[2] - 0.6 + 1, $fn = 24);
   }
 }
 uz = db_z0 - usb_body_h / 2;
 // rounded rectangle whose top (+y) corners are 45 deg chamfers instead: the top edge of an opening
 // faces down when the body prints back down. flip = true chamfers the bottom instead (a boss's underside).
-module rrc2d_up(w, h, r) polygon(concat(
+// c: the top chamfer (default r). The USB-C notch uses c = 1.2: a 2.0 chamfer clips the corners of a
+// spec-maximum plug overmold (12.35 x 6.5, r 2) by 0.4.
+module rrc2d_up(w, h, r, c = -1) let(cc = c < 0 ? r : c) polygon(concat(
   [for (k = [0 : 8]) let(t = 180 + 90 * k / 8) [-w / 2 + r + r * cos(t), -h / 2 + r + r * sin(t)]],
   [for (k = [0 : 8]) let(t = 270 + 90 * k / 8) [w / 2 - r + r * cos(t), -h / 2 + r + r * sin(t)]],
-  [[w / 2, h / 2 - r], [w / 2 - r, h / 2], [-w / 2 + r, h / 2], [-w / 2, h / 2 - r]]));
-module rrc2d(w, h, r, flip = false) { if (flip) mirror([0, 1]) rrc2d_up(w, h, r); else rrc2d_up(w, h, r); }
+  [[w / 2, h / 2 - cc], [w / 2 - cc, h / 2], [-w / 2 + cc, h / 2], [-w / 2, h / 2 - cc]]));
+module rrc2d(w, h, r, flip = false, c = -1) { if (flip) mirror([0, 1]) rrc2d_up(w, h, r, c); else rrc2d_up(w, h, r, c); }
 module usb_cuts() {                           // v4's notch: trapezoid round the plug, skin floor, receptacle hole
   ux = usb_floor * tan(usb_flare);
   translate([usb_x, 0, uz]) rotate([-90, 0, 0]) hull() {
-    translate([0, 0, -1]) linear_extrude(1) rrc2d(usb_w + 2 * ux, usb_h, usb_r, true);
-    linear_extrude(usb_floor) rrc2d(usb_w, usb_h, usb_r, true);
+    translate([0, 0, -1]) linear_extrude(1) rrc2d(usb_w + 2 * ux, usb_h, usb_r, true, 1.2);
+    linear_extrude(usb_floor) rrc2d(usb_w, usb_h, usb_r, true, 1.2);
   }
   translate([usb_x, usb_floor - 0.5, db_z0 - usb_hole[1] / 2]) rotate([-90, 0, 0]) linear_extrude(usb_skin + 2) rrc2d(usb_hole[0], usb_hole[1], usb_hole[2], true);
 }
@@ -82,7 +85,7 @@ module head_body() { difference() {
     difference() { ycut(-1, y_head_end) envelope(); head_cavity(); panel_zone(0); }
     intersection() { ycut(-1, y_head_end) translate([0, 0, floor_t]) linear_extrude(T) plan(wall - 0.01);
       union() { usb_skin_block(); head_posts(); } }
-    prongs(y_head_end, 1);
+    prongs(y_head_end - 0.02, 1, y_head_end - (db_end - 1) - 0.4);   // the pillar stops short of the display's back parts
   }
   usb_cuts(); ir_slot();
   for (s = snaps) translate([s[0], s[1], snap_root_z]) rotate(s[2]) catch(gap = abs(s[2]) == 90 ? tip_snap_y - tip_wall : 0.6);

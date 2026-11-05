@@ -444,6 +444,12 @@ script:
       - light.turn_off: backlight
       - light.turn_off: status_led
       - lambda: |-
+          // the crease roller (GPB1/GPB5) must not wake it from a knock: only keys do. GPINTENB
+          // (0x05) gets its bits back when the MCP is set up again at boot.
+          if (id(g_board_ok)) {
+            uint8_t en = 0;
+            if (id(mcp).read_byte(0x05, &en)) id(mcp).write_byte(0x05, en & ~((1 << 1) | (1 << 5)));
+          }
           bool stuck = !(gpio_get_level(GPIO_NUM_36) && (!id(g_board_ok) || [] {
             uint8_t a = 0xFF, b = 0xFF;   // GPIOA/B; reading also clears INT
             id(mcp).read_byte(0x12, &a);

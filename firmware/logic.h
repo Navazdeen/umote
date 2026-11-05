@@ -43,19 +43,25 @@ inline Action soundbar_volume(Key key) {
 }
 
 // Crease roller (case v5): an EC11 on MCP23017 GPB1/GPB5. feed() takes the new A/B state (A = bit 1)
-// and returns +1 / -1 per completed detent, 0 otherwise; a transition that skips a state is ignored.
+// and returns +1 / -1 when a detent completes, 0 otherwise. A detent completes on arrival at the rest
+// state (A = B = 1 with the pull-ups) after at least half a detent of travel, so a half-click brush,
+// a missed edge or the boot order (A published before B) can't put it out of phase. A transition
+// that skips a state is ignored. The first reading only seeds it.
 struct RollDecoder {
   int8_t acc = 0;
   uint8_t last = 0;
-  int steps_per_detent = 4;
+  bool seeded = false;
+  uint8_t rest = 3;
   int feed(uint8_t ab) {
     static const int8_t STEP[16] = {0, 1, -1, 0, -1, 0, 0, 1, 1, 0, 0, -1, 0, -1, 1, 0};
     ab &= 3;
+    if (!seeded) { seeded = true; last = ab; return 0; }
     acc += STEP[(last << 2) | ab];
     last = ab;
-    if (acc >= steps_per_detent) { acc = 0; return 1; }
-    if (acc <= -steps_per_detent) { acc = 0; return -1; }
-    return 0;
+    if (ab != rest) return 0;
+    int out = acc >= 2 ? 1 : acc <= -2 ? -1 : 0;
+    acc = 0;
+    return out;
   }
 };
 

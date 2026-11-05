@@ -33,7 +33,7 @@ module ec11_envelope(grow = 0) { translate([ec11_x0 - grow, cy - ec11[1] / 2 - g
 // own room; the room's bottom stops at z 0.4, so the back stays closed under the wheel
 module wheel_cuts() {
   translate([whl_x, cy, T - top_skin - 0.5]) linear_extrude(top_skin + 1) square([whl_w + 0.8, whl_d + 0.8], center = true);
-  wheel_envelope(0.4);
+  intersection() { wheel_envelope(0.5); translate([-50, 0, 0.4]) cube([100, L, 30]); }   // closed 0.4 skin under the wheel
 }
 // a hole along z whose cross-section points to -y: the collar prints standing on its key face,
 // so these holes lie on their side and -y is up
@@ -46,12 +46,18 @@ module collar_core() { difference() {
   }
   wheel_cuts();
   // floor pocket under the cradle
-  hull() {                       // its head end ramps at 45 deg (that end faces down when printed standing)
-    translate([-14, piv[0] - 1, floor_t - floor_pocket]) cube([28, tact_c[1] + tact[1] / 2 + 3.5 - piv[0], 0.01]);
-    translate([-14, piv[0] - 1 - floor_pocket - 0.6, floor_t + 0.6]) cube([28, tact_c[1] + tact[1] / 2 + 3.5 - piv[0] + floor_pocket + 0.6, 0.01]);
+  difference() {                 // the tact switch keeps its floor at floor_t
+    hull() {                     // the pocket's head end ramps at 45 deg (it faces down when printed standing)
+      translate([-14, piv[0] - 1, floor_t - floor_pocket]) cube([28, tact_c[1] + tact[1] / 2 + 3.5 - piv[0], 0.01]);
+      translate([-14, piv[0] - 1 - floor_pocket - 0.6, floor_t + 0.6]) cube([28, tact_c[1] + tact[1] / 2 + 3.5 - piv[0] + floor_pocket + 0.6, 0.01]);
+    }
+    translate([tact_c[0] - tact[0] / 2 - 0.3, tact_c[1] - tact[1] / 2 - 0.3, 0]) cube([tact[0] + 0.6, tact[1] + 0.6, 5]);
   }
   // tab slots, open towards the face: 0.2 a side round the 1.6 x 1.0 tabs, 0.4 tall for the rock
   for (x = [-15.6, 15.6]) translate([x - 2, piv[0] - 1.0, piv[1] - cradle_t / 2 - 0.05]) cube([4, 2.0, 10]);
+  // the bend tilts the collar's inner floor up towards the head (1.66 at the tact): flatten it to
+  // floor_t under the tact switch and the cradle so their heights are the ones the design uses
+  translate([-17, piv[0] - 3, floor_t]) cube([34, tact_c[1] + tact[1] / 2 + 3.5 - piv[0] + 3, 0.3]);
 } }
 
 // ---------- wheel: knurled, D-bore for the EC11 shaft ----------
@@ -99,16 +105,17 @@ module crease_screw_cuts() for (h = [true, false]) prong_sites(h) {
   translate([0, 0, -1]) td_hole(crease_hole[1], z_tf + 2);
   translate([0, 0, -1]) td_hole(crease_hole[2], 1 + plate_d + crease_hole[3]);
 }
-// the magnet plate's outline: x +-21.6, its bottom corners following the body's outline
-module plate2d(grow = 0) intersection() { translate([-plate_w / 2 - grow, plate_y0 - grow]) square([plate_w + 2 * grow, L]); plan(3.33 - grow); }
-module plate_recess() {             // runs on into the key body; 45 deg ramp at its crease end
-  translate([0, 0, -0.01]) intersection() {
-    hull() {
-      translate([-50, plate_y0 - 0.15, 0]) cube([100, L, plate_d + 0.01]);
-      translate([-50, plate_y0 - 0.15 - plate_d, 0]) cube([100, L, 0.01]);
-    }
-    linear_extrude(plate_d + 0.02) union() { offset(delta = 0.15) plate2d(); translate([-plate_w / 2 - 0.15, plate_y0 - 1.0]) square([plate_w + 0.3, 2]); }
+// the battery door's two tabs: from the window up the collar's back, over the 4 crease screws (x +-19.5);
+// the collar's back stays whole between them (under the roller)
+tab_x = [15.0, 21.6];
+module tab2d(grow = 0) for (sx = [-1, 1]) translate([sx > 0 ? tab_x[0] - grow : -tab_x[1] - grow, plate_y0 - grow])
+  square([tab_x[1] - tab_x[0] + 2 * grow, door_win_y0 - plate_y0 + 1 + 2 * grow]);
+module plate_recess() translate([0, 0, -0.01]) intersection() {   // 45 deg ramp at its crease end
+  hull() {
+    translate([-50, plate_y0 - 0.15, 0]) cube([100, L, plate_d + 0.01]);
+    translate([-50, plate_y0 - 0.15 - plate_d, 0]) cube([100, L, 0.01]);
   }
+  linear_extrude(plate_d + 0.02) tab2d(0.15);
 }
 // lip over the head panel's 45 deg collar edge (in head coordinates; it is the top of the print)
 module head_lip() head_xf() intersection() {

@@ -42,16 +42,16 @@ V6_PRINT = [("t1_wheel_zone", "Test 1: wheel zone + joint", "print first: EC11, 
             ("dpad_ring", "D-pad ring", "face down (accent colour)"), ("dock", "Charging dock", "base down")]
 V6_ASM = {"asm_head_body": [0xd9d6cf, .65, 0], "asm_key_body": [0xd9d6cf, .65, 0], "asm_head_panel": [0x111418, .3, 1],
           "asm_key_panel": [0x111418, .3, 1], "asm_frame": [0xd9772b, .55, 0.8], "asm_ridge": [0xd9772b, .55, -1.2], "asm_grip_pad": [0x3a3f46, .9, -2.4],
-          "asm_pogo_plate_a": [0xc9a227, .4, 0], "asm_dock_plate_a": [0x2c3036, .6, -2],
+          "asm_pogo_plate_a": [0xc9a227, .4, [0, 1.2, 0]], "asm_dock_plate_a": [0x4a5058, .6, [0, 2.0, 0]],
           "asm_dpad_ring": [0xd9772b, .55, 2], "asm_wheel": [0x24272c, .8, 1.6], "asm_ec11": [0x9aa3ad, .35, 0.4],
-          "asm_carrier": [0x2f7d32, .7, 0.4], "caps_asm": [0x2a2e35, .6, 3], "asm_dock": [0x2c3036, .6, -2]}
+          "asm_carrier": [0x2f7d32, .7, 0.4], "caps_asm": [0x2a2e35, .6, 3], "asm_dock": [0x2c3036, .6, [0, 2.6, 0]]}
 
 
 def build_v6(version):
     here = os.path.dirname(os.path.abspath(__file__)); stl = os.path.join(here, "..", "stl_v6")
     meshes, look = {}, {}
     for f, lk in V6_ASM.items():
-        k = "dock" if f == "asm_dock" else f
+        k = {"asm_dock": "dock", "asm_dock_plate_a": "dock_plate"}.get(f, f)
         meshes[k] = base64.b64encode(open(os.path.join(stl, f + ".stl"), "rb").read()).decode(); look[k] = lk
     rows = "".join(f'<li><a href="{f}.stl" download>{n}</a><span>{os.path.getsize(os.path.join(stl, f + ".stl")) / 1e6:.1f} MB · {o}</span></li>' for f, n, o in V6_PRINT)
     page = open(os.path.join(here, "viewer_v5_template.html")).read()

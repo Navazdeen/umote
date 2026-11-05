@@ -60,13 +60,15 @@ const loader = new THREE.STLLoader(), mesh = {};
 for (const k in M) {
   const g = loader.parse(Uint8Array.from(atob(M[k]), c => c.charCodeAt(0)).buffer); g.computeVertexNormals();
   const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: LOOK[k][0], roughness: LOOK[k][1], metalness: 0 }));
-  m.visible = k !== 'dock'; mesh[k] = m; S.add(m);
+  m.visible = !k.startsWith('dock'); mesh[k] = m; S.add(m);
 }
 const V = { hero: [240, -170, 420], front: [0, 0, 600], back: [0, 0, -600], side: [520, 0, 10], crease: [90, -80, 110] };
 function go(v) { const p = V[v]; C.position.set(ctr.x + p[0], ctr.y + p[1], ctr.z + p[2]); O.update(); }
 document.querySelectorAll('[data-v]').forEach(b => b.onclick = () => go(b.dataset.v));
-document.getElementById('ex').oninput = e => { const s = +e.target.value; for (const k in mesh) mesh[k].position.z = LOOK[k][2] * s; };
-document.getElementById('dock').onchange = e => { if (mesh.dock) mesh.dock.visible = e.target.checked; };
+// explode: a number moves a part along z, [x, y, z] along that direction (per slider step)
+document.getElementById('ex').oninput = e => { const s = +e.target.value; for (const k in mesh) {
+  const d = Array.isArray(LOOK[k][2]) ? LOOK[k][2] : [0, 0, LOOK[k][2]]; mesh[k].position.set(d[0] * s, d[1] * s, d[2] * s); } };
+document.getElementById('dock').onchange = e => { for (const k in mesh) if (k.startsWith('dock')) mesh[k].visible = e.target.checked; };
 function size() { const w = el.clientWidth, h = el.clientHeight; R.setSize(w, h); C.aspect = w / h; C.updateProjectionMatrix(); }
 addEventListener('resize', size); size(); go('hero');
 (function loop() { O.update(); R.render(S, C); requestAnimationFrame(loop); })();

@@ -125,7 +125,7 @@ magnet = [10, 2];                   // N35 disc
 pogo_d = 1.0;  pogo_l = 15.85;      // P75-B1 [CHECK] press-fit hole
 
 // ---------- snaps (coupon-tuned in Task 3) ----------
-snap_uc = 0.6;  snap_len = 9;  snap_t = [1.2, 0.8];  snap_w = 5;
+snap_uc = 0.4;  snap_len = 9;  snap_t = [1.2, 0.8];  snap_w = 5;
 
 // ---------- derived ----------
 in_w  = W - 2 * wall;

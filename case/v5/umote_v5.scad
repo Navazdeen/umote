@@ -30,6 +30,10 @@ else if (part == "envelope") envelope();
 else if (part == "envelope_bent") union() { ycut(y_key_start, L + 1) envelope(); head_xf() ycut(-1, y_head_end) envelope(); }
 else if (part == "snap_test") snap_test();
 else if (part == "roller_test") roller_test();
+else if (part == "head_body") head_body();
+else if (part == "head_panel") translate([0, 0, T]) mirror([0, 0, 1]) head_panel();
+else if (part == "asm_head_body") head_xf() head_body();
+else if (part == "asm_head_panel") head_xf() head_panel();
 else if (part == "asm_collar_core") collar_core();
 else if (part == "asm_wheel") translate([whl_x, cy, axle_z]) wheel();
 else if (part == "asm_cradle") cradle();

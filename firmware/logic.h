@@ -13,7 +13,7 @@
 namespace umote {
 
 enum class Page { TV, SOUNDBAR, HOME, SETTINGS };
-enum class Key { UP, DOWN, LEFT, RIGHT, OK, BACK, HOME, POWER, VOL_UP, VOL_DOWN, MUTE, CH_UP, CH_DOWN, VOICE, OK_HOLD };
+enum class Key { UP, DOWN, LEFT, RIGHT, OK, BACK, HOME, POWER, VOL_UP, VOL_DOWN, MUTE, CH_UP, CH_DOWN, VOICE, OK_HOLD, ROLL_UP, ROLL_DOWN };
 enum class Target {
   TV_KEY, SOUNDBAR_IR, FOCUS_MOVE, FOCUS_TOGGLE, FOCUS_OPTIONS, CLOSE_SHEET, LIST_MOVE, LIST_SELECT, PAGE_SCROLL,
   POWER, NONE
@@ -42,8 +42,31 @@ inline Action soundbar_volume(Key key) {
   }
 }
 
-// Routing table from spec §4.4.
+// Crease roller (case v5): an EC11 on MCP23017 GPB1/GPB5. feed() takes the new A/B state (A = bit 1)
+// and returns +1 / -1 per completed detent, 0 otherwise; a transition that skips a state is ignored.
+struct RollDecoder {
+  int8_t acc = 0;
+  uint8_t last = 0;
+  int steps_per_detent = 4;
+  int feed(uint8_t ab) {
+    static const int8_t STEP[16] = {0, 1, -1, 0, -1, 0, 0, 1, 1, 0, 0, -1, 0, -1, 1, 0};
+    ab &= 3;
+    acc += STEP[(last << 2) | ab];
+    last = ab;
+    if (acc >= steps_per_detent) { acc = 0; return 1; }
+    if (acc <= -steps_per_detent) { acc = 0; return -1; }
+    return 0;
+  }
+};
+
+// Routing table from spec §4.4. The roller is volume on the TV and soundbar pages, scroll elsewhere.
 inline Action route(Page page, Key key, bool volume_to_tv, bool sheet_open) {
+  if (key == Key::ROLL_UP || key == Key::ROLL_DOWN) {
+    bool up = key == Key::ROLL_UP;
+    if (page == Page::HOME) return {Target::PAGE_SCROLL, up ? "UP" : "DOWN"};
+    if (page == Page::SETTINGS) return {Target::LIST_MOVE, up ? "UP" : "DOWN"};
+    key = up ? Key::VOL_UP : Key::VOL_DOWN;
+  }
   if (key == Key::POWER) return {Target::POWER, "POWER"};
   if (key == Key::VOICE) return {Target::NONE, ""};
   if (key == Key::BACK && sheet_open) return {Target::CLOSE_SHEET, "BACK"};

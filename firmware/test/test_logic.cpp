@@ -96,6 +96,23 @@ static void scan_text_is_parsed() {
   assert(parse_scan_text("").empty() && parse_scan_text("garbage\n").empty());
 }
 
+static void roll_decoder_counts_detents() {
+  RollDecoder d; int s = 0;
+  for (uint8_t ab : {1, 3, 2, 0}) s += d.feed(ab);        // one CW detent (4 quarter steps)
+  assert(s == 1);
+  for (uint8_t ab : {2, 3, 1, 0}) s += d.feed(ab);        // one CCW detent
+  assert(s == 0);
+  assert(d.feed(3) == 0);                                 // 0 -> 3 skips a state: ignored
+}
+
+static void roll_routes_by_page() {
+  assert(is(route(Page::TV, Key::ROLL_UP, false, false), Target::SOUNDBAR_IR, "VOL_UP"));
+  assert(is(route(Page::TV, Key::ROLL_UP, true, false), Target::TV_KEY, "VOLUME_UP"));
+  assert(is(route(Page::SOUNDBAR, Key::ROLL_DOWN, false, false), Target::SOUNDBAR_IR, "VOL_DOWN"));
+  assert(is(route(Page::HOME, Key::ROLL_DOWN, false, false), Target::PAGE_SCROLL, "DOWN"));
+  assert(is(route(Page::SETTINGS, Key::ROLL_UP, false, false), Target::LIST_MOVE, "UP"));
+}
+
 int main() {
   tv_volume_goes_to_soundbar_by_default();
   tv_dpad_and_channels_go_to_tv();
@@ -110,6 +127,8 @@ int main() {
   ellipsize_counts_characters();
   backlight_never_goes_dark();
   scan_text_is_parsed();
+  roll_decoder_counts_detents();
+  roll_routes_by_page();
   std::puts("all logic tests passed");
   return 0;
 }

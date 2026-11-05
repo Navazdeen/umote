@@ -491,6 +491,13 @@ script:
   # Shared by every key: 0..15 are MCP23017 bit numbers (pinmap.json), the rest are touch-only.
   # Every physical key: umote::route (logic.h) decides per page where it goes.
   # k = MCP23017 bit (pcb/fab/pinmap.json); 16 = OK held.
+  - id: roll
+    mode: queued
+    then:
+      - lambda: |-
+          static umote::RollDecoder roll;   // crease roller (case v5) quadrature state
+          int d = roll.feed((id(k_roll_a).state ? 2 : 0) | (id(k_roll_b).state ? 1 : 0));
+          if (d) id(press).execute(d > 0 ? 17 : 18);
   - id: press
     parameters: { k: int }
     then:
@@ -500,7 +507,8 @@ script:
           static const std::map<int, Key> KEYS = {
             {0, Key::RIGHT}, {1, Key::VOICE}, {2, Key::HOME}, {3, Key::DOWN}, {4, Key::OK}, {5, Key::UP},
             {6, Key::LEFT}, {7, Key::BACK}, {8, Key::POWER}, {10, Key::VOL_DOWN}, {11, Key::VOL_UP},
-            {12, Key::CH_DOWN}, {14, Key::MUTE}, {15, Key::CH_UP}, {16, Key::OK_HOLD}};
+            {12, Key::CH_DOWN}, {14, Key::MUTE}, {15, Key::CH_UP}, {16, Key::OK_HOLD},
+            {17, Key::ROLL_UP}, {18, Key::ROLL_DOWN}};
           auto it = KEYS.find(k);
           if (it == KEYS.end()) return;
           auto page = (umote::Page) ui::pg.current;
@@ -928,6 +936,13 @@ binary_sensor:
       filters: [ lambda: 'if (!id(g_board_ok)) return {}; return x;', delayed_on: 10ms ], on_press: [ script.execute: { id: press, k: 14 } ] }
   - { platform: gpio, id: k_ch_up, pin: { mcp23xxx: mcp, number: 15, mode: { input: true, pullup: true }, inverted: true, interrupt: CHANGE },
       filters: [ lambda: 'if (!id(g_board_ok)) return {}; return x;', delayed_on: 10ms ], on_press: [ script.execute: { id: press, k: 15 } ] }
+  # crease roller (case v5): EC11 A/B on the two spare pins, GPB1 (pin 2) and GPB5 (pin 6); its
+  # press is wired in parallel with OK. Raw levels, no debounce delay: the decoder ignores bounces
+  # that skip a state, and each detent is 4 transitions.
+  - { platform: gpio, id: k_roll_a, pin: { mcp23xxx: mcp, number: 9, mode: { input: true, pullup: true }, interrupt: CHANGE },
+      filters: [ lambda: 'if (!id(g_board_ok)) return {}; return x;' ], on_state: [ script.execute: roll ] }
+  - { platform: gpio, id: k_roll_b, pin: { mcp23xxx: mcp, number: 13, mode: { input: true, pullup: true }, interrupt: CHANGE },
+      filters: [ lambda: 'if (!id(g_board_ok)) return {}; return x;' ], on_state: [ script.execute: roll ] }
 
 # ---------------------------------------------------------------- IR
 remote_transmitter:

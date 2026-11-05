@@ -22,7 +22,7 @@ P = [["W", W], ["wall", wall], ["tip_wall", tip_wall], ["T", T], ["L", L], ["the
   ["y_head_end", y_head_end], ["y_key_start", y_key_start], ["cy", cy], ["axle_z", axle_z],
   ["whl_d", whl_d], ["whl_w", whl_w], ["whl_proud", whl_proud], ["ec11", ec11], ["tact", tact],
   ["cradle_travel", cradle_travel], ["fork_x", fork_x], ["fork_y", fork_y], ["key_tongue", key_tongue],
-  ["magnet", magnet], ["pad_insert", pad_insert], ["pogo_d", pogo_d], ["pogo_l", pogo_l], ["snap_uc", snap_uc], ["tact_c", tact_c], ["piv", piv]];
+  ["magnet", magnet], ["pad_insert", pad_insert], ["pogo_d", pogo_d], ["pogo_l", pogo_l], ["snap_uc", snap_uc], ["tact_c", tact_c], ["piv", piv], ["roll_z", roll_z], ["roll", roll], ["pz0", pz0], ["pry_setback", pry_setback]];
 function jv(v) = is_list(v) ? str("[", jl(v, 0), "]") : str(v);
 function jl(v, i) = i >= len(v) ? "" : str(jv(v[i]), i < len(v) - 1 ? "," : "", jl(v, i + 1));
 function jo(p, i) = i >= len(p) ? "" : str("\"", p[i][0], "\":", jv(p[i][1]), i < len(p) - 1 ? "," : "", jo(p, i + 1));

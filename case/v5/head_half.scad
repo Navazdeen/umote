@@ -92,6 +92,7 @@ module head_body() { difference() {
 
 // ---------- head face panel ----------
 lip = 1.2;                                   // collar lip over the panel's collar edge (45 deg)
+pry_setback = 0.3;  pry_w = 10;             // the tip seam opens to 0.45 here, so a card gets in
 module ir_clips() for (sx = [-1, 1]) intersection() {   // v4's C saddles, tilted with the LEDs
   ir_xf(sx) difference() {
     translate([-2.4, tip_wall - 0.05, -0.6]) cube([4.8, 5.0, 6]);
@@ -113,6 +114,9 @@ module head_panel() { difference() {
     linear_extrude(0.01) rr2d(win_w, win_l, win_r);
     translate([0, 0, win_cham + 0.01]) linear_extrude(0.01) rr2d(win_w + 2 * win_cham, win_l + 2 * win_cham, win_r + win_cham);
   }
+  // pry point: the tip edge steps back pry_setback over pry_w at the middle
+  intersection() { difference() { panel_zone(pcl - 0.01); panel_zone(pcl + pry_setback); }
+    translate([-pry_w / 2, -1, 0]) cube([pry_w, 12, 30]); }
   // the collar edge: 45 deg chamfer from the face under the collar's lip
   translate([-50, 0, 0]) rotate([90, 0, 90]) linear_extrude(100)
     polygon([[y_head_end - lip, T + 0.01], [y_head_end + 1, T + 0.01], [y_head_end + 1, T - lip - 1], [y_head_end + 0.01, T - lip - 1], [y_head_end + 0.01, T - lip]]);

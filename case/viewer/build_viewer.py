@@ -1,6 +1,36 @@
 """Rebuild both viewers from case/stl_v4: the claude.ai page (scratchpad) and the local
 viewer.html with download links."""
-import base64, json, os, trimesh, numpy as np
+import base64, json, os, sys, trimesh, numpy as np
+
+# v5: python3 case/viewer/build_viewer.py --v5 [version]  ->  case/stl_v5/viewer.html
+V5_PRINT = [("head_body", "Head body", "back down, textured plate"), ("head_panel", "Head face panel", "face down, smooth plate"),
+            ("collar", "Crease collar", "standing on its key-side face (accent colour)"), ("wheel", "Roller wheel", "on its side"),
+            ("cradle", "Roller cradle", "flat"), ("key_body", "Key body", "back down, textured plate"),
+            ("key_panel", "Key face panel", "face down, smooth plate"), ("caps", "Caps + rockers", "flange down"),
+            ("dpad_ring", "D-pad ring", "face down (accent colour)"), ("magnet_plate", "Battery door", "outer face down"),
+            ("dock", "Charging dock", "base down"), ("snap_test", "Snap test", "as exported"), ("roller_test", "Roller test", "as exported")]
+V5_ASM = {"asm_head_body": [0xd9d6cf, .65, 0], "asm_key_body": [0xd9d6cf, .65, 0], "asm_head_panel": [0x111418, .3, 1],
+          "asm_key_panel": [0x111418, .3, 1], "asm_collar": [0xd9772b, .55, 0.5], "asm_dpad_ring": [0xd9772b, .55, 2],
+          "asm_wheel": [0x24272c, .8, 1.6], "asm_cradle": [0x7a8590, .5, 1.2], "caps_asm": [0x2a2e35, .6, 3],
+          "asm_magnet_plate": [0x3a3f46, .5, -0.6], "asm_dock": [0x2c3036, .6, -1]}
+
+
+def build_v5(version):
+    here = os.path.dirname(os.path.abspath(__file__)); stl = os.path.join(here, "..", "stl_v5")
+    meshes, look = {}, {}
+    for f, lk in V5_ASM.items():
+        k = "dock" if f == "asm_dock" else f
+        meshes[k] = base64.b64encode(open(os.path.join(stl, f + ".stl"), "rb").read()).decode(); look[k] = lk
+    rows = "".join(f'<li><a href="{f}.stl" download>{n}</a><span>{os.path.getsize(os.path.join(stl, f + ".stl")) / 1e6:.1f} MB · {o}</span></li>' for f, n, o in V5_PRINT)
+    page = open(os.path.join(here, "viewer_v5_template.html")).read()
+    page = page.replace("%%VERSION%%", version).replace("%%FILES%%", rows).replace("%%MESHES%%", json.dumps(meshes)).replace("%%LOOK%%", json.dumps(look))
+    open(os.path.join(stl, "viewer.html"), "w").write(page)
+    print("built", os.path.join(stl, "viewer.html"), len(page))
+
+
+if "--v5" in sys.argv:
+    build_v5(sys.argv[sys.argv.index("--v5") + 1] if len(sys.argv) > sys.argv.index("--v5") + 1 else "v5")
+    sys.exit(0)
 SP = os.path.dirname(os.path.abspath(__file__))
 STL = os.path.join(SP, "..", "stl_v4")   # page template lives beside this script
 T, plate_t = 15.8, 1.6

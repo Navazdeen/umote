@@ -4,6 +4,42 @@ A battery-powered remote built around the **LCDwiki E32R24P** (ESP32-32E, 2.4" S
 
 > **Latest (2026-11-01):** remote UI + Home Assistant integration shipped and running on the remote. See [`docs/HANDOFF-2026-11-01-remote-ui.md`](docs/HANDOFF-2026-11-01-remote-ui.md); it supersedes the firmware rows below.
 
+## 2026-11-05 session: case v5 (overrides the case sections below)
+
+Design: `docs/superpowers/specs/2026-11-05-remote-case-v5-design.md`. Plan: `docs/superpowers/plans/2026-11-05-remote-case-v5.md`. Source: `case/v5/*.scad` (one dispatcher, `umote_v5.scad`; numbers in `params.scad`). Exports and checks: `case/v5/export.sh all`, `python3 case/check_v5.py case/stl_v5/<part>.stl`, `python3 case/fit_check_v5.py`, `python3 -m pytest case/tests -q`.
+
+- **Why v5:** the new LiPo is 46 x 105 x 5 (total, protection board included). The case is 51 x 218 x 15.8 mm, with an 8 deg Nokia 8110-style bend at the board gap, a 7110-style roller (EC11 on its side, 16 mm wheel, 1.0 mm proud) in the crease, flush dark face panels (N9-style), VOL/CH rockers, V-groove key groups, a raised D-pad ring, a nub on OK, a strap eyelet, and a charging dock. `usb_x` is 0.22 (1 mm towards BOOT from the second v4 print).
+- **Parts and print orientation** (no supports, all fit a 180 mm bed):
+  - head body and key body: back down, textured plate;
+  - head and key face panels: face down, smooth plate;
+  - collar: standing on its key-side face (accent colour);
+  - D-pad ring: face down (accent);
+  - caps and rockers: flange down;
+  - wheel: on its side; cradle: flat;
+  - battery door (`magnet_plate.stl`): outer face down;
+  - dock: base down.
+- **Assembly order:**
+  1. Display board into the head body, tip first, then slid under the tip rim. 4 M2.5 screws into the body's posts.
+  2. EC11 on the cradle; cradle tabs into the collar's slots; wheel on the trimmed shaft; tact switch on the collar floor.
+  3. Collar between the halves. 4 M2 self-tapping screws up through the collar's back into the prongs of both bodies.
+  4. Caps, rockers and the D-pad ring into the key panel from inside. Button board clipped onto the panel. The panel's tongue goes into the collar's groove, then its bottom end snaps in.
+  5. IR LEDs into the head panel's clips. Head panel under the collar's lip, then its tip snaps in. It opens with a card at the tip seam (0.45 mm over 10 mm in the middle).
+  6. Battery in from the back, on foam. Battery door hooked under the collar ramp and clicked in. It covers the 4 crease screws.
+- **Wiring:**
+  - roller A/B go to MCP23017 GPB1 (pin 2) and GPB5 (pin 6); the roller press is in parallel with OK;
+  - the dock pads are two M3 brass inserts in the bottom end, fed through a Schottky diode (pad to anode, cathode to the display board's +5V at C20/C22 or TP4054 pin 4; confirm with a continuity beep to the USB-C VBUS);
+  - the battery pair runs along the +x side under the display board's level; the roller trio runs over the button board's +x edge.
+- **Firmware:** `RollDecoder` in `logic.h` (host-tested), sensors `k_roll_a`/`k_roll_b` and script `roll` in `remote.yaml`. The roller changes volume on the TV and soundbar pages and scrolls Home and Settings. Flash 92.7 %.
+- **Still open on hardware:**
+  - print `snap_test` and `roller_test` first, then set `snap_uc` and the cradle values in `params.scad`;
+  - measure the EC11 with calipers (`ec11*` [CHECK]);
+  - check the USB-C plugs in square at `usb_x` 0.22;
+  - check IR range with the 8 deg LED tilt;
+  - compare Wi-Fi RSSI on the diag page with and without the EC11;
+  - check the dock charges, and that the pads are dead undocked (a coin across them does nothing);
+  - check that the P75 press-fit holds (`pogo_d` [CHECK]).
+- **Uploads:** one copyparty folder per version, holding the whole set (`/stl/v5.0/`, next `v5.1`). Each file is verified by downloading it back and comparing its SHA-256.
+
 ## Status at a glance
 
 | Piece | State | Notes |

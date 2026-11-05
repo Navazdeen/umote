@@ -4,7 +4,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 OUT=stl_v5; mkdir -p "$OUT"
-ALL="params envelope envelope_bent"
+ALL="params head_body head_panel collar wheel cradle key_body key_panel caps dpad_ring magnet_plate dock snap_test roller_test asm_head_body asm_head_panel asm_collar asm_collar_core asm_wheel asm_wheel_pressed asm_cradle asm_cradle_pressed asm_ec11 asm_key_body asm_key_panel caps_asm caps_asm_pressed caps_asm_rocker_tilt asm_dpad_ring asm_magnet_plate asm_dock asm_pogo"
 parts=("$@"); [ "${parts[0]:-all}" = all ] && read -r -a parts <<< "$ALL"
 for p in "${parts[@]}"; do
   log="$OUT/$p.log"

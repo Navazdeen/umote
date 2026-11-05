@@ -10,3 +10,4 @@ __pycache__/
 .remember/
 *.log
 .sdl/
+case/stl_v5/*.log

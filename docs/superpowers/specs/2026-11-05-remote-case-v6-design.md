@@ -145,3 +145,13 @@ The code is `case/v6/`. Where this list and sections 2–6 disagree, this list w
 - the board-clip beams 1.0
 - the tenon pin hole 1.15 to its inner face
 - the POWER/D-pad web 0.6 and the HOME/D-pad web 1.1 (key positions fixed by the PCB)
+
+## 10. v6.1 changes (user, same day)
+
+- **Ridge → finger-rest hump**: the body's own cross-section let down by up to 4.6 under the wheel. It starts with a 1.4 step under the head's back edge, rounds over 3.6 to a flat plateau, and tapers over 13 under the key half's back to a 1.2 lip. The key body's sides follow it. It prints upside down; the collar floor is now the ridge's flat top (z 0), and the frame stands on it.
+- **Ridge screws hidden**: s1 ×2 and s2 ×2 sit under a 1.2 press-fit grip pad (TPU, 4 pegs) on the plateau. The frame's s3 screws are gone: the frame drops in from the top, and lips under both panel ends hold it down.
+- **Contact plates**: a slot in the bottom end, open to the top, with a T-slot behind it. The plate drops in and the key panel holds it.
+  - Plate A: brass pads at ±2.6 + 10×2 magnets at ±10.9.
+  - Plate B: a ready-made magnetic pogo connector (`conn_b` = placeholder sizes [CHECK]).
+  - The dock has matching plates (A: P75 probes + magnets; B: the connector's other half), press-fitted into a pocket under the remote's end.
+- Panel screws move to x ±13; the strap eyelet goes in through the side and out through the end corner.

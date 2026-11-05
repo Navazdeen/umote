@@ -33,12 +33,16 @@ V6_PRINT = [("t1_wheel_zone", "Test 1: wheel zone + joint", "print first: EC11, 
             ("t2_key_corner", "Test 2: key panel corner", "print first: tongues, key holes"),
             ("t3_bottom_end", "Test 3: bottom end", "print first: pads, magnets, eyelet, panel screws"),
             ("head_body", "Head body", "back down, textured plate"), ("head_panel", "Head face panel", "face down, smooth plate"),
-            ("frame", "Collar frame", "cap down (accent colour)"), ("ridge", "Collar ridge", "bottom down (accent colour)"),
+            ("frame", "Collar frame", "cap down (accent colour)"), ("ridge", "Finger-rest ridge", "upside down: flat top on the bed"),
+            ("grip_pad", "Grip pad (TPU)", "flat, pegs up"), ("pogo_plate_a", "Contact plate A: pads + magnets", "standing on its bottom"),
+            ("pogo_plate_b", "Contact plate B: magnetic connector", "standing [CHECK connector size]"),
+            ("dock_plate_a", "Dock plate A: P75 probes + magnets", "bottom down"), ("dock_plate_b", "Dock plate B: connector", "bottom down"),
             ("wheel", "Roller wheel", "on its side"), ("key_body", "Key body", "back down, textured plate"),
             ("key_panel", "Key face panel", "face down, smooth plate"), ("caps", "Caps + rockers", "flange down"),
             ("dpad_ring", "D-pad ring", "face down (accent colour)"), ("dock", "Charging dock", "base down")]
 V6_ASM = {"asm_head_body": [0xd9d6cf, .65, 0], "asm_key_body": [0xd9d6cf, .65, 0], "asm_head_panel": [0x111418, .3, 1],
-          "asm_key_panel": [0x111418, .3, 1], "asm_frame": [0xd9772b, .55, 0.8], "asm_ridge": [0xd9772b, .55, -1.2],
+          "asm_key_panel": [0x111418, .3, 1], "asm_frame": [0xd9772b, .55, 0.8], "asm_ridge": [0xd9772b, .55, -1.2], "asm_grip_pad": [0x3a3f46, .9, -2.4],
+          "asm_pogo_plate_a": [0xc9a227, .4, 0], "asm_dock_plate_a": [0x2c3036, .6, -2],
           "asm_dpad_ring": [0xd9772b, .55, 2], "asm_wheel": [0x24272c, .8, 1.6], "asm_ec11": [0x9aa3ad, .35, 0.4],
           "asm_carrier": [0x2f7d32, .7, 0.4], "caps_asm": [0x2a2e35, .6, 3], "asm_dock": [0x2c3036, .6, -2]}
 

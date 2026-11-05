@@ -25,18 +25,21 @@ P = [["W", W], ["wall", wall], ["tip_wall", tip_wall], ["T", T], ["L", L], ["the
   ["ec11_xf", ec11_xf], ["ec11_h", ec11_h], ["ec11_w", ec11_w], ["ec11_d", ec11_d], ["ec11_bush", ec11_bush], ["ec11_shaft", ec11_shaft],
   ["ec11_nut", ec11_nut], ["carrier", carrier], ["bulk_t", bulk_t],
   ["rail_x", rail_x], ["col_x", col_x], ["col_wall", col_wall], ["cap_z", cap_z], ["ridge_h", ridge_h], ["ridge_in", ridge_in],
-  ["s1", s1], ["s2", s2], ["s3", s3], ["s3_d", s3_d], ["ps", ps], ["m2", m2], ["holes", holes],
+  ["s1", s1], ["s2", s2], ["ps", ps], ["m2", m2], ["holes", holes],
   ["ten_x0", ten_x0], ["ten_x1", ten_x1], ["ten_top", ten_top], ["ten_len", ten_len], ["win", win], ["groove_x", groove_x],
   ["min_wall", min_wall], ["min_panel", min_panel], ["min_land", min_land], ["min_skin", min_skin],
   ["magnet", magnet], ["dmag_x", dmag_x], ["dmag_z", dmag_z], ["pad_insert", pad_insert], ["pad_x", pad_x], ["pad_z", pad_z],
   ["pogo_d", pogo_d], ["pogo_l", pogo_l], ["roll_z", roll_z], ["roll", roll], ["pz0", pz0], ["cap_proud", cap_proud],
-  ["cap_hole", cap_hole], ["cap_d", cap_d], ["side_clr", side_clr], ["batt_end", batt_end], ["bb_end", bb_end], ["eye", eye]];
+  ["pp_w", pp_w], ["pp_z0", pp_z0], ["pp_t", pp_t], ["conn_b", conn_b], ["pegs", pegs], ["pad", pad], ["pad_c", pad_c], ["pad_t", pad_t],
+  ["hy0", hy0], ["hya", hya], ["hyp", hyp], ["hy1", hy1], ["cap_hole", cap_hole], ["cap_d", cap_d], ["side_clr", side_clr], ["batt_end", batt_end], ["bb_end", bb_end], ["eye", eye]];
 function jv(v) = is_list(v) ? str("[", jl(v, 0), "]") : str(v);
 function jl(v, i) = i >= len(v) ? "" : str(jv(v[i]), i < len(v) - 1 ? "," : "", jl(v, i + 1));
 function jo(p, i) = i >= len(p) ? "" : str("\"", p[i][0], "\":", jv(p[i][1]), i < len(p) - 1 ? "," : "", jo(p, i + 1));
 
 module frame_print() translate([0, 0, T]) mirror([0, 0, 1]) children();      // cap down
-module ridge_print() translate([0, 0, ridge_h]) children();                    // bottom down
+module ridge_print() mirror([0, 0, 1]) children();                            // upside down: its flat top on the bed, the hump up
+module pp_print() translate([0, 0, -pp_z0]) children();                                    // contact plate: standing on its bottom
+module dp_print() translate([0, 0, L + dock_g + dp_t]) rotate([-90, 0, 0]) children();   // dock plate: bottom face down
 
 if (part == "params") { echo(str("PARAMS {", jo(P, 0), "}")); cube(0.01); }
 else if (part == "envelope") envelope();
@@ -48,6 +51,16 @@ else if (part == "frame") frame_print() frame();
 else if (part == "asm_frame") frame();
 else if (part == "ridge") ridge_print() ridge();
 else if (part == "asm_ridge") ridge();
+else if (part == "grip_pad") translate([0, 0, ridge_h]) grip_pad();
+else if (part == "asm_grip_pad") grip_pad();
+else if (part == "pogo_plate_a") pp_print() pogo_plate_a();
+else if (part == "pogo_plate_b") pp_print() pogo_plate_b();
+else if (part == "asm_pogo_plate_a") pogo_plate_a();
+else if (part == "asm_pogo_plate_b") pogo_plate_b();
+else if (part == "dock_plate_a") dp_print() dock_plate_a();
+else if (part == "dock_plate_b") dp_print() dock_plate_b();
+else if (part == "asm_dock_plate_a") dock_plate_a();
+else if (part == "asm_dock_plate_b") dock_plate_b();
 else if (part == "wheel") translate([0, 0, whl_w / 2]) rotate([0, 90, 0]) wheel();
 else if (part == "asm_wheel") wheel_at();
 else if (part == "asm_ec11") ec11_model();
@@ -81,6 +94,8 @@ module asm_all() {
   color("dimgray") key_panel();
   color("black") frame();
   color("darkslategray") ridge();
+  color("dimgray") grip_pad();
+  color("gold") pogo_plate_a();
   color("orange") wheel_at();
   color("silver") { ec11_model(); ec11_nut_model(); }
   color("green") carrier_model();
@@ -96,6 +111,7 @@ module t1() {
   translate([60, -40, 0]) frame_print() frame();
   translate([60, -10, 0]) ridge_print() ridge();
   translate([60, 30, whl_w / 2]) rotate([0, 90, 0]) wheel();
+  translate([0, 70, ridge_h]) grip_pad();
 }
 // T2 key corner: a 40 mm slice of the key body from the wheel zone, and the same slice of the panel
 // (tongues, ledge, VOL rocker hole, a round key hole).
@@ -103,8 +119,9 @@ module t2() {
   intersection() { key_body(); translate([-60, y_key_start - 2, -10]) cube([120, 42, 40]); }
   translate([60, 0, 0]) intersection() { translate([0, 0, T]) mirror([0, 0, 1]) key_panel(); translate([-60, y_key_start - 3, -10]) cube([120, 43, 40]); }
 }
-// T3 bottom end: the last 20 mm of the key body (pads, magnets, eyelet, panel screws) and of the panel
+// T3 bottom end: the last 20 mm of the key body (plate slot, eyelet, panel screws), the panel's end and plate A
 module t3() {
+  translate([-60, 0, 0]) pp_print() pogo_plate_a();
   intersection() { key_body(); translate([-60, L - 20, -10]) cube([120, 30, 40]); }
   translate([60, 0, 0]) intersection() { translate([0, 0, T]) mirror([0, 0, 1]) key_panel(); translate([-60, L - 20, -10]) cube([120, 30, 40]); }
 }

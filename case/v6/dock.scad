@@ -1,4 +1,5 @@
-// umote case v6: the charging dock (v5's battery door is gone: the back is solid).
+// umote case v6: the charging dock and its swappable contact plates (A: P75 probes + magnets, B: a
+// ready-made magnetic connector's other half).
 
 // ---------- dock ----------
 // Holds the remote upright on its bottom end, leaning back dock_lean, screen towards the user. Two
@@ -15,11 +16,24 @@ module env_grown(g) union() {        // the envelope grown by g (for the pocket)
 // wire hole below would leave a ledge facing down); glue if the press fit is loose
 module pogo_holes() for (sx = [-1, 1]) translate([sx * pad_x, L - 0.5, pad_z]) rotate([-90, 0, 0]) cylinder(d = pogo_d, h = 40, $fn = 24);
 module pogo_tips() for (sx = [-1, 1]) translate([sx * pad_x, L - pogo_proud, pad_z]) rotate([-90, 0, 0]) cylinder(d = 0.74, h = pogo_l, $fn = 16);
-module dock() difference() {
+module dock_raw() difference() {
   world_to_remote() translate([-32, -16, -20]) cube([64, 34, 20 + 12]);
   intersection() { translate([0, 0, 0]) env_grown(dock_g); translate([-50, L - dock_pocket - 30, -20]) cube([100, dock_pocket + 30, 60]); }
-  pogo_holes();
-  for (sx = [-1, 1]) translate([sx * dmag_x, L - 0.5, dmag_z]) rotate([-90, 0, 0]) cylinder(d = magnet[0] + 0.2, h = magnet[1] + 0.6, $fn = 64);
   world_to_remote() translate([-usbc_bo[0] / 2, 18 - usbc_bo[1] + 0.01, -20 - 0.01]) cube([usbc_bo[0], usbc_bo[1], usbc_bo[2]]);   // breakout, port at the back
   world_to_remote() translate([-1, -2, -20]) cube([2, 20, usbc_bo[2] - 1]);                                                         // wires under the floor
+}
+// the dock's half of the contacts is a swappable plate too: a block under the remote's end, its top
+// the pocket floor; it drops into the dock from the pocket (press fit, a drop of glue if loose)
+dp_t = 6.0;
+module dp_region(g = 0) translate([-pp_w / 2 - g, L - 2, pp_z0 - g]) cube([pp_w + 2 * g, 2 + dock_g + dp_t + g, pz0 - 0.05 - pp_z0 + 2 * g]);
+module dock() difference() { dock_raw(); dp_region(0.15); pogo_holes(); }
+module dock_plate_a() difference() {   // P75 probes onto plate A's pads, 10 x 2 magnets facing plate A's
+  intersection() { dock_raw(); dp_region(0); }
+  pogo_holes();
+  for (sx = [-1, 1]) translate([sx * dmag_x, L - 0.5, dmag_z]) rotate([-90, 0, 0]) cylinder(d = magnet[0] + 0.2, h = magnet[1] + 0.6, $fn = 64);
+}
+module dock_plate_b() difference() {   // the connector's other half, flush with the pocket floor
+  intersection() { dock_raw(); dp_region(0); }
+  translate([-conn_b[0] / 2 - 0.15, L - 1, pad_z - conn_b[1] / 2 - 0.15]) cube([conn_b[0] + 0.3, dp_t + 5, conn_b[1] + 0.3]);
+  for (sx = [-1, 1]) translate([sx * conn_b[3] / 2, L + dock_g + dp_t + 0.01, pad_z]) rotate([90, 0, 0]) cylinder(d = conn_b[4], h = 4.0, $fn = 24);
 }

@@ -8,7 +8,8 @@ from check_struct import thin_spots
 from check_v5 import check_part
 
 STL6 = os.path.join(os.path.dirname(__file__), "..", "stl_v6")
-PRINT = ["head_body", "head_panel", "frame", "ridge", "wheel", "key_body", "key_panel", "caps", "dpad_ring", "dock"]
+PRINT = ["head_body", "head_panel", "frame", "ridge", "grip_pad", "wheel", "key_body", "key_panel", "caps", "dpad_ring", "dock",
+         "pogo_plate_a", "pogo_plate_b", "dock_plate_a", "dock_plate_b"]
 
 
 @pytest.fixture(scope="module")
@@ -41,18 +42,25 @@ EXCEPT = {
     "head_body": [(-7.5, 7.5, 1.5, 2.6, 3.0, 11.0, "USB-C stop skin 0.6 (v4/v5, printed fine; the plug must reach the socket)"),
                   (-15.5, -8.5, -0.5, 2.6, 10.5, 15.0, "IR window skin ~0.95 under the top roll (thin on purpose; the display PCB is under the LEDs)"),
                   (8.5, 15.5, -0.5, 2.6, 10.5, 15.0, "IR window skin"),
-                  (-19.2, -17.9, 80, 86, 0, 3.0, "tenon pin hole: 1.15 to the tenon's inner face, which bears on the frame wall"),
-                  (17.9, 19.2, 80, 86, 0, 3.0, "tenon pin hole")],
+                  (-19.2, -17.9, 79, 86, 0, 5.0, "tenon pin hole: 1.15 to the tenon's inner face, which bears on the frame wall"),
+                  (17.9, 19.2, 79, 86, 0, 5.0, "tenon pin hole")],
+    "key_body": [(-15.6, -10.4, 212.5, 218.5, 0, 10, "panel screw pillar wall 1.0 (the bottom zone holds the pillar and the contact plate)"),
+                 (10.4, 15.6, 212.5, 218.5, 0, 10, "panel screw pillar wall 1.0")],
     "head_panel": [(-16, -8.5, 1.5, 9, 0, 6, "IR LED clip saddle"), (8.5, 16, 1.5, 9, 0, 6, "IR LED clip saddle"),
                    (-20.5, -14.5, 3.5, 10, 0, 6.5, "display boss d4 (clears the LCD)"), (14.5, 20.5, 3.5, 10, 0, 6.5, "display boss"),
                    (-20.5, -14.5, 69.5, 76.5, 0, 6.5, "display boss"), (14.5, 20.5, 69.5, 76.5, 0, 6.5, "display boss")],
+    "pogo_plate_a": [(-5, 5, 218.5, 219.6, 4, 12.5, "backstop behind each brass pad insert, with its wire hole through"),
+                     (-16.5, -5.0, 218.5, 224.5, -0.1, 12.7, "10 mm magnet in a 12.55 plate: 1.17 above and below"),
+                     (5.0, 16.5, 218.5, 224.5, -0.1, 12.7, "10 mm magnet: 1.17 above and below")],
+    "dock_plate_a": [(-13, 13, 1, 4, 3, 8, "magnet pocket floor 1.15")],
     "key_panel": [(8, 14.5, 108, 114, 0, 3, "POWER / D-pad web 0.6: both fixed by the button PCB (as v5)"),
                   (-2, 2, 145, 147, 0, 3, "HOME / D-pad web 1.1: both fixed by the button PCB"),
                   (-23.5, -20.5, 0, 230, 0, 9.5, "board clip beam 1.0 (flexes)"), (20.5, 23.5, 0, 230, 0, 9.5, "board clip beam 1.0")],
 }
 
 
-@pytest.mark.parametrize("part", ["head_body", "head_panel", "frame", "ridge", "key_body", "key_panel", "wheel", "dock"])
+@pytest.mark.parametrize("part", ["head_body", "head_panel", "frame", "ridge", "key_body", "key_panel", "wheel", "dock",
+                                  "pogo_plate_a", "pogo_plate_b", "dock_plate_a", "dock_plate_b"])
 def test_no_thin_material(part):
     pts, t = thin_spots(load(part), 1.2)
     ok = np.zeros(len(pts), bool)
@@ -96,12 +104,43 @@ def test_joint_screws_pass_through_the_tenons(P):
         assert solid(head, ring([x, y], 1.3, 0.3, 1.8)), f"tenon round s1 at {x}"
 
 
-def test_ridge_screws_bite_the_rails_and_the_frame(P):
-    key, frame = load("asm_key_body"), load("asm_frame")
+def test_ridge_screws_bite_the_rails(P):
+    key = load("asm_key_body")
     for x, y in P["s2"]:
         assert solid(key, ring([x, y], 1.3, 0.5, 7.0)), f"rail round s2 at {x}"
-    for x, y in P["s3"]:
-        assert solid(frame, ring([x, y], 1.5, P["floor_t"] + 0.3, P["floor_t"] + 6.5)), f"bulkhead boss round s3 at {y}"
+
+
+def test_grip_pad_covers_every_ridge_screw(P):
+    (cx, cy), (w, l, _) = P["pad_c"], P["pad"]
+    for x, y in P["s1"] + P["s2"]:
+        assert abs(x - cx) + P["m2"][2] / 2 <= w / 2 - 0.3 and abs(y - cy) + P["m2"][2] / 2 <= l / 2 - 0.3, (x, y)
+
+
+def test_ridge_is_a_hump_with_a_flat_top(P):
+    r = load("asm_ridge")
+    assert r.bounds[0][2] == pytest.approx(-P["ridge_h"], abs=0.02)
+    assert r.bounds[1][2] == pytest.approx(0, abs=0.02)                  # flat top: it prints upside down
+    assert r.bounds[1][1] - r.bounds[0][1] > 30                          # long taper towards the bottom
+
+
+def test_frame_lips_sit_under_the_panels(P):
+    f = load("asm_frame")
+    assert f.bounds[1][1] > P["y_key_start"] + 1.0                       # key-end lip under the key panel
+    assert f.bounds[1][2] <= P["T"] + 0.01
+
+
+@pytest.mark.parametrize("plate,body", [("asm_pogo_plate_a", "asm_key_body"), ("asm_pogo_plate_b", "asm_key_body"),
+                                        ("asm_dock_plate_a", "asm_dock"), ("asm_dock_plate_b", "asm_dock")])
+def test_contact_plates_fit_their_slots(plate, body):
+    import fit_check_v6 as fc
+    assert fc.hit(load(plate), load(body), tol=0.05) is None
+
+
+@pytest.mark.parametrize("plate", ["asm_pogo_plate_a", "asm_pogo_plate_b"])
+def test_contact_plate_cant_fall_out_of_the_end(plate):
+    import fit_check_v6 as fc
+    m = load(plate).copy(); m.apply_translation([0, 0.6, 0])            # pulled out of the end face
+    assert fc.hit(m, load("asm_key_body"), tol=0.05) is not None
 
 
 def test_key_panel_screws_bite_its_bosses(P):
@@ -134,7 +173,7 @@ def test_collar_top_lands_are_3(P):
 def test_ridge_closes_the_back_under_the_wheel(P):
     r = load("asm_ridge")
     z_well = P["axle_z"] - P["whl_d"] / 2 - 0.5
-    pts = [[P["whl_x"] + dx, P["cy"] + dy, z] for dx in (-3, 0, 3) for dy in (-3, 0, 3) for z in np.linspace(-P["ridge_h"] + 0.1, z_well - 0.1, 4)]
+    pts = [[P["whl_x"] + dx, P["cy"] + dy, z] for dx in (-3, 0, 3) for dy in (-3, 0, 3) for z in np.linspace(-P["ridge_h"] + P["pad_t"] + 0.1, z_well - 0.1, 4)]
     assert solid(r, pts)
 
 

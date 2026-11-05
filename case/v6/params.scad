@@ -99,7 +99,7 @@ ec11_rows = [-7.5, 7.0];            // pin rows (A C B, D E) from the shaft axis
 ec11_pitch = 2.5;                   // A C B pitch (along z); D E are 5 apart
 ec11_nut = [10.0, 2.0];             // M7 thin nut: across flats, thickness [CHECK: not on the drawing]
 ec11_detent_steps = 4;
-carrier = [1.6, 17.0, 12.3];        // perfboard behind the EC11: thickness (x), length (y), height (z)
+carrier = [1.6, 17.0, 14.3];        // perfboard behind the EC11: thickness (x), length (y), height (z): the collar floor (z 0) to its cap
 bulk_t = 2.5;                       // bulkhead the bushing passes through (nut on the wheel side)
 whl_d = 18.6;  whl_w = 9;  whl_proud = 1.2;
 whl_x = -4;                         // wheel centre across; off centre so the EC11 + carrier stay inside the collar
@@ -114,6 +114,13 @@ m2 = [1.7, 2.4, 4.0, 0.3];          // M2 self-tap hole, clearance hole, counter
 module m2_csk(h) { cylinder(d = m2[1], h = h, $fn = 24); translate([0, 0, -0.01]) cylinder(d = m2[2], h = m2[3] + 0.01, $fn = 32);
   translate([0, 0, m2[3]]) cylinder(d1 = m2[2], d2 = m2[1], h = (m2[2] - m2[1]) / 2, $fn = 32); }
 pad_insert = [4.0, 5.0];
+// ---------- charging contacts: a swappable plate in the bottom end ----------
+// The key body's end has a slot open to the top; a plate drops in (a T-rib on its back, in a T-slot,
+// stops it falling out of the end face) and the key panel holds it down. Plate A: two brass-insert pads + two 10 x 2
+// magnets. Plate B: a ready-made magnetic pogo connector (housing size [CHECK] on the part bought).
+pp_w = 34.4;  pp_z0 = 2.0;  pp_t = 5.3;  pp_tee = [2.0, 1.6, 5.0, 1.4];   // plate width (inside the end's flat part), bottom z, thickness (y);
+                                                           // T-rib on its back: stem w, stem depth, flange w, flange depth
+conn_b = [14.0, 6.0, 5.0, 20.0, 1.7];  // plate B connector: housing w (x), h (z), depth (y), ear hole spacing, ear screw hole [CHECK]
 magnet = [10, 2];
 pogo_d = 1.0;  pogo_l = 15.85;
 
@@ -149,7 +156,9 @@ rail_x = 18.0;                      // the key body's rails stand outside |x| = 
 col_x = rail_x - 0.3;               // collar half-width (0.3 to the rails)
 col_wall = 2.0;
 whl_well = axle_z - whl_d / 2 - whl_gap;          // bottom of the wheel's room
-ridge_h = floor_t - whl_well + 0.5;               // the ridge below the back: 2.5 under the well (room for the countersinks under the tenons)
+ridge_h = 4.6;                                    // finger-rest hump below the back (plateau depth): the grip pad's recess,
+                                                  // the countersinks under it and 1.2 under the tenon pockets
+pad_t = 1.2;                                      // grip pad over the 4 ridge screws (TPU), flush in a recess
 ec11_top = axle_z + ec11_w / 2;
 
 assert(in_w / 2 - batt[0] / 2 >= 0.5, "battery side clearance");
@@ -163,5 +172,5 @@ assert(ec11_xf + ec11_h + carrier[0] + 1.0 <= col_x - col_wall, "EC11, carrier a
 assert(whl_x - whl_d / 2 >= -50 && whl_x - whl_w / 2 - whl_gap >= -(col_x - col_wall) + 4.0, "4 mm wire channel beside the wheel");
 assert(y_key_start - col_wall - (cy + whl_d / 2 + whl_gap) >= 0.2, "wheel room inside the collar");
 assert(carrier[1] <= (y_key_start - y_head_end) - 2 * col_wall - 1.0, "carrier fits between the collar end walls");
-assert(axle_z - ec11_w / 2 >= floor_t + 0.3, "EC11 clears the collar floor");
-assert(carrier[2] <= T - min_panel - floor_t - 0.2, "carrier spans floor to skin");
+assert(axle_z - ec11_w / 2 >= 0.3, "EC11 clears the collar floor (z 0, the ridge's top)");
+assert(carrier[2] <= T - min_panel - 0.2, "carrier spans floor to cap");

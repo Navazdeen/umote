@@ -4,7 +4,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 OUT=stl_v6; mkdir -p "$OUT"
-ALL="params head_body head_panel frame ridge wheel key_body key_panel caps dpad_ring dock asm_head_body asm_head_panel asm_frame asm_ridge asm_wheel asm_ec11 asm_nut asm_carrier asm_key_body asm_key_panel caps_asm caps_asm_pressed caps_asm_rocker_tilt asm_dpad_ring asm_dock asm_pogo t1_wheel_zone t2_key_corner t3_bottom_end"
+ALL="params head_body head_panel frame ridge grip_pad pogo_plate_a pogo_plate_b dock_plate_a dock_plate_b wheel key_body key_panel caps dpad_ring dock asm_head_body asm_head_panel asm_frame asm_ridge asm_grip_pad asm_pogo_plate_a asm_pogo_plate_b asm_dock_plate_a asm_dock_plate_b asm_wheel asm_ec11 asm_nut asm_carrier asm_key_body asm_key_panel caps_asm caps_asm_pressed caps_asm_rocker_tilt asm_dpad_ring asm_dock asm_pogo t1_wheel_zone t2_key_corner t3_bottom_end"
 parts=("$@"); [ "${parts[0]:-all}" = all ] && read -r -a parts <<< "$ALL"
 for p in "${parts[@]}"; do
   log="$OUT/$p.log"

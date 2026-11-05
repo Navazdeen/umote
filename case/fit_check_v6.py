@@ -34,7 +34,8 @@ SKIP = {
 EXACT = {"USB-C plug overmold", "USB-C plug metal"}
 CASE = {"head body": "asm_head_body", "head panel": "asm_head_panel", "frame": "asm_frame", "ridge": "asm_ridge",
         "key body": "asm_key_body", "key panel": "asm_key_panel", "wheel": "asm_wheel",
-        "caps": "caps_asm", "dpad ring": "asm_dpad_ring", "dock": "asm_dock"}                      # the remote docked
+        "caps": "caps_asm", "dpad ring": "asm_dpad_ring", "dock": "asm_dock", "grip pad": "asm_grip_pad",
+        "pogo plate": "asm_pogo_plate_a", "dock plate": "asm_dock_plate_a"}                      # the remote docked
 OPTIONAL = set()
 
 

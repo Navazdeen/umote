@@ -22,17 +22,26 @@ v6 is the structural rework. Spec: `docs/superpowers/specs/2026-11-05-remote-cas
   - `t1_wheel_zone`: EC11, nut, wheel press fit, tenons in the rails
   - `t2_key_corner`: panel tongues, key holes at 0.6 clearance
   - `t3_bottom_end`: pads, magnets, eyelet, panel screws
+- **v6.1 (same day)**:
+  - The back ridge is a smooth finger-rest hump, printed upside down for a clean surface.
+  - Its 4 screws hide under a press-fit grip pad (TPU).
+  - The frame has no screws: it drops in from the top and lips under both panel ends hold it down.
+  - The charging contacts are swappable plates in a slot in the bottom end (open to the top, T-rib keyed, held down by the key panel):
+    - A: brass pads + 10×2 magnets
+    - B: a ready-made magnetic pogo connector (size [CHECK] on the part bought)
+  - The dock takes matching plates.
 - **Hardware**:
-  - 14 × M2 countersunk (DIN 965 / ISO 7046), from the back: s1 ×2 and s2 ×2 about 8 mm, s3 ×2 about 10 mm, key panel ×2 about 12 mm, head panel ×4 about 12 mm. Lengths [CHECK] against T1/T3.
-  - 1.6 mm perfboard, 17 × 12.3, behind the EC11. Snip the EC11's side tabs.
+  - 10 × M2 countersunk (DIN 965 / ISO 7046), from the back: s1 ×2 (into the tenons) and s2 ×2 (into the rails) about 8 mm, under the grip pad; head panel ×4 about 12 mm; key panel ×2 about 12 mm. Lengths [CHECK] against T1/T3.
+  - 1.6 mm perfboard, 17 × 14.3, behind the EC11. Snip the EC11's side tabs.
 - **Assembly order**:
   1. Display into the head body; head panel on top; 4 screws from the back clamp both.
-  2. Solder the EC11 to its carrier. Thread the nut on and press the wheel onto the shaft. Drop it into the frame's U-slot bulkhead from below and tighten the nut.
+  2. Solder the EC11 to its carrier. Thread the nut on, press the wheel onto the shaft, push it up into the frame's U-slot bulkhead from below and tighten the nut.
   3. Join the head to the key body (the tenons slide into the rail slots).
   4. Route the wires: battery and inter-board wires through the frame's −x channel; the roller's three out of the +x notch; all of them across the 7 mm zone under the start of the button board.
-  5. Frame in from below between the rails; ridge on; 6 screws (s1, s2, s3).
-  6. Battery in from the front. Board, clipped to the key panel, on top.
-  7. Key panel: tongues into the rail grooves, then 2 screws at the bottom.
+  5. Frame in **from the top** between the rails (its cap rests on them).
+  6. Ridge on from below with 4 screws; press the grip pad on.
+  7. Contact plate down into its slot; battery in from the front; board, clipped to the key panel, on top.
+  8. Key panel: tongues into the rail grooves, then 2 screws at the bottom (that also holds the frame and the contact plate).
 - **Open**: the EC11 nut size and the clone's body (T1). IR through the 1.4/0.95 skin needs IR-transparent filament [CHECK]. The viewer wasn't checked in a browser (Chrome crashes in this WSL), only built from the v5 template.
 
 ## 2026-11-05 session: case v5 (overrides the case sections below)

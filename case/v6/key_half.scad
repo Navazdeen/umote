@@ -1,20 +1,22 @@
 // umote case v6: key half (button board + battery) body and face panel. Assembled = model coordinates.
 // The body runs from the head's end plane: through the wheel zone it is two solid rails (|x| >=
 // rail_x, under the frame's cap) that take the head's tenons; past y_key_start it is the shell with
-// a solid 2.0 floor. The battery goes in from the front (panel off, board lifted with it).
+// a solid 2.0 floor. The battery goes in from the front (panel off, board lifted with it). Over the
+// ridge's hump the sides follow the hump's let-down section. The charging contacts are a swappable
+// plate in a slot in the bottom end.
 
 batt_end = batt_y0 + batt[1];
 bb_end = bb_y0 + bb_l;
 y_inner_end = L - end_wall;
 bz_top = 6.0;                       // the floor is solid up to here past the battery (bottom zone)
-pad_x = 3.5;  pad_z = 7.9;          // brass-insert contact pads in the bottom end
-dmag_x = 12.5;  dmag_z = 7.3;     // 12.5 (11 in v5): 1.9 between a magnet and a pad hole         // dock magnets in the bottom end wall (axis along y)
-end_block_y = L - 6.6;               // 1.2 in front of the pad inserts (5.0 deep from the end face)
-eye = [-20.0, L - 5.0, 4.0];        // strap eyelet: in through the end face (along y), out through the back (along z)
+pad_x = 2.6;  pad_z = 8.25;         // plate A: brass-insert contact pads (5.2 apart)
+dmag_x = 10.9;  dmag_z = 8.25;      // plate A: 10 x 2 magnets (dock magnets face them)
+end_block_y = L - 10.0;              // solid behind the contact plate's slot (and its T-slot)
+eye = [-21.5, L - 5.0, 5.0];        // strap eyelet: in through the side (along x), out through the end corner (along y)
 clip_y = [bb_y0 + 20, bb_y0 + 100];  clip_w = 6;
 stop_y = bb_end + 0.1;
-ps = [for (sx = [-1, 1]) [sx * 19, bb_end + 2.5]];   // the key panel's 2 screws
-ps_boss = [5.0, 4.5];               // panel boss d, length below the panel
+ps = [for (sx = [-1, 1]) [sx * 13, bb_end + 2.3]];   // the key panel's 2 screws (1.2 in front of the contact plate's slot)
+ps_boss = [4.4, 4.5];               // panel boss d, length below the panel
 
 // the key half's own region: past the head's end plane
 module past_head_plane() head_xf() translate([-100, y_head_end, -100]) cube([200, 400, 300]);
@@ -31,13 +33,36 @@ module td_y(d, y0, y1) translate([0, y0, 0]) rotate([-90, 0, 0]) linear_extrude(
   polygon(concat([for (k = [0 : 23]) let(t = -38.7 + 257.4 * k / 23) [d / 2 * cos(t), d / 2 * sin(t)]], [[0, -d / 2 * 1.6]]));
 module td_x(d, x0, x1) translate([x0, 0, 0]) rotate([0, 90, 0]) linear_extrude(x1 - x0)
   polygon(concat([for (k = [0 : 23]) let(t = 231.3 + 257.4 * k / 23) [d / 2 * cos(t), d / 2 * sin(t)]], [[-d / 2 * 1.6, 0]]));
-// magnet pocket: ends min_skin inside the end face at its top (the face rolls in above roll_z)
-mag_y1 = L - min_skin - max(e_in(dmag_z + magnet[0] / 2 + 0.1), e_in(dmag_z - magnet[0] / 2 - 0.1)) - 0.2;
 end_top = pz0 - 0.05;               // end block top: the panel's bottom end rests on it
+
+// ---------- contact plate: slot in the body, plates A (pads + magnets) and B (magnetic connector) ----------
+// footprint (x, y): the plate, open through the end face, with a T-rib on its back that runs in a
+// T-slot in the end block; g grows it (the slot)
+module pp_foot(g = 0) {
+  translate([-pp_w / 2 - g, L - pp_t - g]) square([pp_w + 2 * g, pp_t + 10]);
+  translate([-pp_tee[0] / 2 - g, L - pp_t - pp_tee[1] - g]) square([pp_tee[0] + 2 * g, pp_tee[1] + 0.02]);
+  translate([-pp_tee[2] / 2 - g, L - pp_t - pp_tee[1] - pp_tee[3] - g]) square([pp_tee[2] + 2 * g, pp_tee[3] + 2 * g]);
+}
+module pp_slot() translate([0, 0, pp_z0]) linear_extrude(30) pp_foot(0.15);
+// magnet pocket from the plate's back, min_skin short of the end face where it is furthest in
+mag_y1 = L - min_skin - max(e_in(dmag_z + magnet[0] / 2 + 0.1), e_in(dmag_z - magnet[0] / 2 - 0.1)) - 0.1;
+module pp_blank() intersection() { envelope(); translate([0, 0, pp_z0]) linear_extrude(pz0 - 0.05 - pp_z0) pp_foot(0); }
+module pogo_plate_a() difference() {   // assembled position
+  pp_blank();
+  for (sx = [-1, 1]) {
+    translate([sx * pad_x, 0, pad_z]) { td_y(pad_insert[0], L - pad_insert[1], L + 1); td_y(2.0, L - pp_t - 1, L - pad_insert[1] + 0.1); }
+    translate([sx * dmag_x, 0, dmag_z]) td_y(magnet[0] + 0.2, L - pp_t - 1, mag_y1);   // teardrop: the plate prints standing
+  }
+}
+module pogo_plate_b() difference() {   // a ready-made magnetic connector: housing through the plate, ears screwed on its back
+  pp_blank();
+  translate([-conn_b[0] / 2 - 0.15, L - pp_t - 1, pad_z - conn_b[1] / 2 - 0.15]) cube([conn_b[0] + 0.3, pp_t + 5, conn_b[1] + 0.3]);
+  for (sx = [-1, 1]) translate([sx * conn_b[3] / 2, 0, pad_z]) td_y(conn_b[4], L - pp_t - 0.01, L - pp_t + 4.0);   // ear screws, teardrop (prints standing)
+}
 module key_body() { difference() {
   union() {
     difference() {
-      intersection() { envelope(); past_head_plane(); }
+      intersection() { union() { envelope(); intersection() { hump_env(); translate([-60, -10, 0]) cube([120, L + 20, 30]); } }; past_head_plane(); }
       // the wheel zone: only the rails stay, under the cap
       translate([-rail_x, -10, -1]) cube([2 * rail_x, y_key_start + 10, 40]);
       translate([-60, -10, cap_z]) cube([120, y_key_start + 10, 40]);
@@ -46,7 +71,7 @@ module key_body() { difference() {
     intersection() { translate([0, 0, -1]) linear_extrude(T) plan(wall - 0.01);
       union() {
         translate([-30, batt_end + 0.5, floor_t - 0.01]) cube([60, 30, bz_top - floor_t]);              // bottom-zone floor
-        translate([-19.5, end_block_y, bz_top - 0.01]) cube([39, 10, end_top - bz_top]);                    // end block: pads + magnets
+        translate([-30, end_block_y, bz_top - 0.01]) cube([60, 10, end_top - bz_top]);                      // end block round the contact plate's slot
         translate([-30, L - 9.5, bz_top - 0.01]) cube([30 - 17.5, 10, 12 - bz_top]);                    // eyelet pillar (-x corner)
         for (p = ps) translate([p[0], p[1], floor_t - 0.01]) cylinder(d = ps_boss[0], h = pz0 - ps_boss[1] - 0.3 - floor_t + 0.01, $fn = 40);
       } }
@@ -60,17 +85,15 @@ module key_body() { difference() {
   }
   for (g = groove_x) translate([g[0] - 0.2, 0, 0]) rotate([90, 0, 90]) linear_extrude(g[1] - g[0] + 0.4) {
     tongue2d(0.15); translate([y_key_start - 1.2, pz0 - 1.2]) square([1.5, 2]); }   // the key panel's tongues; no feathered rail edge above them (the cap covers it)
-  for (p = ps) translate([p[0], p[1], pz0 - ps_boss[1] - 0.3]) cylinder(d = ps_boss[0] + 0.6, h = 10, $fn = 40);              // the panel's bosses
+  for (p = ps) translate([p[0], p[1], pz0 - ps_boss[1] - 0.3]) cylinder(d = ps_boss[0] + 0.4, h = 10, $fn = 40);              // the panel's bosses
+  for (sx = [-1, 1]) translate([sx * 6 - 3.2, stop_y - 0.2, bb_z0]) cube([6.4, 1.9, 10]);                                     // the panel's board stops
   translate([0, 0, pz0 - cap_flange - 0.7]) linear_extrude(5) offset(r = 0.3) key_collars2d();                              // the cap collars under the panel
   for (p = s2) translate([p[0], p[1], -1]) cylinder(d = m2[0], h = 1 + 8, $fn = 24);                 // the ridge's screws, self-tapping
   for (p = ps) translate([p[0], p[1], 0]) m2_csk(30);
-  for (sx = [-1, 1]) {
-    translate([sx * pad_x, 0, pad_z]) { td_y(pad_insert[0], L - pad_insert[1], L + 1); td_y(2.0, end_block_y - 1, L - pad_insert[1] + 0.1); }
-    translate([sx * dmag_x, 0, dmag_z]) intersection() { td_y(magnet[0] + 0.2, end_block_y - 0.1, mag_y1);
-      translate([-10, end_block_y - 1, -10]) cube([20, 10, end_top - 1.4 - dmag_z + 10]); }   // flat roof, 1.4 under the block top
-  }
+  pp_slot();
+  translate([0, 0, pad_z]) td_y(3.0, L - pp_t - 6, L - pp_t + 0.1);                     // the plate's wires into the bottom zone
+  translate([0, eye[1], eye[2]]) td_x(2.2, -W, eye[0] + 1.1);
   translate([eye[0], 0, eye[2]]) td_y(2.2, eye[1] - 1.1, L + 2);
-  translate([eye[0], eye[1], -1]) cylinder(d = 2.2, h = eye[2] + 1, $fn = 24);
 } }
 
 // ---------- key face panel ----------

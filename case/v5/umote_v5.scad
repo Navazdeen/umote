@@ -9,6 +9,7 @@ include <head_half.scad>
 include <collar.scad>
 include <keys.scad>
 include <key_half.scad>
+include <dock.scad>
 
 // every value the checks need, as one JSON line
 P = [["W", W], ["wall", wall], ["tip_wall", tip_wall], ["T", T], ["L", L], ["theta", theta], ["clr", clr],
@@ -46,6 +47,11 @@ else if (part == "caps_asm_pressed") caps_asm(press = 0.3);
 else if (part == "caps_asm_rocker_tilt") caps_asm(tip = 0.3);
 else if (part == "dpad_ring") translate([0, 0, T + 0.5]) mirror([0, 0, 1]) translate(concat(-dc, [0])) translate(concat(dc, [0])) dpad_ring_at();
 else if (part == "asm_dpad_ring") dpad_ring_at();
+else if (part == "magnet_plate") magnet_plate();
+else if (part == "asm_magnet_plate") magnet_plate();
+else if (part == "dock") translate([0, 0, 20]) remote_to_world() dock();
+else if (part == "asm_dock") dock();
+else if (part == "asm_pogo") pogo_tips();
 else if (part == "asm_collar_core") collar_core();
 else if (part == "asm_collar") collar();
 else if (part == "collar") collar_print() collar();

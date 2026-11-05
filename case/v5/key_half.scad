@@ -35,6 +35,7 @@ module key_body() { difference() {
     prongs(y_key_start, -1);
   }
   door_window();
+  door_detents(0.1);
   for (s = key_snaps) translate([s[0], s[1], snap_root_z]) rotate(s[2]) catch(gap = 0.6);
   for (sx = [-1, 1]) {
     translate([sx * pad_x, 0, pad_z]) { td_y(pad_insert[0], L - pad_insert[1], L + 1); td_y(2.0, end_block_y - 1, L - pad_insert[1] + 0.1); }

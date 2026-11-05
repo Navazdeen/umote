@@ -4,7 +4,7 @@ module base2d() { hull() {
   for (sx = [-1, 1]) translate([sx * (W / 2 - tip_r), tip_r]) circle(r = tip_r);
   for (sx = [-1, 1]) translate([sx * (W / 2 - corner_r), L - corner_r]) circle(r = corner_r);
 } }
-module plan(i = 0) { if (i <= 0) base2d(); else offset(r = -i) base2d(); }
+module plan(i = 0) { if (i == 0) base2d(); else offset(r = -i) base2d(); }   // negative i grows it
 module rr2d(w, l, r) { offset(r = r) square([w - 2 * r, l - 2 * r], center = true); }
 
 // plan inset of the outer surface at height z: a 45 deg foot, the lower quarter ellipse into the

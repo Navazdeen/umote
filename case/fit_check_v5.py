@@ -29,8 +29,9 @@ SKIP = {
 }
 CASE = {"head body": "asm_head_body", "head panel": "asm_head_panel", "collar": "asm_collar",
         "key body": "asm_key_body", "key panel": "asm_key_panel", "wheel": "asm_wheel", "cradle": "asm_cradle",
-        "caps": "caps_asm", "dpad ring": "asm_dpad_ring", "magnet plate": "asm_magnet_plate"}
-OPTIONAL = {"magnet plate"}                             # later tasks add these
+        "caps": "caps_asm", "dpad ring": "asm_dpad_ring", "magnet plate": "asm_magnet_plate",
+        "dock": "asm_dock"}                      # the remote docked
+OPTIONAL = set()
 
 
 def box(x0, x1, y0, y1, z0, z1):

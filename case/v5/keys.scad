@@ -91,6 +91,7 @@ module chevron() {
 module ok_cap_nub() { ok_cap(); translate([0, 0, cap_h]) intersection() { sphere(d = 1.6, $fn = 24); translate([-1, -1, 0]) cube(2); } }
 rk_drop = 0.3;                      // rockers sit rk_drop lower: their ends can rise that far as they tip
 rk_h = cap_h + rk_drop;  rk_sock = sock + rk_drop;
+rk_flange_half = rk_drop * 6.5 / 0.3 - 0.5;   // tipping 0.3 at a switch (6.5 out) lifts the flange end less than rk_drop
 module rk_bore() {
   translate([0, 0, -1]) rotate(30) cylinder(d = grip_af / cos(30), h = 1 + rk_sock, $fn = 6);
   translate([0, 0, -0.01]) cylinder(d1 = grip_af / cos(30) + 0.8, d2 = grip_af / cos(30), h = 0.4, $fn = 6);
@@ -101,7 +102,8 @@ module rocker(p, marks) {
   c = (p[0] + p[1]) / 2;  q = [p[0] - c, p[1] - c];
   difference() {
     union() {
-      ef_flange(cap_flange) capsule2d(q, flange_d - 2 * flange_shrink);
+      // flange only along the middle: tipped, a flange at the ends would rise past the panel underside
+      ef_flange(cap_flange) intersection() { capsule2d(q, flange_d - 2 * flange_shrink); square([30, 2 * rk_flange_half], center = true); }
       linear_extrude(rk_h - cap_top_cham) capsule2d(q, cap_d);
       translate([0, 0, rk_h - cap_top_cham]) hull() { linear_extrude(0.01) capsule2d(q, cap_d);
         translate([0, 0, cap_top_cham - 0.01]) linear_extrude(0.01) capsule2d(q, cap_d - 2 * cap_top_cham); }

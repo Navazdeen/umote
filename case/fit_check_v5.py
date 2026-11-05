@@ -186,6 +186,24 @@ def main(argv):
         m = comp[n]; s = trimesh.convex.convex_hull(np.vstack([m.vertices, m.vertices + [0, 0, up]]))
         if "key body" in case and hit(s, case["key body"]) is not None:
             bad.append(f"{n} can't go into the key body")
+    # moving parts in their other positions: every cap pressed, the VOL rocker tipped, the roller pressed
+    print("Moving parts (pressed / tipped):")
+    for label, swap in [("caps pressed", {"caps": "caps_asm_pressed"}), ("rocker tipped", {"caps": "caps_asm_rocker_tilt"}),
+                        ("roller pressed", {"cradle": "asm_cradle_pressed", "wheel": "asm_wheel_pressed"})]:
+        moved = {k: trimesh.load(f"{stl}/{v}.stl", force="mesh") for k, v in swap.items()}
+        for k, mk in moved.items():
+            for a, ma in comp.items():
+                if (a, k) in SKIP or (a.startswith("stem") and k == "caps") or (a in ("EC11", "tact 6x6") and k == "cradle"):
+                    continue
+                h = hit(ma, mk)
+                if h is not None:
+                    bad.append(f"{label}: {a} x {k} {h.volume:.3f} mm3")
+            for b, mb in case.items():
+                if b in swap:
+                    continue
+                h = hit(mk, mb, tol=0.1)
+                if h is not None:
+                    bad.append(f"{label}: {k} x {b} {h.volume:.3f} mm3")
     for line in bad:
         print("  " + line)
     print("RESULT:", "no collisions" if not bad else f"{len(bad)} problems")

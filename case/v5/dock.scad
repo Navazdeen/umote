@@ -19,7 +19,9 @@ module door_collar_part() intersection() {
 }
 module door_detents(grow = 0) for (sx = [-1, 1]) translate([sx * det_x - det[0] / 2 - grow, door_y1, 0.8]) rotate([0, 90, 0])
   linear_extrude(det[0] + 2 * grow) polygon([[0.45 + grow, -0.01], [0, det[1] + grow], [-0.45 - grow, -0.01]]);
-module magnet_plate() union() { door_key_part(); door_collar_part(); door_detents(); }
+// relief under the roller wheel: it is nearly as tall as the body and dips when pressed
+module door_wheel_relief() translate([whl_x - whl_w / 2 - 0.6, cy - 5, 0.4]) cube([whl_w + 1.2, 10, 1]);
+module magnet_plate() difference() { union() { door_key_part(); door_collar_part(); door_detents(); } door_wheel_relief(); }
 
 // ---------- dock ----------
 // Holds the remote upright on its bottom end, leaning back dock_lean, screen towards the user. Two

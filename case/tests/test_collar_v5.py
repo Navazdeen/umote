@@ -57,3 +57,8 @@ def test_roller_parts_clear_each_other():
     for a, b in [("collar", "wheel"), ("collar", "cradle"), ("collar", "ec11"), ("wheel", "cradle")]:
         hit = trimesh.boolean.intersection([parts[a], parts[b]], engine="manifold")
         assert hit.is_empty or hit.volume < 1e-3, f"{a} hits {b}"
+
+
+def test_pressed_wheel_clears_the_battery_door():
+    h = trimesh.boolean.intersection([load("asm_wheel_pressed"), load("asm_magnet_plate")], engine="manifold")
+    assert h.is_empty or h.volume < 1e-3

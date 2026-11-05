@@ -42,3 +42,8 @@ def test_ok_has_a_nub(P):
 
 def test_dpad_ring_proud(P):
     assert load("asm_dpad_ring").bounds[1][2] == pytest.approx(P["T"] + 0.5, abs=0.02)
+
+
+def test_tipped_rocker_clears_the_panel():
+    h = trimesh.boolean.intersection([load("caps_asm_rocker_tilt"), load("asm_key_panel")], engine="manifold")
+    assert h.is_empty or h.volume < 0.1

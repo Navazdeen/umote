@@ -29,15 +29,22 @@ module wheel_envelope(grow = 0) { translate([whl_x, cy, axle_z]) rotate([0, 90, 
 module ec11_envelope(grow = 0) { translate([ec11_x0 - grow, cy - ec11[1] / 2 - grow, axle_z - ec11[0] / 2 - grow])
   cube([ec11[2] + 2 * grow, ec11[1] + 2 * grow, ec11[0] + 2 * grow]); }
 
+// wheel window in the top skin (square: its edge bridges when printed standing), and the wheel's
+// own room; the room's bottom stops at z 0.4, so the back stays closed under the wheel
+module wheel_cuts() {
+  translate([whl_x, cy, T - top_skin - 0.5]) linear_extrude(top_skin + 1) square([whl_w + 0.8, whl_d + 0.8], center = true);
+  wheel_envelope(0.4);
+}
+// a hole along z whose cross-section points to -y: the collar prints standing on its key face,
+// so these holes lie on their side and -y is up
+module td_hole(d, h) linear_extrude(h) polygon(concat([for (k = [0 : 23]) let(t = -38.7 + 257.4 * k / 23) [d / 2 * cos(t), d / 2 * sin(t)]], [[0, -d / 2 * 1.6]]));   // 39 deg sides
 module collar_core() { difference() {
   union() {
     collar_shell();
     // pivot bosses with open-top U slots for the cradle's pins, both ends of the crossbar
     for (x = [-15.6, 15.6]) translate([x, piv[0], floor_t - 0.01]) boss_block();
   }
-  // wheel window in the top skin, and the wheel's own room (it is nearly as tall as the body)
-  translate([whl_x, cy, T - top_skin - 0.5]) linear_extrude(top_skin + 1) square([whl_w + 0.8, whl_d + 0.8], center = true);   // square: its top edge bridges when printed standing
-  wheel_envelope(0.4);           // its bottom stops at z 0.4: the back stays closed under the wheel
+  wheel_cuts();
   // floor pocket under the cradle
   hull() {                       // its head end ramps at 45 deg (that end faces down when printed standing)
     translate([-14, piv[0] - 1, floor_t - floor_pocket]) cube([28, tact_c[1] + tact[1] / 2 + 3.5 - piv[0], 0.01]);
@@ -71,3 +78,54 @@ module cradle() {
   for (y = [cr_ys[0], riser2_y]) translate([arm_x[0], y, cr_z0]) cube([5, 1.6, arm_z + 1 - cr_z0]);         // risers
   translate([arm_x[0], cr_ys[0], arm_z]) cube([5, riser2_y + 1.6 - cr_ys[0], 1.0]);                         // arm (bridge)
 }
+
+// ---------- joints (spec section 5, as ruled in Task 4) ----------
+z_tf = floor_t + 1.8;               // top of the thickened floor under the prongs
+crease_hole = [1.7, 2.3, 4.0, 1.8]; // M2: self-tap, clearance, head d, head depth
+plate_d = 0.8;  plate_w = 43.2;     // magnet plate: recess depth, width (x +-21.6)
+plate_y0 = y_head_end - 1.0;        // plate's crease end (on the collar's back)
+module prong_sites(head) {          // M2 screw centres of the prongs (same numbers the bodies use)
+  for (sx = [-1, 1]) if (head) head_xf() translate([sx * prong_x, y_head_end + prong[1] / 2, 0]) children();
+                     else translate([sx * prong_x, y_key_start - prong[1] / 2, 0]) children();
+}
+module thick_floor() {              // pads under the prongs, inside the collar
+  for (sx = [-1, 1]) {
+    head_xf() translate([sx > 0 ? 17.8 : -in_w / 2 - 0.1, y_head_end - 0.01, floor_t - 0.01]) hull() {   // +y end at 45 deg (faces down in print)
+      cube([in_w / 2 - 17.8 + 0.1, prong[1] + 2.6, 0.01]); cube([in_w / 2 - 17.8 + 0.1, prong[1], z_tf - floor_t]); }   // 35 deg + the 8 deg bend
+    translate([sx > 0 ? 17.8 : -in_w / 2 - 0.1, y_key_start - prong[1], floor_t - 0.01]) cube([in_w / 2 - 17.8 + 0.1, prong[1] + 0.01, z_tf - floor_t]);
+  }
+}
+module crease_screw_cuts() for (h = [true, false]) prong_sites(h) {
+  translate([0, 0, -1]) td_hole(crease_hole[1], z_tf + 2);
+  translate([0, 0, -1]) td_hole(crease_hole[2], 1 + plate_d + crease_hole[3]);
+}
+module plate_recess() {             // runs on into the key body; 45 deg ramp at its crease end
+  translate([0, 0, -0.01]) hull() {
+    translate([-plate_w / 2 - 0.15, plate_y0, 0]) cube([plate_w + 0.3, L, plate_d + 0.01]);
+    translate([-plate_w / 2 - 0.15, plate_y0 - plate_d, 0]) cube([plate_w + 0.3, L, 0.01]);
+  }
+}
+// lip over the head panel's 45 deg collar edge (in head coordinates; it is the top of the print)
+module head_lip() head_xf() intersection() {
+  translate([-50, 0, 0]) rotate([90, 0, 90]) linear_extrude(100)
+    polygon([[y_head_end - lip, T], [y_head_end + 3, T], [y_head_end, T - lip]]);   // inner face slopes gently into the skin
+  panel_zone(pcl);
+}
+// key-end blocks under the top skin, with the grooves for the key panel's wedge tongues
+tongue = [10, 1.5];                 // width, reach: 1.5 over 1.2 tall keeps the groove's roof under 45 deg standing up; at x +-13
+tongue_x = 13;
+module key_tongue2d(grow = 0) polygon([[y_key_start + 0.01, pz0 - 0.8 - grow], [y_key_start + 0.01, pz0 + 0.4 + grow],
+  [y_key_start - tongue[1] - grow, pz0 - 0.8 - grow]]);
+module key_blocks() for (sx = [-1, 1]) difference() {
+  translate([sx > 0 ? 6.2 : -20, y_key_start - 2.2, 12.4]) cube([13.8, 2.21, T - top_skin - 12.4 + 0.01]);
+  translate([sx * tongue_x - tongue[0] / 2 - 0.2, 0, 0]) rotate([90, 0, 90]) linear_extrude(tongue[0] + 0.4) key_tongue2d(0.15);
+}
+module collar() { difference() {
+  union() { collar_core(); thick_floor(); head_lip(); key_blocks(); }
+  crease_screw_cuts(); plate_recess(); wheel_cuts();
+} }
+
+// pressed: the cradle (and what it carries) swings down about its tabs until the arm has pushed
+// the tact plunger 0.25 mm
+press_a = asin(0.25 / (tact_c[1] - piv[0]));
+module pressed() translate([0, piv[0], piv[1]]) rotate([-press_a, 0, 0]) translate([0, -piv[0], -piv[1]]) children();

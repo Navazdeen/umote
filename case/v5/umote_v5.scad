@@ -20,7 +20,7 @@ P = [["W", W], ["wall", wall], ["tip_wall", tip_wall], ["T", T], ["L", L], ["the
   ["y_head_end", y_head_end], ["y_key_start", y_key_start], ["cy", cy], ["axle_z", axle_z],
   ["whl_d", whl_d], ["whl_w", whl_w], ["whl_proud", whl_proud], ["ec11", ec11], ["tact", tact],
   ["cradle_travel", cradle_travel], ["fork_x", fork_x], ["fork_y", fork_y], ["key_tongue", key_tongue],
-  ["magnet", magnet], ["pad_insert", pad_insert], ["pogo_d", pogo_d], ["pogo_l", pogo_l], ["snap_uc", snap_uc]];
+  ["magnet", magnet], ["pad_insert", pad_insert], ["pogo_d", pogo_d], ["pogo_l", pogo_l], ["snap_uc", snap_uc], ["tact_c", tact_c], ["piv", piv]];
 function jv(v) = is_list(v) ? str("[", jl(v, 0), "]") : str(v);
 function jl(v, i) = i >= len(v) ? "" : str(jv(v[i]), i < len(v) - 1 ? "," : "", jl(v, i + 1));
 function jo(p, i) = i >= len(p) ? "" : str("\"", p[i][0], "\":", jv(p[i][1]), i < len(p) - 1 ? "," : "", jo(p, i + 1));
@@ -35,6 +35,12 @@ else if (part == "head_panel") translate([0, 0, T]) mirror([0, 0, 1]) head_panel
 else if (part == "asm_head_body") head_xf() head_body();
 else if (part == "asm_head_panel") head_xf() head_panel();
 else if (part == "asm_collar_core") collar_core();
+else if (part == "asm_collar") collar();
+else if (part == "collar") collar_print() collar();
+else if (part == "wheel") wheel_flat();
+else if (part == "cradle") translate([0, 0, -cr_z0]) cradle();
+else if (part == "asm_cradle_pressed") pressed() cradle();
+else if (part == "asm_wheel_pressed") pressed() translate([whl_x, cy, axle_z]) wheel();
 else if (part == "asm_wheel") translate([whl_x, cy, axle_z]) wheel();
 else if (part == "asm_cradle") cradle();
 else if (part == "asm_ec11") ec11_envelope();
@@ -63,6 +69,7 @@ module snap_test() {
 // roller_test: the collar without its fork and slots (standing on its key face), the wheel and the cradle.
 // the collar prints standing on its key-side face (assembled +y points down)
 module collar_print() translate([0, 0, y_key_start]) rotate([-90, 0, 0]) children();
+module wheel_flat() translate([0, 0, whl_w / 2]) rotate([0, 90, 0]) wheel();
 module roller_test() {
   collar_print() collar_core();
   translate([0, 45, whl_w / 2]) rotate([0, 90, 0]) wheel();

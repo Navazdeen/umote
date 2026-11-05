@@ -37,11 +37,15 @@ module head_cavity() { intersection() {
 } }
 
 // ---------- head body ----------
-prong_x = 19.5;  prong = [4.0, 4.0, 5.0];    // [x width, y reach into the collar, z height]
+// prongs: blocks merged into the side walls that reach prong[1] into the collar and sit on its
+// thickened floor; an M2 from the back (under the magnet plate) threads up into each
+prong_x = 19.5;  prong = [5.7, 4.0, 4.3];    // [x width from 17.8 to the wall, y reach, z height]
 module prongs(y0, dir) {                     // dir +1: reach +y from y0 (head), -1: reach -y (key)
-  for (sx = [-1, 1]) translate([sx * prong_x - prong[0] / 2, dir > 0 ? y0 - 1 : y0 - prong[1], floor_t - 0.01])
-    difference() { cube([prong[0], prong[1] + 1, prong[2]]);
-      translate([prong[0] / 2, dir > 0 ? prong[1] / 2 + 1 : prong[1] / 2, -1]) cylinder(d = 2.1, h = prong[2] + 0.5, $fn = 24); }
+  zb = floor_t + 1.8;
+  for (sx = [-1, 1]) mirror([sx > 0 ? 0 : 1, 0, 0]) translate([17.8, dir > 0 ? y0 - 1 : y0 - prong[1], zb]) difference() {
+    cube([in_w / 2 - 17.8 + 0.5, prong[1] + 1, prong[2]]);
+    translate([prong_x - 17.8, dir > 0 ? prong[1] / 2 + 1 : prong[1] / 2, -1]) cylinder(d = 1.7, h = prong[2] - 0.6, $fn = 24);
+  }
 }
 uz = db_z0 - usb_body_h / 2;
 // rounded rectangle whose top (+y) corners are 45 deg chamfers instead: the top edge of an opening

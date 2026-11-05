@@ -112,3 +112,36 @@ Release: `/stl/v6.0/` on copyparty, full set, SHA-checked (as v5).
 - EC11 nut, wheel press fit: from T1.
 - Firmware: no change (the press tact was in parallel with OK; the encoder stays on MCP GPB1/GPB5).
 - Viewer rebuilt for v6.
+
+## 9. As built (changes found while building; the plan lists the first eight)
+
+The code is `case/v6/`. Where this list and sections 2–6 disagree, this list wins.
+
+1. **T 16.6** (not 15.8): 2.0 floor + 2.0 face don't fit the button-board stack in 15.8.
+2. **board_gap 24, L 224.4**: the Ø18.6 wheel (2.0 skin over the EC11) and the 17 mm carrier fit the collar.
+3. **Wheel at x = −4**, EC11 frame top at x 8. Bushing through a 2.5 bulkhead with a **U-slot open to the bottom**: the EC11 goes in with its nut, wheel and carrier already on, then the nut is tightened.
+4. **The collar is two parts**: the **frame** (the black cap across the full width, its inner walls, the bulkhead) and the **ridge** (back ridge 3.8 deep, the collar floor, the wheel well). A one-piece collar can't take the EC11 in.
+5. **Panels are full-width caps**: the top 2.0 of the shell, like the frame's cap. The seam runs along both sides 2 mm below the face, the whole length. That makes the body's opening the full 47.2, so the 46 mm battery goes in from the front (with v5's inset panel the opening was 44.4). Each panel bears on the wall tops all round.
+6. **Joint**: two tenons from the head (bed-flat bottom, 45° roof) into slots in the key body's **rails** (|x| ≥ 18, solid through the wheel zone), closed from below by the ridge.
+7. **Screws, all M2 countersunk, all from the back** (14):
+   - 2 × s1 from the ridge, as pins through the tenons
+   - 2 × s2 from the ridge into the rails
+   - 2 × s3 from the ridge into bosses on the bulkhead (they hold the frame)
+   - 2 × key panel at the bottom zone
+   - 4 × head panel through the display's posts and corner holes into bosses under the panel; this clamps the display too
+   - 2 × carrier screws: none (the carrier spans floor to cap)
+8. **Key panel**: 2 screws at the bottom plus 2 tongues at the top, in grooves in the rails' key ends under the cap. The end block rises to the panel and carries its bottom end.
+9. **Battery moved 5.5 towards the bottom** (it still ends under the board). This leaves a 7 mm zone under the board's start, which every wire through the collar crosses. Wires through the wheel zone run in the frame's −x channel beside the wheel; the roller's three go out of a notch on +x.
+10. **Rim (`land`) is 0**, because the panels are caps. The key body's walls are 2.4 up to the panel line; the outer top roll thins them to 1.6 at that edge.
+11. **Dock magnets at x ±12.5** (1.9 to the pad holes). End block 1.2 in front of the pad inserts. The strap eyelet goes in through the end face and out through the back.
+12. **POWER's key rib** turns to +x and **HOME's** to +y (they came 0.85 and 0.45 from the panel end and the D-pad hole). Their icons stay upright.
+13. **IR LEDs** sit just over the display PCB (z 12.2), with a 1.4 skin whose upper part steps back under the roll. They stay behind ~0.95 of skin at the top.
+
+**Exceptions to section 3**, kept on purpose and named in `case/tests/test_v6.py`:
+- the USB-C stop skin 0.6 (v4/v5)
+- the IR window skin ~0.95
+- the IR clip saddles 0.85
+- the display bosses 1.15
+- the board-clip beams 1.0
+- the tenon pin hole 1.15 to its inner face
+- the POWER/D-pad web 0.6 and the HOME/D-pad web 1.1 (key positions fixed by the PCB)

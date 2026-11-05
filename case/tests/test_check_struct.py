@@ -35,3 +35,25 @@ def test_thin_slot_found():
 def test_thickness_at_point():
     plate = box(40, 30, 6)
     assert thickness_at(plate, [20, 15, 6.0], [0, 0, -1]) == pytest.approx(6.0, abs=0.01)
+
+
+def wedge(top_x):
+    """a 6 mm plate, 40 long at the bottom, top_x long at the top: its end is a wedge"""
+    w = trimesh.Trimesh(vertices=[[0, 0, 0], [40, 0, 0], [0, 20, 0], [40, 20, 0],
+                                  [0, 0, 6], [top_x, 0, 6], [0, 20, 6], [top_x, 20, 6]],
+                        faces=[[0, 2, 1], [1, 2, 3], [4, 5, 6], [5, 7, 6], [0, 1, 5], [0, 5, 4],
+                               [2, 6, 7], [2, 7, 3], [0, 4, 6], [0, 6, 2], [1, 3, 7], [1, 7, 5]])
+    assert w.is_watertight
+    return w
+
+
+def test_blunt_wedge_edge_is_not_thin():
+    # 60 deg (a panel's rolled edge, a 45 deg tongue): only the edge itself is thin
+    t, _ = min_thickness(wedge(40 - 6 / np.tan(np.radians(60))))
+    assert t > 1.2
+
+
+def test_knife_edge_is_thin():
+    # 20 deg: thin for mm back from its edge, and it is reported
+    t, _ = min_thickness(wedge(40 - 6 / np.tan(np.radians(20))))
+    assert t < 1.2

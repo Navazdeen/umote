@@ -19,32 +19,40 @@ def thickness_at(mesh, point, direction):
     return float(t[0])
 
 
+FACING = np.cos(np.radians(40))     # a ray counts only if it leaves through a face within 40 deg of facing it (a 45 deg chamfer doesn't)
+
+
 def _cast(mesh, pts, dirs):
+    """inward ray length per sample; inf where it leaves through a face turned more than 50 deg
+    away (the other side of a 45 deg chamfer, a blunt wedge or a rolled edge, not the opposite wall)"""
     org = pts + dirs * 1e-3
-    loc, ray, _ = mesh.ray.intersects_location(org, dirs, multiple_hits=False)
+    loc, ray, tri = mesh.ray.intersects_location(org, dirs, multiple_hits=False)
     out = np.full(len(pts), np.inf)
     if len(ray):
-        out[ray] = np.linalg.norm(loc - org[ray], axis=1) + 1e-3
+        facing = (mesh.face_normals[tri] * dirs[ray]).sum(1) > FACING
+        out[ray[facing]] = np.linalg.norm(loc[facing] - org[ray[facing]], axis=1) + 1e-3
     return out
 
 
-def thickness_samples(mesh, density=2.0, edge_skip=0.3, seed=1):
-    """(points, thickness) for about `density` samples per mm2 of surface"""
+def thickness_samples(mesh, density=2.0, edge_skip=0.3, seed=1, acute_skip=0.0):
+    """(points, thickness) for about `density` samples per mm2 of surface.
+    Samples within edge_skip of any sharp (> 30 deg) edge are dropped, and within acute_skip of a
+    convex edge sharper than 90 deg (a wedge: a ray from beside it leaves through the other face
+    after a short way, though the part isn't thin there)."""
     n = int(max(2000, mesh.area * density))
     pts, fi = trimesh.sample.sample_surface(mesh, n, seed=seed)
     nrm = mesh.face_normals[fi]
-    if edge_skip > 0:
-        # sharp edges: drop samples near a face boundary whose neighbour turns more than 30 deg
-        ang = mesh.face_adjacency_angles
-        sharp = mesh.face_adjacency_edges[ang > np.radians(30)]
-        if len(sharp):
-            a, b = mesh.vertices[sharp[:, 0]], mesh.vertices[sharp[:, 1]]
-            keep = np.ones(len(pts), bool)
-            for lo in range(0, len(pts), 4000):
-                p = pts[lo:lo + 4000]
-                d = _seg_dist(p, a, b)
-                keep[lo:lo + 4000] = d > edge_skip
-            pts, nrm = pts[keep], nrm[keep]
+    ang = mesh.face_adjacency_angles
+    for lim, skip in ((np.radians(30), edge_skip), (np.radians(91), acute_skip)):
+        sel = (ang > lim) & (mesh.face_adjacency_convex if lim > np.radians(90) else True)
+        edges = mesh.face_adjacency_edges[sel]
+        if skip <= 0 or not len(edges):
+            continue
+        a, b = mesh.vertices[edges[:, 0]], mesh.vertices[edges[:, 1]]
+        keep = np.ones(len(pts), bool)
+        for lo in range(0, len(pts), 4000):
+            keep[lo:lo + 4000] = _seg_dist(pts[lo:lo + 4000], a, b) > skip
+        pts, nrm = pts[keep], nrm[keep]
     return pts, _cast(mesh, pts, -nrm)
 
 
@@ -80,11 +88,21 @@ def thin_spots(mesh, limit, density=2.0, exclude=None, edge_skip=0.3):
     return pts[bad], t[bad]
 
 
+def clusters(pts, t, cell=2.0):
+    """thin samples grouped on a cell grid: [(min thickness, centre, count)], thinnest first"""
+    out = {}
+    for p, v in zip(pts, t):
+        k = tuple(np.floor(p / cell).astype(int))
+        lo, c, n = out.get(k, (np.inf, np.zeros(3), 0))
+        out[k] = (min(lo, v), c + p, n + 1)
+    return sorted([(lo, c / n, n) for lo, c, n in out.values()], key=lambda r: r[0])
+
+
 if __name__ == "__main__":
     m = trimesh.load(sys.argv[1], force="mesh")
     lim = float(sys.argv[2]) if len(sys.argv) > 2 else 2.0
     p, t = thin_spots(m, lim)
-    for i in np.argsort(t)[:20]:
-        print(f"{t[i]:.2f} at {np.round(p[i], 1).tolist()}")
+    for lo, c, n in clusters(p, t)[:25]:
+        print(f"{lo:.2f} at {np.round(c, 1).tolist()} ({n})")
     print(f"{len(t)} samples under {lim}")
     sys.exit(1 if len(t) else 0)

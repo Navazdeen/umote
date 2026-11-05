@@ -4,6 +4,37 @@ A battery-powered remote built around the **LCDwiki E32R24P** (ESP32-32E, 2.4" S
 
 > **Latest (2026-11-01):** remote UI + Home Assistant integration shipped and running on the remote. See [`docs/HANDOFF-2026-11-01-remote-ui.md`](docs/HANDOFF-2026-11-01-remote-ui.md); it supersedes the firmware rows below.
 
+## 2026-11-05 session: case v6 (overrides the v5 case section below)
+
+The user printed v5.1 in full and it failed in the hand:
+- the key half bent: the battery door left 0.05 mm of back per side
+- the collar's flat face-to-face joints rocked
+- the collar top and the wheel mount were thin
+- the EC11 was modelled as a plain box, so the real part couldn't fit
+- the key panel popped out of its slot
+- there were holes through the tip and bottom end
+
+v6 is the structural rework. Spec: `docs/superpowers/specs/2026-11-05-remote-case-v6-design.md` (section 9 is the as-built record). Plan: `docs/superpowers/plans/2026-11-05-remote-case-v6.md`. Code: `case/v6/`.
+
+- **Checks**: `case/v6/export.sh all` exports everything. `pytest case/tests` must be all green (`test_v6.py` and `test_check_struct.py` cover v6). `case/check_struct.py part.stl 1.2` lists the thin spots in one part.
+- **Release**: `release/v6.0/` (13 STLs + viewer) is on copyparty at `/stl/v6.0/`, SHA-256 checked.
+- **Print the three test pieces first**:
+  - `t1_wheel_zone`: EC11, nut, wheel press fit, tenons in the rails
+  - `t2_key_corner`: panel tongues, key holes at 0.6 clearance
+  - `t3_bottom_end`: pads, magnets, eyelet, panel screws
+- **Hardware**:
+  - 14 × M2 countersunk (DIN 965 / ISO 7046), from the back: s1 ×2 and s2 ×2 about 8 mm, s3 ×2 about 10 mm, key panel ×2 about 12 mm, head panel ×4 about 12 mm. Lengths [CHECK] against T1/T3.
+  - 1.6 mm perfboard, 17 × 12.3, behind the EC11. Snip the EC11's side tabs.
+- **Assembly order**:
+  1. Display into the head body; head panel on top; 4 screws from the back clamp both.
+  2. Solder the EC11 to its carrier. Thread the nut on and press the wheel onto the shaft. Drop it into the frame's U-slot bulkhead from below and tighten the nut.
+  3. Join the head to the key body (the tenons slide into the rail slots).
+  4. Route the wires: battery and inter-board wires through the frame's −x channel; the roller's three out of the +x notch; all of them across the 7 mm zone under the start of the button board.
+  5. Frame in from below between the rails; ridge on; 6 screws (s1, s2, s3).
+  6. Battery in from the front. Board, clipped to the key panel, on top.
+  7. Key panel: tongues into the rail grooves, then 2 screws at the bottom.
+- **Open**: the EC11 nut size and the clone's body (T1). IR through the 1.4/0.95 skin needs IR-transparent filament [CHECK]. The viewer wasn't checked in a browser (Chrome crashes in this WSL), only built from the v5 template.
+
 ## 2026-11-05 session: case v5 (overrides the case sections below)
 
 Design: `docs/superpowers/specs/2026-11-05-remote-case-v5-design.md`. Plan: `docs/superpowers/plans/2026-11-05-remote-case-v5.md`. Source: `case/v5/*.scad` (one dispatcher, `umote_v5.scad`; numbers in `params.scad`). Exports and checks: `case/v5/export.sh all`, `python3 case/check_v5.py case/stl_v5/<part>.stl`, `python3 case/fit_check_v5.py`, `python3 -m pytest case/tests -q`.

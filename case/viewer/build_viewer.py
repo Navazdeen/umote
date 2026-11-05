@@ -28,6 +28,37 @@ def build_v5(version):
     print("built", os.path.join(stl, "viewer.html"), len(page))
 
 
+# v6: python3 case/viewer/build_viewer.py --v6 [version]  ->  case/stl_v6/viewer.html
+V6_PRINT = [("t1_wheel_zone", "Test 1: wheel zone + joint", "print first: EC11, nut, wheel fit, tenons"),
+            ("t2_key_corner", "Test 2: key panel corner", "print first: tongues, key holes"),
+            ("t3_bottom_end", "Test 3: bottom end", "print first: pads, magnets, eyelet, panel screws"),
+            ("head_body", "Head body", "back down, textured plate"), ("head_panel", "Head face panel", "face down, smooth plate"),
+            ("frame", "Collar frame", "cap down (accent colour)"), ("ridge", "Collar ridge", "bottom down (accent colour)"),
+            ("wheel", "Roller wheel", "on its side"), ("key_body", "Key body", "back down, textured plate"),
+            ("key_panel", "Key face panel", "face down, smooth plate"), ("caps", "Caps + rockers", "flange down"),
+            ("dpad_ring", "D-pad ring", "face down (accent colour)"), ("dock", "Charging dock", "base down")]
+V6_ASM = {"asm_head_body": [0xd9d6cf, .65, 0], "asm_key_body": [0xd9d6cf, .65, 0], "asm_head_panel": [0x111418, .3, 1],
+          "asm_key_panel": [0x111418, .3, 1], "asm_frame": [0xd9772b, .55, 0.8], "asm_ridge": [0xd9772b, .55, -1.2],
+          "asm_dpad_ring": [0xd9772b, .55, 2], "asm_wheel": [0x24272c, .8, 1.6], "asm_ec11": [0x9aa3ad, .35, 0.4],
+          "asm_carrier": [0x2f7d32, .7, 0.4], "caps_asm": [0x2a2e35, .6, 3], "asm_dock": [0x2c3036, .6, -2]}
+
+
+def build_v6(version):
+    here = os.path.dirname(os.path.abspath(__file__)); stl = os.path.join(here, "..", "stl_v6")
+    meshes, look = {}, {}
+    for f, lk in V6_ASM.items():
+        k = "dock" if f == "asm_dock" else f
+        meshes[k] = base64.b64encode(open(os.path.join(stl, f + ".stl"), "rb").read()).decode(); look[k] = lk
+    rows = "".join(f'<li><a href="{f}.stl" download>{n}</a><span>{os.path.getsize(os.path.join(stl, f + ".stl")) / 1e6:.1f} MB · {o}</span></li>' for f, n, o in V6_PRINT)
+    page = open(os.path.join(here, "viewer_v5_template.html")).read()
+    page = page.replace("%%VERSION%%", version).replace("%%FILES%%", rows).replace("%%MESHES%%", json.dumps(meshes)).replace("%%LOOK%%", json.dumps(look)).replace("umote case v5", "umote case v6")
+    open(os.path.join(stl, "viewer.html"), "w").write(page)
+    print("built", os.path.join(stl, "viewer.html"), len(page))
+
+
+if "--v6" in sys.argv:
+    build_v6(sys.argv[sys.argv.index("--v6") + 1] if len(sys.argv) > sys.argv.index("--v6") + 1 else "v6")
+    sys.exit(0)
 if "--v5" in sys.argv:
     build_v5(sys.argv[sys.argv.index("--v5") + 1] if len(sys.argv) > sys.argv.index("--v5") + 1 else "v5")
     sys.exit(0)

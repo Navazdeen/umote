@@ -14,13 +14,13 @@ floor_pocket = 0.6;                 // the collar floor thins under the cradle s
 module boss_block() { h = piv[1] - floor_t + 1.2;
   translate([-1.5, -2, 0]) hull() { cube([3, 4, h]); translate([0, 0, 0]) cube([3, 4 + h, 0.01]); } }
 // a thin slice of the envelope at y (for hulling the collar between the two halves)
-module yslice(y) ycut(y - 0.01, y) envelope();
+module yslice(y, side = 1) ycut(side > 0 ? y : y - 0.01, side > 0 ? y + 0.01 : y) envelope();   // side +1: just past y
 module inner_slice(y) ycut(y - 0.01, y) union() {
   translate([0, 0, floor_t]) linear_extrude(roll_z - floor_t) plan(wall);
   stack(roll_z, T - top_skin, 6, 1.8);
 }
 module collar_shell() { difference() {
-  hull() { head_xf() yslice(y_head_end); yslice(y_key_start); }
+  hull() { head_xf() yslice(y_head_end, 1); yslice(y_key_start, -1); }
   hull() { head_xf() translate([0, -0.5, 0]) inner_slice(y_head_end); translate([0, 0.5, 0]) inner_slice(y_key_start); }
 } }
 
@@ -99,23 +99,28 @@ module crease_screw_cuts() for (h = [true, false]) prong_sites(h) {
   translate([0, 0, -1]) td_hole(crease_hole[1], z_tf + 2);
   translate([0, 0, -1]) td_hole(crease_hole[2], 1 + plate_d + crease_hole[3]);
 }
+// the magnet plate's outline: x +-21.6, its bottom corners following the body's outline
+module plate2d(grow = 0) intersection() { translate([-plate_w / 2 - grow, plate_y0 - grow]) square([plate_w + 2 * grow, L]); plan(3.33 - grow); }
 module plate_recess() {             // runs on into the key body; 45 deg ramp at its crease end
-  translate([0, 0, -0.01]) hull() {
-    translate([-plate_w / 2 - 0.15, plate_y0, 0]) cube([plate_w + 0.3, L, plate_d + 0.01]);
-    translate([-plate_w / 2 - 0.15, plate_y0 - plate_d, 0]) cube([plate_w + 0.3, L, 0.01]);
+  translate([0, 0, -0.01]) intersection() {
+    hull() {
+      translate([-50, plate_y0 - 0.15, 0]) cube([100, L, plate_d + 0.01]);
+      translate([-50, plate_y0 - 0.15 - plate_d, 0]) cube([100, L, 0.01]);
+    }
+    linear_extrude(plate_d + 0.02) union() { offset(delta = 0.15) plate2d(); translate([-plate_w / 2 - 0.15, plate_y0 - 1.0]) square([plate_w + 0.3, 2]); }
   }
 }
 // lip over the head panel's 45 deg collar edge (in head coordinates; it is the top of the print)
 module head_lip() head_xf() intersection() {
   translate([-50, 0, 0]) rotate([90, 0, 90]) linear_extrude(100)
-    polygon([[y_head_end - lip, T], [y_head_end + 3, T], [y_head_end, T - lip]]);   // inner face slopes gently into the skin
+    polygon([[y_head_end - lip + 0.2, T], [y_head_end + 3, T], [y_head_end + 0.15, T - lip + 0.05]]);   // 0.1 off the panel's chamfer; inner face slopes gently into the skin
   panel_zone(pcl);
 }
 // key-end blocks under the top skin, with the grooves for the key panel's wedge tongues
-tongue = [10, 1.5];                 // width, reach: 1.5 over 1.2 tall keeps the groove's roof under 45 deg standing up; at x +-13
+tongue = [10, 1.2];                 // width, reach = height: exactly 45 deg suits both prints (panel face down, collar standing)
 tongue_x = 13;
-module key_tongue2d(grow = 0) polygon([[y_key_start + 0.01, pz0 - 0.8 - grow], [y_key_start + 0.01, pz0 + 0.4 + grow],
-  [y_key_start - tongue[1] - grow, pz0 - 0.8 - grow]]);
+module key_tongue2d(grow = 0) offset(delta = grow) polygon([[y_key_start + 0.01, pz0 - 0.8], [y_key_start + 0.01, pz0 - 0.8 + tongue[1]],
+  [y_key_start - tongue[1] + 0.01, pz0 - 0.8]]);
 module key_blocks() for (sx = [-1, 1]) difference() {
   translate([sx > 0 ? 6.2 : -20, y_key_start - 2.2, 12.4]) cube([13.8, 2.21, T - top_skin - 12.4 + 0.01]);
   translate([sx * tongue_x - tongue[0] / 2 - 0.2, 0, 0]) rotate([90, 0, 90]) linear_extrude(tongue[0] + 0.4) key_tongue2d(0.15);

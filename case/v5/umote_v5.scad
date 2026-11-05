@@ -7,6 +7,8 @@ include <params.scad>
 include <profile.scad>
 include <head_half.scad>
 include <collar.scad>
+include <keys.scad>
+include <key_half.scad>
 
 // every value the checks need, as one JSON line
 P = [["W", W], ["wall", wall], ["tip_wall", tip_wall], ["T", T], ["L", L], ["theta", theta], ["clr", clr],
@@ -34,6 +36,10 @@ else if (part == "head_body") head_body();
 else if (part == "head_panel") translate([0, 0, T]) mirror([0, 0, 1]) head_panel();
 else if (part == "asm_head_body") head_xf() head_body();
 else if (part == "asm_head_panel") head_xf() head_panel();
+else if (part == "key_body") key_body();
+else if (part == "key_panel") translate([0, 0, T]) mirror([0, 0, 1]) key_panel();
+else if (part == "asm_key_body") key_body();
+else if (part == "asm_key_panel") key_panel();
 else if (part == "asm_collar_core") collar_core();
 else if (part == "asm_collar") collar();
 else if (part == "collar") collar_print() collar();
@@ -54,14 +60,14 @@ module st_box() { translate([-3, -1, -1]) cube([29.5, 15, 30]); }
 module snap_test() {
   intersection() { st_box(); difference() {
     envelope(); head_cavity(); panel_zone(0);
-    for (i = [0 : 2]) translate([st_x[i], tip_snap_y, snap_root_z]) rotate(-90) catch(st_uc[i]);
-    translate([side_snap_x, 6.0, snap_root_z]) catch(0.4, gap = 1.0);
+    for (i = [0 : 2]) translate([st_x[i], tip_snap_y, snap_root_z]) rotate(-90) catch(st_uc[i], gap = tip_snap_y - tip_wall);
+    translate([side_snap_x, 6.0, snap_root_z]) catch(0.4, gap = 0.6);
   } }
   translate([0, 40, T]) mirror([0, 0, 1]) difference() {
     union() {
       intersection() { st_box(); panel_zone(pcl); }
-      for (i = [0 : 2]) translate([st_x[i], tip_snap_y, snap_root_z]) rotate(-90) snap(st_uc[i]);
-      translate([side_snap_x, 6.0, snap_root_z]) snap(0.4, gap = 1.0);
+      for (i = [0 : 2]) translate([st_x[i], tip_snap_y, snap_root_z]) rotate(-90) snap(st_uc[i], gap = tip_snap_y - tip_wall);
+      translate([side_snap_x, 6.0, snap_root_z]) snap(0.4, gap = 0.6);
     }
     for (i = [0 : 2]) for (k = [0 : i]) translate([st_x[i] - 2 + k * 1.6, 9, pz0 - 0.1]) cylinder(d = 0.9, h = 0.5, $fn = 16);
   }

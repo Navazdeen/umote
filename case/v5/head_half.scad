@@ -12,18 +12,19 @@ module snap(uc = snap_uc, gap = 0.4, len = snap_beam, w = snap_w, t = [1.0, 0.8]
   translate([0, -w / 2, 0]) rotate([90, 0, 0]) mirror([0, 0, 1]) linear_extrude(w)
     polygon([[-t[0], 0], [0, 0], [0, zt], [p, zt - p], [p, zt - p - 0.2], [0, -len], [-t[1], -len]]);
 }
-// the matching pocket in the wall, same frame (the wall's inner face is at x = gap)
+// the matching pocket, same frame. It is cut from the beam's face (x = 0): above roll_z the wall
+// rolls in, so its inner face is nearer than gap at the hook's height.
 module catch(uc = snap_uc, gap = 0.4, len = snap_beam, w = snap_w) {
   p = gap + uc;  zt = -len + 2 * p + 0.2;
   translate([0, -(w + 0.6) / 2, 0]) rotate([90, 0, 0]) mirror([0, 0, 1]) linear_extrude(w + 0.6)
-    polygon([[gap - 0.01, zt + 0.1], [p + 0.15, zt - p - 0.05], [p + 0.15, zt - p - 0.35], [gap - 0.01, -len - 0.35]]);
+    polygon([[-0.01, zt + 0.1 + gap], [p + 0.15, zt - p - 0.05], [p + 0.15, zt - p - 0.35], [-0.01, -len - 0.35 - gap]]);
 }
 // where the 4 snaps sit (straight head coordinates): [x, y, rotation about z]; the beam's outer
 // face points along the rotated +x. Two on the tip wall (beside the IR clips, outside the USB-end
 // screw heads), one on each side wall near the tip.
 snap_root_z = pz0;
-tip_snap_y = tip_wall + 0.4;         // beam outer face 0.4 in from the tip wall
-side_snap_x = in_w / 2 - 0.9;        // under the panel edge, clear of the rolled wall
+tip_snap_y = 2.9;                    // beam outer face: clear of the rolled tip wall at the root (2.82 at z 14.2)
+side_snap_x = 22.3;                  // beam outer face; inner face 21.3 (the LCD starts at y 10.5, the snaps sit at y 6)
 snaps = [[ 17.5, tip_snap_y, -90], [-17.5, tip_snap_y, -90],
          [ side_snap_x, 6.0, 0], [-side_snap_x, 6.0, 180]];
 
@@ -43,7 +44,10 @@ prong_x = 19.5;  prong = [5.7, 4.0, 4.3];    // [x width from 17.8 to the wall, 
 module prongs(y0, dir) {                     // dir +1: reach +y from y0 (head), -1: reach -y (key)
   zb = floor_t + 1.8;
   for (sx = [-1, 1]) mirror([sx > 0 ? 0 : 1, 0, 0]) translate([17.8, dir > 0 ? y0 - 1 : y0 - prong[1], zb]) difference() {
-    cube([in_w / 2 - 17.8 + 0.5, prong[1] + 1, prong[2]]);
+    union() {
+      translate([0, dir > 0 ? 0 : prong[1], 0]) cube([in_w / 2 - 17.8 + 0.5, 1, prong[2]]);      // root, into the own wall
+      translate([0, dir > 0 ? 1 : 0, 0]) cube([in_w / 2 - 17.8 - 0.1, prong[1], prong[2]]);       // reach, inside the collar
+    }
     translate([prong_x - 17.8, dir > 0 ? prong[1] / 2 + 1 : prong[1] / 2, -1]) cylinder(d = 1.7, h = prong[2] - 0.6, $fn = 24);
   }
 }
@@ -81,7 +85,7 @@ module head_body() { difference() {
     prongs(y_head_end, 1);
   }
   usb_cuts(); ir_slot();
-  for (s = snaps) translate([s[0], s[1], snap_root_z]) rotate(s[2]) catch(gap = abs(s[2]) == 90 ? 0.4 : 1.0);
+  for (s = snaps) translate([s[0], s[1], snap_root_z]) rotate(s[2]) catch(gap = abs(s[2]) == 90 ? tip_snap_y - tip_wall : 0.6);
   // IR LED wire groove down the -x side wall, from the LED's level to below the display PCB
   translate([-in_w / 2 - ir_wire[2], ir_wire[0], eb]) cube([ir_wire[2] + 0.01, ir_wire[1], roll_z - eb + 1]);
 } }
@@ -95,11 +99,12 @@ module ir_clips() for (sx = [-1, 1]) intersection() {   // v4's C saddles, tilte
     translate([-1.3, tip_wall - 1, -3]) cube([2.6, 7, 3]);
   }
   translate([-50, 0, 0]) cube([100, 50, pz0 + 0.05]);
+  translate([0, 0.15, -0.01]) union() { head_cavity(); translate([0, 0, pz0]) linear_extrude(1) plan(wall); }   // stays inside, 0.15 off the tip wall
 }
 module head_panel() { difference() {
   union() {
     intersection() { panel_zone(pcl); translate([-50, -1, 0]) cube([100, y_head_end + 1, 30]); }
-    for (s = snaps) translate([s[0], s[1], snap_root_z + 0.01]) rotate(s[2]) snap(gap = abs(s[2]) == 90 ? 0.4 : 1.0);
+    for (s = snaps) translate([s[0], s[1], snap_root_z + 0.01]) rotate(s[2]) snap(gap = abs(s[2]) == 90 ? tip_snap_y - tip_wall : 0.6);
     ir_clips();
   }
   // screen window + 45 deg bezel (v4)

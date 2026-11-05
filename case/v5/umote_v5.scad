@@ -22,7 +22,7 @@ P = [["W", W], ["wall", wall], ["tip_wall", tip_wall], ["T", T], ["L", L], ["the
   ["y_head_end", y_head_end], ["y_key_start", y_key_start], ["cy", cy], ["axle_z", axle_z],
   ["whl_d", whl_d], ["whl_w", whl_w], ["whl_proud", whl_proud], ["ec11", ec11], ["tact", tact],
   ["cradle_travel", cradle_travel], ["fork_x", fork_x], ["fork_y", fork_y], ["key_tongue", key_tongue],
-  ["magnet", magnet], ["pad_insert", pad_insert], ["pogo_d", pogo_d], ["pogo_l", pogo_l], ["snap_uc", snap_uc], ["tact_c", tact_c], ["piv", piv], ["roll_z", roll_z], ["roll", roll], ["pz0", pz0], ["pry_setback", pry_setback]];
+  ["magnet", magnet], ["pad_insert", pad_insert], ["pogo_d", pogo_d], ["pogo_l", pogo_l], ["snap_uc", snap_uc], ["tact_c", tact_c], ["piv", piv], ["roll_z", roll_z], ["roll", roll], ["pz0", pz0], ["pry_setback", pry_setback], ["cap_proud", cap_proud]];
 function jv(v) = is_list(v) ? str("[", jl(v, 0), "]") : str(v);
 function jl(v, i) = i >= len(v) ? "" : str(jv(v[i]), i < len(v) - 1 ? "," : "", jl(v, i + 1));
 function jo(p, i) = i >= len(p) ? "" : str("\"", p[i][0], "\":", jv(p[i][1]), i < len(p) - 1 ? "," : "", jo(p, i + 1));
@@ -40,6 +40,12 @@ else if (part == "key_body") key_body();
 else if (part == "key_panel") translate([0, 0, T]) mirror([0, 0, 1]) key_panel();
 else if (part == "asm_key_body") key_body();
 else if (part == "asm_key_panel") key_panel();
+else if (part == "caps") caps_plate();
+else if (part == "caps_asm") caps_asm();
+else if (part == "caps_asm_pressed") caps_asm(press = 0.3);
+else if (part == "caps_asm_rocker_tilt") caps_asm(tip = 0.3);
+else if (part == "dpad_ring") translate([0, 0, T + 0.5]) mirror([0, 0, 1]) translate(concat(-dc, [0])) translate(concat(dc, [0])) dpad_ring_at();
+else if (part == "asm_dpad_ring") dpad_ring_at();
 else if (part == "asm_collar_core") collar_core();
 else if (part == "asm_collar") collar();
 else if (part == "collar") collar_print() collar();
@@ -75,6 +81,7 @@ module snap_test() {
 // roller_test: the collar without its fork and slots (standing on its key face), the wheel and the cradle.
 // the collar prints standing on its key-side face (assembled +y points down)
 module collar_print() translate([0, 0, y_key_start]) rotate([-90, 0, 0]) children();
+module dpad_ring_at() translate(concat(dc, [0])) dpad_ring();
 module wheel_flat() translate([0, 0, whl_w / 2]) rotate([0, 90, 0]) wheel();
 module roller_test() {
   collar_print() collar_core();

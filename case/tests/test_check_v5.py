@@ -62,3 +62,9 @@ def test_bridge_span(save):
 def test_long_bridge_fails(save):
     b = union(box(5, 10, 10), box(5, 10, 10, at=(25, 0, 0)), box(30, 10, 2, at=(0, 0, 10)))
     assert any("bridge" in p for p in check_part(save(b), max_bridge=17))
+
+
+def test_thin_step_is_not_a_bridge(save):
+    # a 30 x 30 block on a 29.8 x 29.8 one: a 0.1 mm ledge all round at z 0.2, not a bridge
+    b = union(box(29.8, 29.8, 0.2, at=(0.1, 0.1, 0)), box(30, 30, 3, at=(0, 0, 0.2)))
+    assert check_part(save(b)) == []

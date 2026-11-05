@@ -29,8 +29,10 @@ def bridge_spans(m):
     spans = []
     for g in groups:
         v = m.vertices[m.faces[g].ravel()]
-        ext = v[:, :2].max(axis=0) - v[:, :2].min(axis=0)
-        spans.append(float(ext.max()))
+        ext = float((v[:, :2].max(axis=0) - v[:, :2].min(axis=0)).max())
+        if m.area_faces[g].sum() / ext < 0.5:      # a strip under ~0.5 mm wide is a ledge (elephant's-foot steps), not a bridge
+            continue
+        spans.append(ext)
     return spans
 
 

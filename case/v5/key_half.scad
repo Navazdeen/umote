@@ -52,7 +52,7 @@ module door_window() translate([0, 0, -1]) linear_extrude(floor_t + 1.01) door2d
 // ---------- key face panel ----------
 module key_face_cuts() {
   translate(concat(dc, [pz0 - 1])) cylinder(r = acc_out + 0.1, h = pan_t + 2, $fn = 192);      // D-pad + ring
-  translate(concat(dc, [pz0 - 0.01])) cylinder(r = acc_out + 1.3, h = 0.86, $fn = 192);        // ring flange pocket
+  for (a = ring_tabs) translate(concat(dc, [0])) rotate(a - ring_tab_arc / 2 - 0.1 * 10) translate([0, 0, pz0 - 0.01]) ring_tab(0.1);   // tab pockets
   for (k = round_keys) translate(concat(bpos(singles[k]), [pz0 - 3])) {
     cylinder(d = cap_hole, h = 10);
     translate([-(rib_w + 2 * rib_clr) / 2, -(cap_d / 2 + rib_out + rib_clr), 0]) cube([rib_w + 2 * rib_clr, cap_d / 2, 3 + pan_t - rib_skin]);
@@ -76,9 +76,11 @@ module group2d(g, grow) offset(delta = grow) {
 // cap flange collars under the face (v4): round keys keyed, rockers in capsule pockets
 module key_collars() translate([0, 0, pz0 - cap_flange - 0.4]) linear_extrude(cap_flange + 0.45) difference() {
   union() {
+    translate(dc) circle(r = ring_out + 1.5, $fn = 192);
     for (k = round_keys) translate(bpos(singles[k])) circle(d = flange_d + 2 * flange_clr + 2.4);
     for (p = [vol, ch]) capsule2d(p, flange_d + 2 * flange_clr + 2.4);
   }
+  translate(dc) circle(r = acc_out + 0.1, $fn = 192);  // inside the D-pad hole the ring frame is the ceiling: only v4's outer wall stays
   for (k = round_keys) translate(bpos(singles[k])) circle(d = flange_d + 2 * flange_clr);
   for (p = [vol, ch]) capsule2d(p, flange_d + 2 * flange_clr);
 }
@@ -95,6 +97,7 @@ module key_panel() { difference() {
     for (y = clip_y) for (sx = [-1, 1]) mirror([sx > 0 ? 0 : 1, 0, 0]) translate([bb_w / 2 + 0.1, y, pz0 + 0.01]) board_clip();
     for (sx = [-1, 1]) translate([sx * 6 - 3, stop_y, bb_z0 + 0.5]) cube([6, 1.5, pz0 - bb_z0 - 0.45]);      // bottom stops
     for (s = key_snaps) translate([s[0], s[1], snap_root_z + 0.01]) rotate(s[2]) snap(gap = 0.6);
+    rk_fulcrums();
     for (sx = [-1, 1]) translate([sx * tongue_x - tongue[0] / 2, 0, 0]) rotate([90, 0, 90]) linear_extrude(tongue[0]) key_tongue2d(0);
   }
   key_face_cuts();

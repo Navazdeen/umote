@@ -942,9 +942,10 @@ binary_sensor:
       filters: [ lambda: 'if (!id(g_board_ok)) return {}; return x;', delayed_on: 10ms ], on_press: [ script.execute: { id: press, k: 14 } ] }
   - { platform: gpio, id: k_ch_up, pin: { mcp23xxx: mcp, number: 15, mode: { input: true, pullup: true }, inverted: true, interrupt: CHANGE },
       filters: [ lambda: 'if (!id(g_board_ok)) return {}; return x;', delayed_on: 10ms ], on_press: [ script.execute: { id: press, k: 15 } ] }
-  # crease roller (case v5): EC11 A/B on the two spare pins, GPB1 (pin 2) and GPB5 (pin 6); its
-  # press is wired in parallel with OK. Raw levels, no debounce delay: the decoder ignores bounces
-  # that skip a state, and each detent is 4 transitions.
+  # crease roller (case v5/v6): EC11 A/B on the two spare pins, GPB1 (pin 2) and GPB5 (pin 6), C to
+  # GND; hand-wired from the EC11's carrier board, no PCB change. v6 has no wheel press (OK selects),
+  # so the EC11's switch pins stay unconnected. Raw levels, no debounce delay: the decoder ignores
+  # bounces that skip a state, and each detent is 4 transitions.
   - { platform: gpio, id: k_roll_a, pin: { mcp23xxx: mcp, number: 9, mode: { input: true, pullup: true }, interrupt: CHANGE },
       filters: [ lambda: 'if (!id(g_board_ok)) return {}; return x;' ], on_state: [ script.execute: roll ] }
   - { platform: gpio, id: k_roll_b, pin: { mcp23xxx: mcp, number: 13, mode: { input: true, pullup: true }, interrupt: CHANGE },

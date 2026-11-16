@@ -1092,6 +1092,13 @@ inline lv_obj_t *toggle(lv_obj_t *row) {
   return t;
 }
 
+// Top of a device menu: a Back button (chevron and the device's name) that closes it.
+inline lv_obj_t *sheet_back(lv_obj_t *s, const std::string &id, const char *name) {
+  lv_obj_t *b = nm(button(s, 4, 2, 190, 44, WHITE, LV_OPA_TRANSP, 9, [] { close_sheets(); }), id);
+  icon(b, "chev_left", 20, 2, 12, WHITE);
+  return text(b, 26, 11, 160, R.f17b, WHITE, name);
+}
+
 inline void build_options();
 inline void destroy_options() {
   if (!op.root) return;
@@ -1136,10 +1143,10 @@ inline void set_speed(int d) {
 
 inline void build_options() {
   op.root = dim_layer("opt_dim");
-  lv_obj_t *s = nm(box(op.root, 0, 46, 240, 274, SHEET, LV_OPA_COVER, 14), "opt_sheet");
+  lv_obj_t *s = nm(box(op.root, 0, 26, 240, 294, SHEET, LV_OPA_COVER, 14), "opt_sheet");
   lv_obj_add_flag(s, LV_OBJ_FLAG_CLICKABLE);
-  box(s, 102, 6, 36, 5, WHITE, 77, 2);
-  lv_obj_t *pw = nm(button(s, 0, 14, 240, 44, WHITE, LV_OPA_TRANSP, 0, [] {
+  op.title = sheet_back(s, "opt_back", "");
+  lv_obj_t *pw = nm(button(s, 0, 54, 240, 44, WHITE, LV_OPA_TRANSP, 0, [] {
                       Tile *tp = opt_tile();
                       if (!tp) return;
                       Tile &t = *tp;
@@ -1148,22 +1155,22 @@ inline void build_options() {
                       t.state = on ? "on" : "off";
                       paint_toggle(op.power_tog, on);
                     }), "row_opt_power");
-  op.title = text(pw, 14, 12, 160, R.f17b, WHITE, "");
+  text(pw, 14, 13, 160, R.f15, WHITE, "Power");
   op.power_tog = toggle(pw);
-  text(s, 12, 66, 0, R.f12s, WHITE, "Speed", LV_TEXT_ALIGN_LEFT, 184);
-  lv_obj_t *minus = nm(button(s, 12, 84, 56, 44, CARD, LV_OPA_COVER, 12, [] { set_speed(-1); }), "opt_speed_minus");
+  text(s, 12, 106, 0, R.f12s, WHITE, "Speed", LV_TEXT_ALIGN_LEFT, 184);
+  lv_obj_t *minus = nm(button(s, 12, 124, 56, 44, CARD, LV_OPA_COVER, 12, [] { set_speed(-1); }), "opt_speed_minus");
   icon(minus, "minus", 20, 18, 12, WHITE);
-  op.speed = text(s, 76, 92, 40, R.f20b, WHITE, "0", LV_TEXT_ALIGN_RIGHT);
-  op.of = text(s, 120, 97, 48, R.f13, WHITE, "of 6", LV_TEXT_ALIGN_LEFT, 191);
-  lv_obj_t *plus = nm(button(s, 172, 84, 56, 44, CARD, LV_OPA_COVER, 12, [] { set_speed(1); }), "opt_speed_plus");
+  op.speed = text(s, 76, 132, 40, R.f20b, WHITE, "0", LV_TEXT_ALIGN_RIGHT);
+  op.of = text(s, 120, 137, 48, R.f13, WHITE, "of 6", LV_TEXT_ALIGN_LEFT, 191);
+  lv_obj_t *plus = nm(button(s, 172, 124, 56, 44, CARD, LV_OPA_COVER, 12, [] { set_speed(1); }), "opt_speed_plus");
   icon(plus, "plus", 20, 18, 12, WHITE);
-  text(s, 12, 138, 0, R.f12s, WHITE, "Timer", LV_TEXT_ALIGN_LEFT, 184);
+  text(s, 12, 178, 0, R.f12s, WHITE, "Timer", LV_TEXT_ALIGN_LEFT, 184);
   // Atomberg timer options: Off, 1, 2, 3, 6 hours
   static const char *const T[] = {"Off", "1 h", "3 h", "6 h"};
   static const int H[] = {0, 1, 3, 6};
   for (int i = 0; i < 4; i++) {
     int hours = H[i];
-    lv_obj_t *b = nm(text_button(s, 12 + 56 * i, 156, 48, 44, T[i], CARD, LV_OPA_COVER, 12, WHITE, [i, hours] {
+    lv_obj_t *b = nm(text_button(s, 12 + 56 * i, 196, 48, 44, T[i], CARD, LV_OPA_COVER, 12, WHITE, [i, hours] {
                        for (int k = 0; k < 4; k++)
                          lv_obj_set_style_bg_color(op.timers[k], lv_color_hex(k == i ? BLUE : CARD), 0);
                        if (opt_tile() && hooks.ha) hooks.ha("timer", opt_tile()->timer, std::to_string(hours));
@@ -1171,7 +1178,7 @@ inline void build_options() {
     op.timers.push_back(b);
   }
   lv_obj_set_style_bg_color(op.timers[0], lv_color_hex(BLUE), 0);
-  op.led_row = nm(button(s, 0, 210, 240, 44, WHITE, LV_OPA_TRANSP, 0, [] {
+  op.led_row = nm(button(s, 0, 248, 240, 44, WHITE, LV_OPA_TRANSP, 0, [] {
                     if (!opt_tile()) return;
                     if (hooks.ha) hooks.ha("toggle", opt_tile()->led, "");
                     lv_obj_t *t = op.led_tog;
@@ -1375,13 +1382,12 @@ inline void open_group(const std::string &tile_id) {
   gs.tile_id = tile_id;
   gs.rows = group_rows(*tp);
   int n = (int) gs.rows.size();
-  int list_h = std::min(44 * n, 264), sheet_h = 48 + list_h + 6;   // six rows fit without scrolling
+  int list_h = std::min(44 * n, 264), sheet_h = 54 + list_h + 2;   // six rows fit without scrolling
   gs.root = dim_layer("grp_dim");
   lv_obj_t *s = nm(box(gs.root, 0, 320 - sheet_h, 240, sheet_h, SHEET, LV_OPA_COVER, 14), "grp_sheet");
   lv_obj_add_flag(s, LV_OBJ_FLAG_CLICKABLE);
-  box(s, 102, 6, 36, 5, WHITE, 77, 2);
-  text(s, 14, 18, 212, R.f17b, WHITE, tp->name.c_str());
-  gs.list = nm(box(s, 0, 48, 240, list_h, WHITE, LV_OPA_TRANSP), "grp_list");
+  sheet_back(s, "grp_back", tp->name.c_str());
+  gs.list = nm(box(s, 0, 54, 240, list_h, WHITE, LV_OPA_TRANSP), "grp_list");
   if (44 * n > list_h) {
     lv_obj_add_flag(gs.list, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_scroll_dir(gs.list, LV_DIR_VER);

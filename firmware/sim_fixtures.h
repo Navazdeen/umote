@@ -192,8 +192,10 @@ inline bool sim_load_fixture(const std::string &f, int64_t now_ms) {
     ui::parse_members(SIM_MEMBERS);                                  // HA reports again
     ui::refresh_group();
     ok &= ui::gs.rows[1].on && ui::gs.rows[1].bri == 40;
-    ui::close_sheets();
+    // the Back button at the top of the menu closes it
+    lv_obj_send_event(lv_obj_get_child(lv_obj_get_child(ui::gs.root, 0), 0), LV_EVENT_CLICKED, nullptr);
     settle();
+    ok &= !ui::gs.root && !ui::sheet_open();
     lv_obj_send_event(ui::hp.objs[1], LV_EVENT_PRESSED, nullptr);
     lv_obj_send_event(ui::hp.objs[1], LV_EVENT_RELEASED, nullptr);
     lv_obj_send_event(ui::hp.objs[1], LV_EVENT_SHORT_CLICKED, nullptr);

@@ -33,6 +33,15 @@
 #     re-validation on wake, QIO 80 MHz flash: shorter wakes.
 #   - Battery read once per wake before the backlight is on (no-load voltage).
 #   - <= 20 %: ultra saver (25 % backlight, 8 s timeout, no voice). <= 5 %: IR only.
+#
+# Status LED (the on-board RGB LED, seen as a glow through the back plate):
+#   amber steady   charging            green steady   full (shown for about an hour)
+#   red blink      battery <= 20 %     red steady     battery <= 5 %        (both only while awake)
+#   green flash    IR sent             blue flash     sent over WiFi        blue pulse   listening
+# Charging is guessed from the battery voltage (umote::ChargeTracker in logic.h): no pin reports it.
+# Asleep, the LED pins are held, so charging shows as red + green full on (no PWM in deep sleep).
+# To notice the charger at all the remote wakes dark for about a second every ${poll_idle_min} min,
+# and every ${poll_charge_min} min while charging [CHECK the cost on a meter].
 
 substitutions:
   name: tv-remote
@@ -45,6 +54,8 @@ substitutions:
   wifi_password_fallback: !secret wifi_password
   stb_nec_address: "0x0000"      # set-top box NEC address [CHECK: capture]
   key_mask: "0xDDFF"             # the 14 key bits used in pinmap.json
+  poll_idle_min: "15"            # dark wake to look for a charger
+  poll_charge_min: "5"           # dark wake to follow the charge
 
 esphome:
   name: ${name}
@@ -164,6 +175,7 @@ globals:
   - { id: g_fast, type: bool, initial_value: 'false' }      # PM lock held (CPU at 240 MHz)
   - { id: g_autoprobe, type: bool, initial_value: 'true' }  # interval may auto-reboot on a probe hit
   - { id: g_pm_lock, type: esp_pm_lock_handle_t, initial_value: 'nullptr' }
+  - { id: g_charge, type: int, initial_value: '0' }         # umote::Charge: 0 none, 1 charging, 2 full
 
 # ---------------------------------------------------------------- power
 deep_sleep:
@@ -200,6 +212,11 @@ light:
     default_transition_length: 0s
     effects:
       - pulse: { name: listening, transition_length: 400ms, update_interval: 400ms }
+      - strobe:
+          name: low
+          colors:
+            - { state: true, brightness: 30%, red: 100%, green: 0%, blue: 0%, duration: 250ms }
+            - { state: false, duration: 2250ms }
 
 sensor:
   - platform: debug
@@ -251,7 +268,16 @@ sensor:
           id(g_mode) = m;
           static const char *const NAME[] = {"Normal", "Ultra saver", "Critical"};
           id(power_mode).publish_state(NAME[m]);
+          // charging, from how the voltage moves. The first reading after a wake is taken before
+          // the screen and WiFi are on ("rested"); the 60 s ones after it are under load.
+          static RTC_DATA_ATTR umote::ChargeTracker chg = {};
+          static bool rested = true;
+          id(g_charge) = (int) chg.feed((int) (x * 1000), rested);
+          rested = false;
+          static const char *const CHG[] = {"Not charging", "Charging", "Full"};
+          id(charge_state).publish_state(CHG[id(g_charge)]);
       - script.execute: ui_refresh
+      - script.execute: led_base
   - platform: template
     id: batt_pct
     name: Battery
@@ -296,7 +322,12 @@ text_sensor:
     id: ha_txt_7
     entity_id: sensor.umote_home
     attribute: tiles
-    on_value: [ lambda: 'ui::parse_tiles(x); ui::cache_put(ui::CACHE_TILES, x); ui::hp.updated_ms = millis(); ui::render_home();' ]
+    on_value: [ lambda: 'ui::parse_tiles(x); ui::cache_put(ui::CACHE_TILES, x); ui::hp.updated_ms = millis(); ui::render_home(); ui::refresh_group();' ]
+  - platform: homeassistant            # rows of a tile's hold menu (each light, relay, brightness)
+    id: ha_txt_13
+    entity_id: sensor.umote_home
+    attribute: members
+    on_value: [ lambda: 'ui::parse_members(x); ui::refresh_group();' ]
   - platform: homeassistant
     id: ha_txt_8
     entity_id: remote.navazdeen
@@ -334,6 +365,11 @@ text_sensor:
   - platform: template
     id: power_mode
     name: Power mode
+    entity_category: diagnostic
+    update_interval: never
+  - platform: template
+    id: charge_state
+    name: Charging
     entity_category: diagnostic
     update_interval: never
 
@@ -374,8 +410,9 @@ script:
   - id: start_session
     then:
       - if:
-          condition:             # woken by a key release: nothing to do, back to sleep dark
-            lambda: 'return id(g_wake) == 1 && id(g_wake_keys) == 0;'
+          condition:             # woken by a key release, or by the timer to look at the charger
+            lambda: |-             # (the battery was read at boot): nothing more to do, back to sleep dark
+              return (id(g_wake) == 1 && id(g_wake_keys) == 0) || (id(g_wake) == 3 && gpio_get_level(GPIO_NUM_36));
           then:
             - script.execute: go_to_sleep
           else:
@@ -388,15 +425,20 @@ script:
                   lambda: 'return !id(g_board_ok);'
                 then:
                   - logger.log: { level: WARN, format: "Button board (MCP23017 @ 0x20) not found: touch-only mode" }
-                  - light.turn_on: { id: status_led, red: 100%, green: 55%, blue: 0%, brightness: 30% }
+                  - light.turn_on: { id: status_led, red: 100%, green: 55%, blue: 0%, brightness: 30%, effect: none }
                   - delay: 150ms
-                  - light.turn_off: status_led
+                  - script.execute: led_base
             - if:
                 condition:
                   lambda: 'return id(g_wake) == 0;'
                 then:
                   - script.execute: net_up
                   - script.execute: { id: ui_toast, text: "Awake 3 min for OTA" }
+            - if:                  # a touch means the screen is being used: start WiFi now, not at the
+                condition:         # first tap (connecting takes about 10 s)
+                  lambda: 'return id(g_wake) >= 2 && id(g_mode) < 2;'
+                then:
+                  - script.execute: net_up
             - lambda: |-
                 for (int k = 0; k < 16; k++)
                   if (id(g_wake_keys) & (1 << k)) id(press).execute(k);
@@ -429,7 +471,7 @@ script:
     then:
       - wait_until:              # "stay awake" / OTA window, and work in flight
           condition:
-            lambda: 'return millis() >= id(g_awake_until) && !id(tv_key).is_running() && !id(voice_start).is_running();'
+            lambda: 'return millis() >= id(g_awake_until) && !id(tv_key).is_running() && !id(voice_start).is_running() && !id(ui_launch).is_running() && !id(ui_ha).is_running();'
       - lambda: 'id(g_stay) = false;'
       - wait_until:              # no finger on the screen, no key held: else the release wakes us again
           condition:
@@ -460,8 +502,10 @@ script:
           // the board is missing (IO35 floats) or a key is jammed (it would wake at once).
           if (id(g_board_ok) && !stuck)
             esp_sleep_enable_ext0_wakeup(GPIO_NUM_35, 0);
-          if (stuck)
-            id(sleeper).set_sleep_duration(10 * 60 * 1000);   // look again in 10 min
+          // timer wake: follow the charge, or look for a charger; a jammed key is looked at again too
+          uint32_t nap_min = id(g_charge) ? ${poll_charge_min} : ${poll_idle_min};
+          if (stuck) nap_min = std::min<uint32_t>(nap_min, 10);
+          id(sleeper).set_sleep_duration(nap_min * 60 * 1000);
           // drive or release every pin into its zero-current state and hold it through sleep
           auto drive = [](gpio_num_t p, int level) {
             gpio_reset_pin(p);
@@ -474,8 +518,10 @@ script:
           drive(GPIO_NUM_4, 1);      // amp shut down
           drive(GPIO_NUM_21, 0);     // backlight off
           drive(GPIO_NUM_18, 0);     // mic SCK stopped: INMP441 sleeps
-          drive(GPIO_NUM_22, 1);     // RGB LED off (common anode)
-          drive(GPIO_NUM_16, 1);
+          // RGB LED (common anode, low = on), held through sleep: red + green while charging,
+          // green when full, otherwise off
+          drive(GPIO_NUM_22, id(g_charge) == 1 ? 0 : 1);
+          drive(GPIO_NUM_16, id(g_charge) ? 0 : 1);
           drive(GPIO_NUM_17, 1);
           // IO19 (WS) and IO23 (SD) have 10k pull-ups from the SD slot: leave them inputs, never low
           gpio_reset_pin(GPIO_NUM_19);
@@ -537,20 +583,31 @@ script:
 
   # ---- hooks called by the UI (ui.yaml / ui_lv.h) ----
   - id: ui_launch
+    mode: restart                # the latest tap wins
     parameters: { source: string }
     then:
-      - lambda: 'if (!id(g_armed)) return;'
+      - lambda: |-
+          const ui::Source *s = ui::find_source(source);
+          ui::toast("Opening " + (s ? ui::short_name(*s) : source));
       - if:
           condition:
             lambda: 'return !ui::tv.tv_on;'
           then:
             - script.execute: tv_wake
       - script.execute: net_up
-      - wait_until: { condition: api.connected, timeout: 6s }
-      - homeassistant.action:
-          action: umote.launch
-          data_template: { source_id: "{{ s }}" }
-          variables: { s: !lambda 'return source;' }
+      # WiFi + HA take about 10 s after a wake. With the old 6 s the first tap was sent into a link
+      # that wasn't there yet and was lost without a word.
+      - wait_until: { condition: api.connected, timeout: 15s }
+      - if:
+          condition: api.connected
+          then:
+            - homeassistant.action:
+                action: umote.launch
+                data_template: { source_id: "{{ s }}" }
+                variables: { s: !lambda 'return source;' }
+            - delay: 150ms                         # let it leave before a possible sleep
+          else:
+            - script.execute: { id: ui_toast, text: "No link to Home Assistant" }
   - id: ui_power
     then:
       - script.execute: key_power
@@ -580,13 +637,38 @@ script:
     parameters: { code: string }
     then:
       - script.execute: { id: soundbar_ir, code: !lambda 'return code;' }
-  # Home tiles and the options sheet. kind: on | off | toggle | fan_pct | timer.
+  # On-screen volume buttons: soundbar (IR) or TV, as Settings > Buttons says, like the keys.
+  - id: ui_volume
+    parameters: { code: string }
+    then:
+      - lambda: |-
+          auto key = code == "VOL_UP" ? umote::Key::VOL_UP : code == "VOL_DOWN" ? umote::Key::VOL_DOWN : umote::Key::MUTE;
+          auto a = umote::volume_action(key, id(g_vol_to_tv));
+          if (a.target == umote::Target::TV_KEY) id(tv_key).execute(std::string(a.code));
+          else id(soundbar_ir).execute(std::string(a.code));
+  # Home tiles and the hold menus. kind: on | off | toggle | fan_pct | timer | bri | number.
   - id: ui_ha
     mode: queued
     parameters: { kind: string, entities: string, value: string }
     then:
       - script.execute: net_up
-      - wait_until: { condition: api.connected, timeout: 6s }
+      - wait_until: { condition: api.connected, timeout: 15s }
+      - if:
+          condition:
+            lambda: 'return kind == "bri";'
+          then:
+            - homeassistant.action:
+                action: light.turn_on
+                data_template: { entity_id: "{{ e }}", brightness_pct: "{{ v }}" }
+                variables: { e: !lambda 'return entities;', v: !lambda 'return value;' }
+      - if:
+          condition:
+            lambda: 'return kind == "number";'
+          then:
+            - homeassistant.action:
+                action: number.set_value
+                data_template: { entity_id: "{{ e }}", value: "{{ v }}" }
+                variables: { e: !lambda 'return entities;', v: !lambda 'return value;' }
       - if:
           condition:
             lambda: 'return kind == "fan_pct";'
@@ -730,7 +812,7 @@ script:
             - script.execute: { id: ui_toast, text: "Battery critical: WiFi keys off" }
           else:
             - script.execute: net_up
-            - wait_until: { condition: api.connected, timeout: 6s }
+            - wait_until: { condition: api.connected, timeout: 15s }
             - if:
                 condition: api.connected
                 then:
@@ -822,7 +904,7 @@ script:
   - id: voice_stop
     then:
       - microphone.stop_capture: mic
-      - light.turn_off: status_led
+      - script.execute: led_base
 
   # SSID, IP and signal for the Status tab
   - id: read_wifi
@@ -841,19 +923,37 @@ script:
       - delay: 1500ms
       - lambda: 'App.safe_reboot();'
 
-  # Feedback: short green = IR sent, short blue = sent over WiFi
+  # What the LED shows when nothing else is using it: charging, full, or a low battery.
+  - id: led_base
+    then:
+      - lambda: |-
+          int c = id(g_charge), m = id(g_mode);
+          if (id(voice_start).is_running()) return;   // the listening pulse stays
+          if (!c && !m) {
+            id(status_led).turn_off().perform();
+            return;
+          }
+          auto call = id(status_led).turn_on();
+          call.set_effect(!c && m == 1 ? "low" : "None");               // saver: a red blink
+          if (c == 1) call.set_rgb(1.0f, 0.45f, 0.0f);                  // charging: amber
+          else if (c == 2) call.set_rgb(0.0f, 1.0f, 0.0f);              // full: green
+          else call.set_rgb(1.0f, 0.0f, 0.0f);                          // critical: red
+          call.set_brightness(0.3f);
+          call.perform();
+
+  # Feedback: short green = IR sent, short blue = sent over WiFi; then back to the base colour
   - id: flash_ir
     mode: restart
     then:
-      - light.turn_on: { id: status_led, red: 0%, green: 100%, blue: 0%, brightness: 35% }
+      - light.turn_on: { id: status_led, red: 0%, green: 100%, blue: 0%, brightness: 35%, effect: none }
       - delay: 60ms
-      - light.turn_off: status_led
+      - script.execute: led_base
   - id: flash_wifi
     mode: restart
     then:
-      - light.turn_on: { id: status_led, red: 0%, green: 0%, blue: 100%, brightness: 35% }
+      - light.turn_on: { id: status_led, red: 0%, green: 0%, blue: 100%, brightness: 35%, effect: none }
       - delay: 60ms
-      - light.turn_off: status_led
+      - script.execute: led_base
 
 interval:
   - interval: 2s                 # only while awake

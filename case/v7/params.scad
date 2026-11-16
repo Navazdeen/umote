@@ -137,8 +137,9 @@ L = bb_y0 + bb_l + bottom_zone + end_wall;
 front_in = T - pan_t;
 touch_z  = front_in - 0.3;
 db_top = touch_z - db_front;  db_z0 = db_top - db_pcb;
-batt_foam = 0.2;
-batt_z0 = floor_t + batt_foam;
+batt_foam = 0.2;                    // v7.1: double-sided tape between the deck and the battery
+seat_z = 1.65;                      // v7.1: the battery deck, flat and level (2.0 on three ribs in v7.0); the key plate's inside reaches 1.63 at the battery's end
+batt_z0 = seat_z + batt_foam;
 bb_z0  = floor_t + foam + batt[2] + smd_h;  bb_top = bb_z0 + bb_pcb;
 act_top = bb_top + sw_total;
 pz0 = T - pan_t;
@@ -175,7 +176,7 @@ assert(in_w / 2 - batt[0] / 2 >= 0.5, "battery side clearance");
 assert(batt_y0 + batt[1] <= bb_y0 + bb_l, "battery under the button board");
 assert(bb_top + max(sw_body, top_parts) + 0.3 <= front_in, "button board parts hit the face panel");
 assert(db_z0 - db_back >= zs(db_y0) + 0.3, "display back parts hit the head plate");
-assert(zs(batt_y0 + batt[1]) <= floor_t && batt_z0 >= floor_t, "battery seat above the key plate");
+assert(zs(batt_y0 + batt[1]) <= seat_z && batt_z0 >= seat_z, "battery seat above the key plate");
 assert(whl_well - zb(cy) >= min_panel, "back skin under the wheel >= 2.0");
 assert(T - ec11_top - ec11_gap >= min_panel, "collar skin over the EC11 >= 2.0");
 assert(bush_end >= whl_x + whl_w / 2 + 0.5 - 1e-6, "bushing end clears the wheel's inner face by 0.5");

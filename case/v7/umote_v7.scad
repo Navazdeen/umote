@@ -18,7 +18,7 @@ P = [["W", W], ["wall", wall], ["tip_wall", tip_wall], ["T", T], ["L", L], ["the
   ["db_end", db_end], ["db_top", db_top], ["db_z0", db_z0], ["lcd_from_ant", lcd_from_ant], ["lcd_l", lcd_l],
   ["bb_w", bb_w], ["bb_l", bb_l], ["bb_pcb", bb_pcb], ["bb_y0", bb_y0], ["bb_z0", bb_z0], ["bb_top", bb_top],
   ["sw_body", sw_body], ["sw_total", sw_total], ["smd_h", smd_h], ["top_parts", top_parts],
-  ["batt", batt], ["batt_y0", batt_y0], ["batt_z0", batt_z0], ["floor_t", floor_t],
+  ["batt", batt], ["batt_y0", batt_y0], ["batt_z0", batt_z0], ["floor_t", floor_t], ["seat_z", seat_z],
   ["ir_x", ir_x], ["ir_z", ir_z], ["front_in", front_in], ["pan_t", pan_t], ["pz0", pz0],
   ["y_head_end", y_head_end], ["y_key_start", y_key_start], ["cy", cy], ["axle_z", axle_z],
   ["whl_d", whl_d], ["whl_w", whl_w], ["whl_x", whl_x], ["whl_proud", whl_proud], ["whl_gap", whl_gap], ["whl_well", whl_well],

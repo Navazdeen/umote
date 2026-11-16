@@ -25,7 +25,7 @@ Code: `case/v7/`. v6 (`case/v6/`) stays as the record of what failed.
 |---|---|---|
 | `shell` | the whole face and all four walls in one piece; on the inside of the face: display bosses, IR saddles, wheel-zone cheeks + cross walls + EC11 bulkhead, key collars, 4 board clips, the end block | face down on the smooth plate, turned corner to corner (needs 191 × 191 of a 220 bed). No overhang, longest bridge 5 mm |
 | `head_back` | flat plate, tip to keel line; 4 display posts, the wheel's well, lips inside the walls | outside down |
-| `key_back` | flat plate, keel line to the end = the battery door; battery ribs, lips, 2 tongues | outside down |
+| `key_back` | flat plate, keel line to the end = the battery door; flat battery deck (v7.1; three ribs in v7.0), lips, 2 tongues | outside down |
 
 Unchanged from v6: wheel, caps and rockers, D-pad ring, contact plates A/B, dock and its plates (the dock pocket is recut from the keel envelope).
 Gone: head body, key body, both face panels, collar frame, ridge, TPU grip pad, tenons.
@@ -57,7 +57,7 @@ Why this way up: a V back cannot lie on the bed, so a one-piece back tray (the m
 6. Lay the wires into the notches of the two cross walls (battery pair and inter-board set on −x, the roller's three on +x).
 7. Contact plate into the end slot.
 8. Head plate on: 4 × M2 × 12, 2 × M2 × 8.
-9. Battery on its foam. Key plate: tongues in at 45° under the cheeks, lay it down, 2 × M2 × 8.
+9. Battery taped to the key plate's deck (v7.1; it lay on foam over ribs in v7.0), its wires long enough to open the door. Key plate: tongues in at 45° under the cheeks, lay it down, 2 × M2 × 8.
 
 Battery change later: 2 screws, key plate off along its 45° line.
 

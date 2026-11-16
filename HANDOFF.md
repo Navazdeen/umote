@@ -4,6 +4,17 @@ A battery-powered remote built around the **LCDwiki E32R24P** (ESP32-32E, 2.4" S
 
 > **Latest (2026-11-01):** remote UI + Home Assistant integration shipped and running on the remote. See [`docs/HANDOFF-2026-11-01-remote-ui.md`](docs/HANDOFF-2026-11-01-remote-ui.md); it supersedes the firmware rows below.
 
+## 2026-11-16 session: case v7.1 (flat battery deck, hairline keel seam) and the printable board at 1.0 mm
+
+The user wants to stick the battery down, and v7.0's key plate held it on three 2.4 mm ribs. They also asked for the printable button board with the copper pattern 1.0 mm high, and whether it still fits.
+
+- **Key plate**: the ribs are now one level deck from lip to lip (46.6 × 101), at `seat_z` 1.65 (the ribs were at 2.0; the plate's inside reaches 1.63 at the battery's end, so this is as low as a level seat goes). The plate prints tilted 1.8 deg, so the deck's top has a 0.2 step about every 6 mm; foam tape takes that up.
+- **Room under the button board**: battery top to board underside was 1.1 (v7.0), now 1.45 with 0.2 of tape under the battery. The 1.0 ridges leave 0.45 for solder: cut the leads flush. The 0805s on the copper side (C1, C2, R4 to R7) stand 1.5 to 2.2 below the board on those ridges, so the capacitors press into the battery by up to 0.8 [CHECK: file the two capacitor pads down, or use the real PCB].
+- **Keel seam**: the user's print showed the seam between the two back plates as a groove. It was drawn that way (a 0.75 V, about 1 mm wide and 0.5 deep). It is now `seam_v` 0.3: 0.2 a side, one layer deep, so it reads as a hairline. The surfaces either side are flush (checked on the meshes). It can't go to zero: both plates print outside down, and two squashed first layers would hold them apart.
+- **Changed STLs**: `key_back`, `head_back`, and the two test pieces that carry slices of them (`t1_wheel_zone`, `t2_bottom_end`). Everything else is v7.0's file, byte for byte.
+- **Board**: `RIDGE=1.0 python3 make_stl.py stl` in `pcb/` (1.0 is now the default). 43 × 112 × 2.6, watertight, no copper under the case's four board clips.
+- **Release**: `release/v7.1/` (14 case STLs + `button_board_print.stl`, viewer, zip, SHA256SUMS.txt), copyparty `/stl/v7.1/`, and the Windows folder.
+
 ## 2026-11-13 session: case v7 "Keel" (overrides the v6 case section below)
 
 The user printed v6.1 in full: the display half stopped short of the key half (0.15 mm tenon fits, entering at the bend), the M2 pilots were too small (drawn 1.7), and the bend itself was unclear. They asked to scrap the bend. v7 is straight, with a shallow V back.

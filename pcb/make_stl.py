@@ -11,7 +11,7 @@ import board as B
 from route import pad_geom
 
 OUT = sys.argv[1] if len(sys.argv) > 1 else "stl"
-RIDGE = 1.4          # raised copper pattern height (1.4: user asked for pads 1 mm higher)
+RIDGE = float(os.environ.get("RIDGE", 1.0))   # raised copper pattern height (0.4 at first, 1.4 on 2026-10-29, 1.0 on 2026-11-16: user's requests)
 HOLE_EXTRA = 0.3     # printed holes come out small (0.2 was still tight)
 os.makedirs(OUT, exist_ok=True)
 res = pickle.load(open("best.pkl", "rb"))

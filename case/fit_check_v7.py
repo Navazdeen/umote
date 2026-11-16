@@ -17,7 +17,7 @@ SKIP = {
     ("IR LED L", "shell"), ("IR LED R", "shell"),                    # dome in the tip wall, body in its saddle
     ("EC11", "shell"), ("EC11 nut", "shell"),                        # bushing in the bulkhead's U-slot, nut against it
     ("EC11", "wheel"), ("EC11", "EC11 nut"), ("EC11", "carrier"),
-    ("battery 46x105", "key back"),                                  # on the plate's ribs (0.2 foam)
+    ("battery 46x105", "key back"),                                  # on the plate's flat deck (0.2 tape)
     ("display PCB", "LCD + touch glass"), ("display PCB", "display back parts"), ("display PCB", "USB-C receptacle"),
     ("display back parts", "USB-C receptacle"), ("USB-C plug overmold", "USB-C receptacle"),
     ("USB-C plug overmold", "USB-C plug metal"), ("button PCB", "copper-side SMDs"),

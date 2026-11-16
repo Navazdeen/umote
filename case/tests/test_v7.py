@@ -216,11 +216,14 @@ def test_key_plate_hooks_under_the_cheeks(P):
     assert fc.hit(lifted, load("asm_shell"), tol=0.05) is not None
 
 
-def test_battery_sits_on_ribs_clear_of_the_plate(P):
+def test_battery_sits_on_a_flat_deck(P):
+    # v7.1: one level deck from lip to lip (v7.0 had three ribs), so the battery can be taped down
     k = load("asm_key_back")
-    assert P["batt_z0"] >= P["floor_t"]
-    for x in P["rib_x"]:
-        assert solid(k, [[x, y, P["floor_t"] - 0.1] for y in (P["batt_y0"] + 10, P["batt_y0"] + 50, P["batt_end"] - 10)])
+    assert P["batt_z0"] >= P["seat_z"]
+    xs = [-P["batt"][0] / 2 + 0.5, *P["rib_x"], -7.5, 7.5, P["batt"][0] / 2 - 0.5]
+    ys = (P["batt_y0"] + 10, P["batt_y0"] + 50, P["batt_end"] - 10)
+    assert solid(k, [[x, y, P["seat_z"] - 0.1] for x in xs for y in ys])
+    assert not any(k.contains([[x, y, P["seat_z"] + 0.1] for x in xs for y in ys]))
 
 
 @pytest.mark.parametrize("plate,body", [("asm_pogo_plate_a", "asm_shell"), ("asm_pogo_plate_b", "asm_shell"),

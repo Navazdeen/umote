@@ -7,6 +7,7 @@
 #                 soundbar | home | home_focus_each | options_fan | options_lights | options_switches |
 #                 options_display | picker
 #   SIM_TEXT = large    the Large text size
+#   SIM_BUSY = 1        show the busy bar (a command is on its way)
 #   SIM_DUMP = <path>   write the visible widget tree for tools/check_ui.py, then exit
 
 esphome:
@@ -46,6 +47,7 @@ esphome:
         - lambda: |-
             const char *m = getenv("SIM_TOAST");
             if (m) ui::toast(m);
+            if (getenv("SIM_BUSY")) ui::set_busy(true);
         - if:
             condition:
               lambda: 'return getenv("SIM_DUMP") != nullptr;'

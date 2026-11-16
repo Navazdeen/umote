@@ -418,6 +418,8 @@ script:
           else:
             - lambda: |-
                 if (id(g_wake) == 2) id(g_armed) = false;   // the waking tap isn't a button press
+                // ... nor a tap on whatever is under the finger: swallowed until the finger lifts
+                if (id(g_wake) == 2 && !gpio_get_level(GPIO_NUM_36)) ui::set_guard(true);
                 if (id(g_wake) == 0) id(g_awake_until) = millis() + 180000;   // OTA window after power-on
             - script.execute: idle_timer
             - if:
@@ -462,6 +464,7 @@ script:
       - delay: 1500ms
       - lambda: 'if (id(g_fast)) { esp_pm_lock_release(id(g_pm_lock)); id(g_fast) = false; }'
       - delay: !lambda 'return id(g_idle_ms) - 4500;'
+      - lambda: 'ui::set_guard(true);'   # dimmed: the next touch only wakes the screen (see touchscreen on_release)
       - light.turn_on: { id: backlight, brightness: 6% }
       - delay: 3s
       - script.execute: go_to_sleep
@@ -605,7 +608,11 @@ script:
                 action: umote.launch
                 data_template: { source_id: "{{ s }}" }
                 variables: { s: !lambda 'return source;' }
-            - delay: 150ms                         # let it leave before a possible sleep
+            # stay "busy" until the TV shows it (HA reports the new source), or give up quietly
+            - wait_until:
+                condition:
+                  lambda: 'return ui::tv.current == source;'
+                timeout: 8s
           else:
             - script.execute: { id: ui_toast, text: "No link to Home Assistant" }
   - id: ui_power
@@ -619,7 +626,7 @@ script:
     parameters: { seconds: float }
     then:
       - script.execute: net_up
-      - wait_until: { condition: api.connected, timeout: 6s }
+      - wait_until: { condition: api.connected, timeout: 15s }
       - homeassistant.action:
           action: media_player.media_seek
           data: { entity_id: media_player.navazdeen }
@@ -653,6 +660,12 @@ script:
     then:
       - script.execute: net_up
       - wait_until: { condition: api.connected, timeout: 15s }
+      - if:
+          condition:
+            not: api.connected
+          then:
+            - script.execute: { id: ui_toast, text: "No link to Home Assistant" }
+            - script.stop: ui_ha
       - if:
           condition:
             lambda: 'return kind == "bri";'
@@ -923,6 +936,14 @@ script:
       - delay: 1500ms
       - lambda: 'App.safe_reboot();'
 
+  # The wake-only touch is over: let touches through again, a moment after the finger lifts so
+  # LVGL has seen the release on the guard layer and not on a button.
+  - id: guard_off
+    mode: restart
+    then:
+      - delay: 150ms
+      - lambda: 'ui::set_guard(false);'
+
   # What the LED shows when nothing else is using it: charging, full, or a low battery.
   - id: led_base
     then:
@@ -956,6 +977,12 @@ script:
       - script.execute: led_base
 
 interval:
+  # The busy bar shows from the tap until the command has gone out (for a source: until the TV shows it).
+  - interval: 100ms
+    then:
+      - lambda: |-
+          ui::set_busy(id(ui_launch).is_running() || id(ui_ha).is_running() || id(tv_key).is_running() ||
+                       id(ui_seek).is_running() || id(key_power).is_running() || id(tv_wake).is_running());
   - interval: 2s                 # only while awake
     then:
       - lambda: |-
@@ -1128,3 +1155,4 @@ touchscreen:
       - script.execute: idle_timer
     on_release:
       - lambda: 'id(g_armed) = true;'
+      - script.execute: guard_off

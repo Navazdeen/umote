@@ -163,7 +163,8 @@ inline void on_tap(lv_obj_t *o, Tap fn, lv_event_code_t code = LV_EVENT_CLICKED)
 inline lv_obj_t *button(lv_obj_t *parent, int x, int y, int w, int h, uint32_t bg, lv_opa_t opa, int radius,
                         Tap fn, lv_event_code_t code = LV_EVENT_CLICKED) {
   lv_obj_t *b = box(parent, x, y, w, h, bg, opa, radius);
-  lv_obj_set_style_bg_opa(b, opa > LV_OPA_50 ? (lv_opa_t) LV_OPA_70 : (lv_opa_t) (opa + 30), LV_STATE_PRESSED);
+  // pressed: solid buttons dim clearly, see-through ones light up
+  lv_obj_set_style_bg_opa(b, opa > LV_OPA_50 ? (lv_opa_t) LV_OPA_50 : (lv_opa_t) (opa + 56), LV_STATE_PRESSED);
   on_tap(b, std::move(fn), code);
   return b;
 }
@@ -262,7 +263,8 @@ inline void build_status() {
   lv_label_set_long_mode(chrome.batt, LV_LABEL_LONG_CLIP);
 }
 
-inline lv_obj_t *banner, *banner_text, *toast_box, *toast_text;
+inline lv_obj_t *banner, *banner_text, *toast_box, *toast_text, *busy_bar, *busy_dot;
+inline bool busy_on = false;
 inline lv_timer_t *toast_timer;
 
 constexpr int BANNER_PAD = 9;
@@ -291,9 +293,46 @@ inline void build_overlays() {
   banner = nm(box(lv_layer_top(), 136, 10, 100, 22, 0xE5484D, LV_OPA_COVER, 11), "banner");
   banner_text = nm(text(banner, 0, 3, 0, R.f12s, WHITE, ""), "banner_text");
   show(banner, false);
+  // "Working on it": a blue bar sweeping along the top edge while a tap is on its way to the TV or HA
+  busy_bar = nm(box(lv_layer_top(), 0, 0, 240, 4, WHITE, 36), "busy_bar");
+  busy_dot = box(busy_bar, 0, 0, 84, 4, BLUE, LV_OPA_COVER, 2);
+  show(busy_bar, false);
   toast_box = nm(box(lv_layer_top(), 20, 132, 200, 44, CARD, 235, 12), "toast");
   toast_text = text(toast_box, 8, 13, 184, R.f14s, WHITE, "", LV_TEXT_ALIGN_CENTER);
   show(toast_box, false);
+}
+
+// While the screen is dimmed (or was off), a touch only wakes it. A see-through layer above
+// everything takes that touch, so nothing underneath is pressed blind.
+inline lv_obj_t *guard;
+inline void set_guard(bool on) {
+  if (!ready) return;
+  if (!guard) {
+    guard = box(lv_layer_sys(), 0, 0, 240, 320, 0x000000, LV_OPA_TRANSP);
+    lv_obj_add_flag(guard, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_remove_flag(guard, LV_OBJ_FLAG_GESTURE_BUBBLE);
+  }
+  show(guard, on);
+  lv_obj_update_layout(guard);   // in place before the next touch is read, not at the next redraw
+}
+inline bool guard_on() { return guard && !lv_obj_has_flag(guard, LV_OBJ_FLAG_HIDDEN); }
+
+inline void set_busy(bool on) {
+  if (!ready || on == busy_on) return;
+  busy_on = on;
+  show(busy_bar, on);
+  lv_anim_delete(busy_dot, nullptr);
+  if (!on) return;
+  lv_anim_t a;
+  lv_anim_init(&a);
+  lv_anim_set_var(&a, busy_dot);
+  lv_anim_set_exec_cb(&a, [](void *o, int32_t v) { lv_obj_set_x((lv_obj_t *) o, v); });
+  lv_anim_set_values(&a, 0, 240 - 84);
+  lv_anim_set_duration(&a, 650);
+  lv_anim_set_playback_duration(&a, 650);
+  lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
+  lv_anim_set_path_cb(&a, lv_anim_path_ease_in_out);
+  lv_anim_start(&a);
 }
 
 inline void toast(const std::string &t) {

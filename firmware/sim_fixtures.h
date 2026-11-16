@@ -210,6 +210,32 @@ inline bool sim_load_fixture(const std::string &f, int64_t now_ms) {
     }
     printf("hold_menu: %s\n", ok ? "PASS" : "FAIL");
     exit(ok ? 0 : 3);
+  } else if (f == "dim_guard") {
+    // On a dimmed screen a touch only wakes it: the tile under the finger is not pressed.
+    static std::vector<std::string> calls;
+    ui::hooks.ha = [](const std::string &k, const std::string &e, const std::string &v) { calls.push_back(k + " " + e); };
+    ui::parse_tiles(SIM_TILES);
+    ui::render_home();
+    ui::show_page(2);
+    lv_refr_now(nullptr);
+    lv_point_t pt = {62, 90};                                        // on the first Home tile
+    auto hit = [&] {
+      lv_obj_t *o = lv_indev_search_obj(lv_layer_sys(), &pt);
+      return o ? o : lv_indev_search_obj(lv_screen_active(), &pt);
+    };
+    bool a = hit() == ui::hp.objs[0];
+    ui::set_guard(true);
+    bool b = ui::guard_on() && hit() == ui::guard;
+    lv_obj_send_event(hit(), LV_EVENT_SHORT_CLICKED, nullptr);
+    bool c = calls.empty();
+    ui::set_guard(false);
+    bool d = hit() == ui::hp.objs[0];
+    lv_obj_send_event(hit(), LV_EVENT_SHORT_CLICKED, nullptr);
+    bool e = calls.size() == 1;
+    bool ok = a && b && c && d && e;
+    printf("  tile under finger %d, guard takes it %d, nothing sent %d, tile again %d, sent %d\n", a, b, c, d, e);
+    printf("dim_guard: %s\n", ok ? "PASS" : "FAIL");
+    exit(ok ? 0 : 3);
   } else if (f == "wake_cache") {
     // Data cached before deep sleep is shown at once on wake, marked as not yet confirmed.
     ui::cache_put(ui::CACHE_SOURCES, SIM_SOURCES);

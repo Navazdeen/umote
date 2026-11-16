@@ -122,6 +122,8 @@ logger:
   level: DEBUG                   # bring-up; back to INFO once WiFi on IO1 is confirmed
 
 api:
+  encryption:
+    key: !secret api_key         # 32 random bytes, base64; HA reads it from the Builder
   reboot_timeout: 0s             # WiFi is off most of the time; never reboot for that
   on_client_connected:
     - lambda: 'id(g_net) = 3;'
@@ -133,6 +135,7 @@ api:
 
 ota:
   - platform: esphome
+    password: !secret ota_password
 
 # The remote deep-sleeps after 6-20 s idle. A wake from deep sleep is a reset, so with the default
 # 60 s a freshly OTA'd firmware never counts as good and the bootloader rolls it back. Mark the

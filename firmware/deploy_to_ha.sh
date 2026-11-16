@@ -6,7 +6,7 @@
 #                                          (a subfolder so the dashboard doesn't list them as devices;
 #                                          paths that ESPHome resolves from the config dir are rewritten)
 # Refuses to overwrite an existing tv-remote.yaml unless FORCE=1.
-# Checks that secrets.yaml defines wifi_ssid, wifi_password and tv_mac (prints only yes/no, never values).
+# Checks that secrets.yaml defines wifi_ssid, wifi_password, tv_mac, api_key and ota_password (prints only yes/no, never values).
 set -euo pipefail
 cd "$(dirname "$0")"
 HOST="${HA_SSH:-root@192.168.31.91}"
@@ -27,7 +27,7 @@ sed -e 's#^    - logic.h#    - tv-remote/logic.h#' -e 's#^    - ui_lv.h#    - tv
 sed 's#file: assets/#file: tv-remote/assets/#' assets.yaml | "${SSH[@]}" "cat > $D/tv-remote/assets.yaml"
 tar -czf - ui_res.yaml logic.h ui_lv.h assets | "${SSH[@]}" "rm -rf $D/tv-remote/assets && tar -xzf - -C $D/tv-remote"
 "${SSH[@]}" "ls -la $D/tv-remote.yaml $D/tv-remote
-  for k in wifi_ssid wifi_password tv_mac; do
+  for k in wifi_ssid wifi_password tv_mac api_key ota_password; do
     if grep -q \"^\$k:\" $D/secrets.yaml 2>/dev/null; then echo \"secrets.yaml has \$k: yes\"; else echo \"secrets.yaml has \$k: NO - add it\"; fi
   done"
 echo "Done. Open http://192.168.31.91:8123 -> ESPHome Device Builder -> tv-remote"

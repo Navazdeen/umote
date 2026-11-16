@@ -42,6 +42,12 @@ inline Action soundbar_volume(Key key) {
   }
 }
 
+// Volume follows Settings > Buttons on every page, for the keys and the on-screen buttons alike.
+inline Action volume_action(Key key, bool to_tv) {
+  if (!to_tv) return soundbar_volume(key);
+  return {Target::TV_KEY, key == Key::VOL_UP ? "VOLUME_UP" : key == Key::VOL_DOWN ? "VOLUME_DOWN" : "VOLUME_MUTE"};
+}
+
 // Crease roller (case v5): an EC11 on MCP23017 GPB1/GPB5. feed() takes the new A/B state (A = bit 1)
 // and returns +1 / -1 when a detent completes, 0 otherwise. A detent completes on arrival at the rest
 // state (A = B = 1 with the pull-ups) after at least half a detent of travel, so a half-click brush,
@@ -78,11 +84,9 @@ inline Action route(Page page, Key key, bool volume_to_tv, bool sheet_open) {
   if (key == Key::BACK && sheet_open) return {Target::CLOSE_SHEET, "BACK"};
   bool vol = key == Key::VOL_UP || key == Key::VOL_DOWN || key == Key::MUTE;
   bool ch = key == Key::CH_UP || key == Key::CH_DOWN;
+  if (vol) return volume_action(key, volume_to_tv);
   switch (page) {
     case Page::TV:
-      if (vol && volume_to_tv)
-        return {Target::TV_KEY, key == Key::VOL_UP ? "VOLUME_UP" : key == Key::VOL_DOWN ? "VOLUME_DOWN" : "MUTE"};
-      if (vol) return soundbar_volume(key);
       if (ch) return {Target::TV_KEY, key == Key::CH_UP ? "CHANNEL_UP" : "CHANNEL_DOWN"};
       switch (key) {
         case Key::UP: return {Target::TV_KEY, "DPAD_UP"};
@@ -95,14 +99,12 @@ inline Action route(Page page, Key key, bool volume_to_tv, bool sheet_open) {
         default: return {Target::NONE, ""};
       }
     case Page::SOUNDBAR:
-      if (vol) return soundbar_volume(key);
       if (is_dpad(key)) return {Target::SOUNDBAR_IR, dir_name(key)};
       if (key == Key::OK) return {Target::SOUNDBAR_IR, "ENTER"};
       if (key == Key::BACK) return {Target::SOUNDBAR_IR, "RETURN"};
       if (key == Key::HOME) return {Target::SOUNDBAR_IR, "HOME"};
       return {Target::NONE, ""};
     case Page::HOME:
-      if (vol) return soundbar_volume(key);
       if (ch) return {Target::PAGE_SCROLL, key == Key::CH_UP ? "UP" : "DOWN"};
       if (is_dpad(key)) return {Target::FOCUS_MOVE, dir_name(key)};
       if (key == Key::OK) return {Target::FOCUS_TOGGLE, "OK"};
@@ -110,7 +112,6 @@ inline Action route(Page page, Key key, bool volume_to_tv, bool sheet_open) {
       if (key == Key::HOME) return {Target::TV_KEY, "HOME"};
       return {Target::NONE, ""};
     case Page::SETTINGS:
-      if (vol) return soundbar_volume(key);
       if (is_dpad(key)) return {Target::LIST_MOVE, dir_name(key)};
       if (key == Key::OK) return {Target::LIST_SELECT, "OK"};
       if (key == Key::HOME) return {Target::TV_KEY, "HOME"};
@@ -168,6 +169,74 @@ inline std::vector<std::pair<std::string, int>> parse_scan_text(const std::strin
   }
   return out;
 }
+
+// ---- charging, guessed from the battery voltage -------------------------------------------------------
+// No pin says "charging" on this board, so it is inferred. The TP4054 pushes about 300 mA into the
+// cell: the voltage steps up when the charger goes on, climbs, then sits near 4.2 V; it steps down
+// when the charger comes off. "Full on the charger" and "full, just unplugged" look the same, so
+// FULL is shown for a limited time only. Thresholds are estimates [CHECK on the device].
+enum class Charge : uint8_t { NONE, CHARGING, FULL };
+constexpr int CHG_RISE_MV = 35;         // rise over the last resting reading that means "charger on"
+constexpr int CHG_DROP_MV = 35;         // fall below the peak, at rest, that means "charger off"
+constexpr int CHG_DROP_LOADED_MV = 60;  // the same while awake (screen and WiFi pull the reading down)
+constexpr int CHG_FULL_MV = 4100;       // at or above this the cell is in the constant-voltage phase
+constexpr int CHG_FLAT_MV = 8;          // "not rising any more" between two resting readings
+constexpr int CHG_FLAT_POLLS = 3;       // that many flat readings in a row = full
+constexpr int CHG_FULL_POLLS = 12;      // resting readings FULL is shown for (1 h at one per 5 min)
+constexpr int CHG_MAX_POLLS = 144;      // give up on CHARGING after this many (12 h)
+
+// Plain data: kept in RTC memory across deep sleep (all zero = fresh). feed() takes every battery
+// reading; `rested` is true for one taken with the screen and WiFi off (at wake).
+struct ChargeTracker {
+  uint8_t state, flat;
+  uint16_t ref_mv, peak_mv, last_mv, polls;
+  Charge get() const { return (Charge) state; }
+  void set(Charge c, int ref) {
+    state = (uint8_t) c;
+    flat = 0;
+    polls = 0;
+    ref_mv = (uint16_t) ref;
+  }
+  Charge feed(int mv, bool rested) {
+    switch (get()) {
+      case Charge::NONE:
+        if (ref_mv && mv >= ref_mv + CHG_RISE_MV) {
+          set(Charge::CHARGING, ref_mv);
+          peak_mv = last_mv = (uint16_t) mv;
+        } else if (rested) {
+          ref_mv = (uint16_t) mv;
+        }
+        break;
+      case Charge::CHARGING:
+        if (mv > peak_mv) peak_mv = (uint16_t) mv;
+        if (!rested) {
+          if (mv + CHG_DROP_LOADED_MV <= peak_mv) set(Charge::NONE, 0);   // 0: the next resting reading seeds it
+          break;
+        }
+        polls++;
+        if (mv + CHG_DROP_MV <= peak_mv) {
+          // the charger chip switching off at the end of a charge looks like an unplug
+          if (peak_mv >= CHG_FULL_MV) set(Charge::FULL, mv);
+          else set(Charge::NONE, mv);
+        } else if (polls > CHG_MAX_POLLS) {
+          set(Charge::NONE, mv);
+        } else if (mv >= CHG_FULL_MV) {
+          flat = mv - last_mv <= CHG_FLAT_MV ? flat + 1 : 0;
+          if (flat >= CHG_FLAT_POLLS) set(Charge::FULL, mv);
+        }
+        last_mv = (uint16_t) mv;
+        break;
+      case Charge::FULL:
+        if (!rested) {
+          if (mv + 2 * CHG_DROP_LOADED_MV < CHG_FULL_MV) set(Charge::NONE, 0);
+        } else if (++polls >= CHG_FULL_POLLS || mv + CHG_DROP_LOADED_MV < CHG_FULL_MV) {
+          set(Charge::NONE, mv);
+        }
+        break;
+    }
+    return get();
+  }
+};
 
 // Backlight: never below 30 % (lower is unreadable on this panel and can't be undone by touch).
 constexpr float BACKLIGHT_MIN = 0.3f, BACKLIGHT_DEFAULT = 0.6f;

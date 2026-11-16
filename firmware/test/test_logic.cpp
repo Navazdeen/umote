@@ -12,7 +12,7 @@ static bool is(Action a, Target t, const char *code) { return a.target == t && s
 static void tv_volume_goes_to_soundbar_by_default() {
   assert(is(route(Page::TV, Key::VOL_UP, false, false), Target::SOUNDBAR_IR, "VOL_UP"));
   assert(is(route(Page::TV, Key::VOL_UP, true, false), Target::TV_KEY, "VOLUME_UP"));
-  assert(is(route(Page::TV, Key::MUTE, true, false), Target::TV_KEY, "MUTE"));
+  assert(is(route(Page::TV, Key::MUTE, true, false), Target::TV_KEY, "VOLUME_MUTE"));
 }
 static void tv_dpad_and_channels_go_to_tv() {
   assert(is(route(Page::TV, Key::UP, false, false), Target::TV_KEY, "DPAD_UP"));
@@ -32,7 +32,7 @@ static void home_page_moves_focus() {
   assert(route(Page::HOME, Key::OK_HOLD, false, false).target == Target::FOCUS_OPTIONS);
   assert(route(Page::HOME, Key::BACK, false, true).target == Target::CLOSE_SHEET);
   assert(is(route(Page::HOME, Key::CH_UP, false, false), Target::PAGE_SCROLL, "UP"));
-  assert(route(Page::HOME, Key::VOL_DOWN, true, false).target == Target::SOUNDBAR_IR);
+  assert(route(Page::HOME, Key::VOL_DOWN, false, false).target == Target::SOUNDBAR_IR);
 }
 static void settings_and_global_keys() {
   assert(is(route(Page::SETTINGS, Key::DOWN, false, false), Target::LIST_MOVE, "DOWN"));
@@ -141,7 +141,84 @@ static void roll_routes_by_page() {
   assert(is(route(Page::SETTINGS, Key::ROLL_UP, false, false), Target::LIST_MOVE, "UP"));
 }
 
+static void volume_setting_applies_on_every_page() {
+  for (Page p : {Page::TV, Page::SOUNDBAR, Page::HOME, Page::SETTINGS}) {
+    assert(is(route(p, Key::VOL_UP, true, false), Target::TV_KEY, "VOLUME_UP"));
+    assert(is(route(p, Key::VOL_DOWN, true, false), Target::TV_KEY, "VOLUME_DOWN"));
+    assert(is(route(p, Key::MUTE, true, false), Target::TV_KEY, "VOLUME_MUTE"));
+    assert(is(route(p, Key::VOL_UP, false, false), Target::SOUNDBAR_IR, "VOL_UP"));
+    assert(is(route(p, Key::MUTE, false, false), Target::SOUNDBAR_IR, "MUTE"));
+  }
+  assert(is(volume_action(Key::VOL_DOWN, true), Target::TV_KEY, "VOLUME_DOWN"));
+  assert(is(route(Page::TV, Key::ROLL_UP, true, false), Target::TV_KEY, "VOLUME_UP"));
+}
+
+static Charge feed_all(ChargeTracker &t, std::initializer_list<int> mvs) {
+  Charge c = t.get();
+  for (int mv : mvs) c = t.feed(mv, true);
+  return c;
+}
+static void charge_idle_battery_is_not_charging() {
+  ChargeTracker t{};
+  // resting readings drifting down, with the small recovery a cell shows after a session
+  assert(feed_all(t, {3900, 3895, 3880, 3900, 3890, 3870, 3895}) == Charge::NONE);
+  assert(t.feed(3840, false) == Charge::NONE);   // awake: the load pulls it down
+  assert(t.feed(3890, true) == Charge::NONE);
+}
+static void charge_plug_in_then_unplug() {
+  ChargeTracker t{};
+  assert(feed_all(t, {3800, 3795}) == Charge::NONE);
+  assert(t.feed(3850, true) == Charge::CHARGING);            // the step when the charger goes on
+  assert(feed_all(t, {3870, 3900, 3940}) == Charge::CHARGING);
+  assert(t.feed(3925, false) == Charge::CHARGING);           // picked up and used while on the charger
+  assert(t.feed(3890, true) == Charge::NONE);                // unplugged mid-charge: off, not "full"
+  assert(feed_all(t, {3885, 3880}) == Charge::NONE);
+}
+static void charge_seen_while_awake() {
+  ChargeTracker t{};
+  t.feed(3800, true);
+  assert(t.feed(3770, false) == Charge::NONE);
+  assert(t.feed(3840, false) == Charge::CHARGING);           // plugged in with the screen on
+  assert(t.feed(3850, false) == Charge::CHARGING);
+  assert(t.feed(3780, false) == Charge::NONE);               // pulled off again, still awake
+  assert(t.feed(3810, true) == Charge::NONE);                // the resting reading after must not re-trigger
+  assert(t.feed(3815, true) == Charge::NONE);
+}
+static void charge_full_then_times_out() {
+  ChargeTracker t{};
+  t.feed(4000, true);
+  assert(feed_all(t, {4060, 4120, 4170, 4195}) == Charge::CHARGING);
+  assert(feed_all(t, {4200, 4198}) == Charge::CHARGING);
+  assert(t.feed(4201, true) == Charge::FULL);                // flat near 4.2 V
+  for (int i = 0; i < CHG_FULL_POLLS - 1; i++) assert(t.feed(4190, true) == Charge::FULL);
+  assert(t.feed(4190, true) == Charge::NONE);                // an hour later the light goes off
+  assert(t.feed(4185, true) == Charge::NONE);
+}
+static void charge_charger_stops_at_the_top() {
+  ChargeTracker t{};
+  t.feed(4050, true);
+  assert(feed_all(t, {4110, 4180, 4205}) == Charge::CHARGING);
+  assert(t.feed(4160, true) == Charge::FULL);                // the chip ended the charge: the cell relaxes
+  assert(t.feed(4155, true) == Charge::FULL);
+  assert(t.feed(4020, true) == Charge::NONE);                // clearly in use off the charger
+}
+static void charge_gives_up_after_12_hours() {
+  ChargeTracker t{};
+  t.feed(3700, true);
+  assert(t.feed(3760, true) == Charge::CHARGING);
+  Charge c = Charge::CHARGING;
+  for (int i = 0; i <= CHG_MAX_POLLS; i++) c = t.feed(3760, true);
+  assert(c == Charge::NONE);
+}
+
 int main() {
+  volume_setting_applies_on_every_page();
+  charge_idle_battery_is_not_charging();
+  charge_plug_in_then_unplug();
+  charge_seen_while_awake();
+  charge_full_then_times_out();
+  charge_charger_stops_at_the_top();
+  charge_gives_up_after_12_hours();
   tv_volume_goes_to_soundbar_by_default();
   tv_dpad_and_channels_go_to_tv();
   soundbar_page_is_all_ir();

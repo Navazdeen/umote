@@ -12,7 +12,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import AREA
 from .coordinator import UmoteCoordinator
-from .home import build_tiles
+from .home import build_home
 
 
 def _json(value) -> str:
@@ -52,11 +52,12 @@ class HomeSensor(SensorEntity):
     _attr_name = "umote home"
     _attr_icon = "mdi:sofa"
     _attr_should_poll = False
-    _unrecorded_attributes = frozenset({"tiles"})
+    _unrecorded_attributes = frozenset({"tiles", "members"})
 
     def __init__(self) -> None:
         self.entity_id = "sensor.umote_home"
         self._tiles: list[dict] = []
+        self._members: dict[str, list[dict]] = {}
         self._ids: set[str] = set()
 
     async def async_added_to_hass(self) -> None:
@@ -84,13 +85,15 @@ class HomeSensor(SensorEntity):
         devs = dr.async_get(self.hass)
         entities = [{"entity_id": e.entity_id, "device_id": e.device_id, "area_id": e.area_id,
                      "entity_category": e.entity_category, "hidden_by": e.hidden_by,
+                     "name": e.name or e.original_name,
                      "disabled_by": e.disabled_by} for e in ents.entities.values()]
         devices = {d.id: {"id": d.id, "name": d.name, "name_by_user": d.name_by_user, "area_id": d.area_id}
                    for d in devs.devices.values()}
         states = {s.entity_id: {"state": s.state, "attributes": dict(s.attributes)}
                   for s in self.hass.states.async_all(("fan", "light", "switch", "number"))}
-        self._tiles = build_tiles(entities, devices, states, AREA)
+        self._tiles, self._members = build_home(entities, devices, states, AREA)
         self._ids = {i for t in self._tiles for i in t["entities"]}
+        self._ids |= {t["options"]["brightness"] for t in self._tiles if t["options"].get("brightness")}
 
     @property
     def native_value(self) -> int:
@@ -98,4 +101,4 @@ class HomeSensor(SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict:
-        return {"tiles": _json(self._tiles)}
+        return {"tiles": _json(self._tiles), "members": _json(self._members)}

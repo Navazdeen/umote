@@ -14,10 +14,51 @@ def _short(device: dict) -> str:
     for p in AREA_PREFIXES:
         if name.lower().startswith(p):
             name = name[len(p):]
-    words = name.split()
+    return _sentence(name)
+
+
+def _sentence(name: str) -> str:
     # Sentence case, keeping acronyms such as "TV".
-    words = [w if w.isupper() and len(w) > 1 else w.lower() for w in words]
+    words = [w if w.isupper() and len(w) > 1 else w.lower() for w in name.split()]
     return " ".join(words)[:1].upper() + " ".join(words)[1:]
+
+
+def _member_name(entity: dict, device: dict, states: dict) -> str:
+    """A light's or switch's own name without its device's: "TV Cabinet Light 1" -> "Light 1"."""
+    eid = entity["entity_id"]
+    raw = (entity.get("name") or states.get(eid, {}).get("attributes", {}).get("friendly_name")
+           or eid.split(".", 1)[1])
+    name = " ".join(raw.replace("_", " ").split())
+    prefixes = {(device.get(k) or "").replace("_", " ").lower().strip() for k in ("name", "name_by_user")} - {""}
+    stripped = True
+    while stripped:
+        stripped = False
+        for p in sorted(prefixes, key=len, reverse=True):
+            if name.lower().startswith(p + " "):
+                name, stripped = name[len(p) + 1:], True
+    return _sentence(name)
+
+
+def _member(entity: dict, device: dict, states: dict) -> dict:
+    """One row of the remote's device menu: name, state, and brightness in percent when it dims."""
+    st = states.get(entity["entity_id"], {})
+    state, attrs = st.get("state", "unavailable"), st.get("attributes", {})
+    m = {"n": _member_name(entity, device, states), "s": "offline" if state in OFFLINE else state}
+    if any(mode != "onoff" for mode in attrs.get("supported_color_modes") or ()):
+        m["b"] = round((attrs.get("brightness") or 0) * 100 / 255) if state == "on" else 0
+    return m
+
+
+def _number_member(entity_id: str, states: dict) -> dict:
+    st = states.get(entity_id, {})
+    attrs = st.get("attributes", {})
+    lo, hi = attrs.get("min", 0), attrs.get("max", 100)
+    try:
+        pct = round((float(st.get("state")) - lo) * 100 / (hi - lo))
+    except (TypeError, ValueError, ZeroDivisionError):
+        pct = 0
+    return {"n": "Brightness", "s": "offline" if st.get("state", "unavailable") in OFFLINE else "on",
+            "b": max(0, min(100, pct)), "lo": lo, "hi": hi}
 
 
 def _state(ids: list[str], states: dict) -> tuple[str, int]:
@@ -36,6 +77,15 @@ def _tile(dev_id, suffix, name, kind, icon, ids, states, label_on, options):
 
 
 def build_tiles(entities: list[dict], devices: dict[str, dict], states: dict[str, dict], area: str) -> list[dict]:
+    return build_home(entities, devices, states, area)[0]
+
+
+def build_home(entities: list[dict], devices: dict[str, dict], states: dict[str, dict],
+               area: str) -> tuple[list[dict], dict[str, list[dict]]]:
+    """(tiles, members). members[tile id] lists what the tile's menu shows, in the order of the
+    tile's entities: one row per light or switch, or the display's brightness."""
+    by_id = {e["entity_id"]: e for e in entities}
+    members: dict[str, list[dict]] = {}
     by_dev: dict[str, list[str]] = {}
     for e in entities:
         dev = devices.get(e.get("device_id") or "", {})
@@ -65,12 +115,16 @@ def build_tiles(entities: list[dict], devices: dict[str, dict], states: dict[str
         if switches and numbers and not lights:
             tiles.append(_tile(dev_id, "display", name, "display", "clock", switches[:1], states,
                                lambda _on: "On", {"brightness": numbers[0]}))
+            members[tiles[-1]["id"]] = [_number_member(numbers[0], states)]
             continue
         if lights:
             tiles.append(_tile(dev_id, "lights", f"{name} lights", "lights", "bulb", lights, states,
                                lambda on: f"{on} on", {}))
+            members[tiles[-1]["id"]] = [_member(by_id[i], devices.get(dev_id, {}), states) for i in lights]
         if switches:
             tiles.append(_tile(dev_id, "switches", f"{name} power", "switches", "plug", switches, states,
                                lambda on: f"{on} on", {}))
-    tiles.sort(key=lambda t: (t["state"] != "on", t["name"].lower()))
-    return tiles
+            members[tiles[-1]["id"]] = [_member(by_id[i], devices.get(dev_id, {}), states) for i in switches]
+    # A fixed order: sorting "on" first made every tile jump the moment it was tapped.
+    tiles.sort(key=lambda t: (t["name"].lower(), t["id"]))
+    return tiles, members

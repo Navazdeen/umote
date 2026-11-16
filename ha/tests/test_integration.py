@@ -26,13 +26,17 @@ def fast(monkeypatch):
 
 class MockAdb:
     def __init__(self, hass: HomeAssistant):
-        self.hass, self.up = hass, True
+        self.hass, self.up, self.commands = hass, True, []
         hass.states.async_set(TV_REMOTE, "on", {"current_activity": "com.netflix.ninja"})
         hass.states.async_set(TV_ADB, "playing", {})
         hass.services.async_register("androidtv", "adb_command", self._cmd)
 
     async def _cmd(self, call: ServiceCall):
         if not self.up:
+            return
+        self.commands.append(call.data["command"])
+        if call.data["command"] not in RESPONSES:
+            self.hass.states.async_set(TV_ADB, "playing", {"adb_response": ""})
             return
         self.hass.states.async_set(TV_ADB, "playing", {"adb_response": fx(RESPONSES[call.data["command"]])})
 
@@ -87,17 +91,25 @@ async def test_coordinator_keeps_last_sources_when_adb_unavailable(hass, mock_ad
     assert "ERROR" not in caplog.text
 
 
-async def test_launch_input_sends_home_then_passthrough(hass, mock_adb):
-    await setup(hass)      # media_player loads first, then the mocks replace its services
+async def test_launch_goes_over_adb(hass, mock_adb):
+    """Android TV Remote's "open app" does nothing on this TV, and HOME + play_media is slow."""
+    await setup(hass)
     order = []
     hass.services.async_register("remote", "send_command", lambda c: order.append(("remote", c.data["command"])))
     hass.services.async_register("media_player", "play_media",
                                  lambda c: order.append((c.data["media_content_type"], c.data["media_content_id"])))
+    url = "content://android.media.tv/passthrough/com.mediatek.tvinput%2F.hdmi.HDMIInputService%2FHW4"
+    for sid, command in (("com.netflix.ninja", "monkey -p com.netflix.ninja -c android.intent.category.LEANBACK_LAUNCHER 1"),
+                         ("tuner", "monkey -p com.mediatek.wwtv.tvcenter -c android.intent.category.LEANBACK_LAUNCHER 1"),
+                         ("hdmi1", "am start -a android.intent.action.VIEW -d " + url)):
+        await hass.services.async_call(DOMAIN, "launch", {"source_id": sid}, blocking=True)
+        assert mock_adb.commands[-1] == command
+    assert order == []
+    mock_adb.up = False                               # ADB down, TV still on: the old path
+    hass.states.async_set(TV_ADB, "unavailable", {})
     await hass.services.async_call(DOMAIN, "launch", {"source_id": "hdmi1"}, blocking=True)
-    assert order == [("remote", "HOME"), ("url", "content://android.media.tv/passthrough/"
-                                                  "com.mediatek.tvinput%2F.hdmi.HDMIInputService%2FHW4")]
     await hass.services.async_call(DOMAIN, "launch", {"source_id": "com.netflix.ninja"}, blocking=True)
-    assert order[-1] == ("app", "com.netflix.ninja")
+    assert order == [("remote", "HOME"), ("url", url), ("remote", "HOME"), ("app", "com.netflix.ninja")]
 
 
 async def test_launch_unknown_source_raises(hass, mock_adb):
@@ -145,7 +157,10 @@ async def test_home_sensor_lists_living_room_tiles(hass, mock_adb):
         "TV fan", "Fridge fan", "Clock fan", "Cabinet lights", "Cabinet power", "Matrix clock"}
     hass.states.async_set("fan.tv_fan", "on", {"percentage": 50, "percentage_step": 16.67})
     await hass.async_block_till_done()
-    assert json.loads(hass.states.get("sensor.umote_home").attributes["tiles"])[0]["label"] == "Speed 3"
+    attrs = hass.states.get("sensor.umote_home").attributes
+    assert next(t for t in json.loads(attrs["tiles"]) if t["name"] == "TV fan")["label"] == "Speed 3"
+    lights = next(t for t in json.loads(attrs["tiles"]) if t["name"] == "Cabinet lights")
+    assert [m["n"] for m in json.loads(attrs["members"])[lights["id"]]][0] == "Bottom light"
 
 
 async def test_artwork_entity_unavailable_without_art(hass, mock_adb):

@@ -1,7 +1,7 @@
 import json
 
 from conftest import FIX
-from custom_components.umote.home import build_tiles
+from custom_components.umote.home import build_home, build_tiles
 
 REG = json.loads((FIX / "registry.json").read_text())
 FANS = ("fan.tv_fan", "fan.fridge_fan", "fan.clock_fan")
@@ -42,7 +42,36 @@ def test_fan_label_shows_speed_when_on():
     ts = tiles(**{"fan.tv_fan": on})
     assert tile(ts, "TV fan")["label"] == "Speed 3" and tile(ts, "TV fan")["state"] == "on"
     assert tile(ts, "Fridge fan")["label"] == "Off"
-    assert ts[0]["name"] == "TV fan"                 # on tiles first
+
+
+def test_order_does_not_change_when_a_tile_turns_on():
+    names = [t["name"] for t in tiles()]
+    assert names == sorted(names, key=str.lower)
+    on = {"state": "on", "attributes": {"percentage": 50, "percentage_step": 16.666666666666668}}
+    assert [t["name"] for t in tiles(**{"fan.tv_fan": on, CAB_LIGHTS[4]: {"state": "on", "attributes": {}}})] == names
+
+
+def test_members_list_each_light_with_brightness():
+    dim = {"supported_color_modes": ["brightness"]}
+    st = states(**{CAB_LIGHTS[0]: {"state": "on", "attributes": {**dim, "brightness": 128,
+                                                              "friendly_name": "tv_cabinet TV Cabinet Light 1"}},
+                   CAB_LIGHTS[4]: {"state": "unavailable", "attributes": {}}})
+    ts, members = build_home(REG["entities"], REG["devices"], st, "living_room")
+    lights = tile(ts, "Cabinet lights")
+    rows = dict(zip(lights["entities"], members[lights["id"]]))
+    assert rows[CAB_LIGHTS[0]] == {"n": "Light 1", "s": "on", "b": 50}
+    assert rows[CAB_LIGHTS[1]] == {"n": "Light 2", "s": "off"}            # not dimmable: no slider
+    assert rows[CAB_LIGHTS[4]] == {"n": "Bottom light", "s": "offline"}
+    power = tile(ts, "Cabinet power")
+    assert [m["n"] for m in members[power["id"]]] == ["Relay 1", "Relay 2", "Relay 3"]
+    assert tile(ts, "TV fan")["id"] not in members
+
+
+def test_display_member_is_its_brightness():
+    num = "number.living_room_weather_matrix_matrix_brightness"
+    st = states(**{num: {"state": "64", "attributes": {"min": 0, "max": 255}}})
+    ts, members = build_home(REG["entities"], REG["devices"], st, "living_room")
+    assert members[tile(ts, "Matrix clock")["id"]] == [{"n": "Brightness", "s": "on", "b": 25, "lo": 0, "hi": 255}]
 
 
 def test_unavailable_is_offline_not_off():

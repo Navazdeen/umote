@@ -14,7 +14,7 @@ from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
 
-from .const import (CMD_HDMI, CMD_PACKAGES, CMD_TV_INPUT, DOMAIN, HOME_SETTLE_S, MAX_ATTR_BYTES,
+from .const import (CMD_HDMI, CMD_LAUNCH, CMD_PACKAGES, CMD_VIEW, CMD_TV_INPUT, DOMAIN, HOME_SETTLE_S, MAX_ATTR_BYTES,
                     SCAN_INTERVAL_S, SYSTEM_PACKAGES, TV_ADB, TV_PLAYER, TV_REMOTE, USE_AFTER_S,
                     WAKE_TIMEOUT_S)
 from .sources import build_sources, source_id_for_activity
@@ -184,13 +184,19 @@ class UmoteCoordinator(DataUpdateCoordinator[dict]):
                     await asyncio.sleep(0.5)
         except TimeoutError as err:
             raise HomeAssistantError("The TV did not wake up") from err
-        await self.hass.services.async_call("remote", "send_command",
-                                            {"entity_id": TV_REMOTE, "command": "HOME"}, blocking=True)
-        await asyncio.sleep(HOME_SETTLE_S)
-        kind, content = ("url", src["target"]) if src["kind"] == "input" else ("app", src["target"])
-        await self.hass.services.async_call("media_player", "play_media",
-                                            {"entity_id": TV_PLAYER, "media_content_type": kind,
-                                             "media_content_id": content}, blocking=True)
+        # Everything starts over ADB (1-3 s). Android TV Remote's "open app" (a market:// link) reports
+        # success on this TV and does nothing, and HOME + settle + play_media took about 10 s for an
+        # input. That path stays as the fallback for when ADB is down.
+        command = (CMD_VIEW.format(url=src["target"]) if src["kind"] == "input"
+                   else CMD_LAUNCH.format(package=src["target"]))
+        if await self._adb(command) is None:
+            await self.hass.services.async_call("remote", "send_command",
+                                                {"entity_id": TV_REMOTE, "command": "HOME"}, blocking=True)
+            await asyncio.sleep(HOME_SETTLE_S)
+            kind = "url" if src["kind"] == "input" else "app"
+            await self.hass.services.async_call("media_player", "play_media",
+                                                {"entity_id": TV_PLAYER, "media_content_type": kind,
+                                                 "media_content_id": src["target"]}, blocking=True)
         self.count_use(source_id)
         self.async_set_updated_data(self._publish(True))
 

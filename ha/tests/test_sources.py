@@ -37,9 +37,10 @@ def test_input_name_priority():
     assert s["hdmi1"]["icon"] == "ps5" and s["hdmi1"]["color"] == "#00439c" and s["hdmi2"]["icon"] == "hdmi"
 
 
-def test_apps_ordered_by_uses_then_name():
+def test_apps_ordered_by_last_use_then_uses():
     apps = [s["id"] for s in build()["sources"] if s["kind"] == "app"]
-    assert apps[:3] == ["com.netflix.ninja", "com.amazon.amazonvideo.livingroom", "in.startv.hotstar"]
+    assert apps[:3] == ["com.netflix.ninja", "in.startv.hotstar", "com.amazon.amazonvideo.livingroom"]
+    assert apps[3] == "com.sonyliv"                  # never used: after the used ones, before stale
 
 
 def test_apps_unused_30_days_go_to_more():
@@ -50,11 +51,14 @@ def test_apps_unused_30_days_go_to_more():
     assert "com.sonyliv" not in out["more"]         # never used = not yet stale
 
 
-def test_quick_row_is_top4_and_always_contains_current():
+def test_quick_row_is_most_recent_with_current_first():
     out = build()
-    assert out["quick"] == ["hdmi1", "com.netflix.ninja", "com.amazon.amazonvideo.livingroom", "org.videolan.vlc"]
-    out = build(current="in.startv.hotstar")
-    assert len(out["quick"]) == 4 and "in.startv.hotstar" in out["quick"] and out["current"] == "in.startv.hotstar"
+    assert out["quick"] == ["hdmi1", "com.netflix.ninja", "in.startv.hotstar", "com.amazon.amazonvideo.livingroom"]
+    out = build(current="com.amazon.amazonvideo.livingroom")      # what's running leads the row
+    assert out["quick"] == ["com.amazon.amazonvideo.livingroom", "hdmi1", "com.netflix.ninja", "in.startv.hotstar"]
+    assert out["current"] == "com.amazon.amazonvideo.livingroom"
+    out = build(current="com.sonyliv")                            # even one never used before
+    assert out["quick"][0] == "com.sonyliv" and len(out["quick"]) == 4
 
 
 def test_passthrough_target_is_url_encoded():

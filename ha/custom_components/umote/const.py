@@ -61,3 +61,5 @@ CMD_TV_INPUT = "dumpsys tv_input"
 CMD_HDMI = "dumpsys hdmi_control"
 CMD_PACKAGES = ("cmd package query-activities --brief -a android.intent.action.MAIN "
                 "-c android.intent.category.LEANBACK_LAUNCHER")
+CMD_LAUNCH = "monkey -p {package} -c android.intent.category.LEANBACK_LAUNCHER 1"
+CMD_VIEW = "am start -a android.intent.action.VIEW -d {url}"

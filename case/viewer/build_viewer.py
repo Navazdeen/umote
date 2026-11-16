@@ -65,6 +65,44 @@ def build_v6(version):
     print("built", os.path.join(stl, "viewer.html"), len(page))
 
 
+# v7: python3 case/viewer/build_viewer.py --v7 [version]  ->  case/stl_v7/viewer.html
+V7_PRINT = [("t0_screw_gauge", "Test 0: screw gauge", "print first: drive an M2 into each hole (notches: 1 = 1.7 ... 5 = 2.1)"),
+            ("t1_wheel_zone", "Test 1: wheel zone", "print first: EC11 in its U-slot, wheel, both plates' edges, tongues"),
+            ("t2_bottom_end", "Test 2: bottom end", "print first: contact plate slot, eyelet, key plate screws"),
+            ("shell", "Front shell (face + walls)", "face down, smooth plate; already turned corner to corner for a 220 bed"),
+            ("head_back", "Head back plate", "outside down, textured plate"), ("key_back", "Key back plate (battery door)", "outside down, textured plate"),
+            ("wheel", "Roller wheel", "on its side"), ("caps", "Caps + rockers", "flange down"),
+            ("dpad_ring", "D-pad ring", "face down (accent colour)"),
+            ("pogo_plate_a", "Contact plate A: pads + magnets", "standing on its bottom"),
+            ("pogo_plate_b", "Contact plate B: magnetic connector", "standing [CHECK connector size]"),
+            ("dock", "Charging dock", "base down"),
+            ("dock_plate_a", "Dock plate A: P75 probes + magnets", "bottom down"), ("dock_plate_b", "Dock plate B: connector", "bottom down")]
+# explode: the shell stays; both plates drop off the back (the key plate along its 45 deg line),
+# the roller parts and the contact plate drop out of the back, caps and ring lift out of the face
+V7_ASM = {"asm_shell": [0x1b1e23, .35, 0], "asm_head_back": [0xd9d6cf, .65, -2.0], "asm_key_back": [0xd9d6cf, .65, [0, 1.0, -2.0]],
+          "asm_pogo_plate_a": [0xc9a227, .4, -1.0], "asm_dock_plate_a": [0x4a5058, .6, [0, 2.0, 0]],
+          "asm_dpad_ring": [0xd9772b, .55, 1.0], "asm_wheel": [0xd9772b, .55, -1.2], "asm_ec11": [0x9aa3ad, .35, -1.2],
+          "asm_nut": [0x9aa3ad, .35, -1.2], "asm_carrier": [0x2f7d32, .7, -1.2], "caps_asm": [0x2a2e35, .6, 2.0],
+          "asm_dock": [0x2c3036, .6, [0, 2.6, 0]]}
+
+
+def build_v7(version):
+    here = os.path.dirname(os.path.abspath(__file__)); stl = os.path.join(here, "..", "stl_v7")
+    meshes, look = {}, {}
+    for f, lk in V7_ASM.items():
+        k = {"asm_dock": "dock", "asm_dock_plate_a": "dock_plate"}.get(f, f)
+        import trimesh                                   # binary STL: a fifth of OpenSCAD's ASCII, so the page stays small
+        meshes[k] = base64.b64encode(trimesh.load(os.path.join(stl, f + ".stl"), force="mesh").export(file_type="stl")).decode(); look[k] = lk
+    rows = "".join(f'<li><a href="{f}.stl" download>{n}</a><span>{os.path.getsize(os.path.join(stl, f + ".stl")) / 1e6:.1f} MB · {o}</span></li>' for f, n, o in V7_PRINT)
+    page = open(os.path.join(here, "viewer_v5_template.html")).read()
+    page = page.replace("%%VERSION%%", version).replace("%%FILES%%", rows).replace("%%MESHES%%", json.dumps(meshes)).replace("%%LOOK%%", json.dumps(look)).replace("umote case v5", "umote case v7").replace(">Crease<", ">Wheel<").replace("</style>", ':root[data-theme="dark"] { --bg: #15171a; --bg2: #1d2024; --ink: #e9e7e2; --muted: #9aa3ad; --line: #353a41; }\n</style>').replace("Every part prints without supports; orientations are in the list.", "One front shell, two flat back plates. Every part prints without supports; orientations are in the list. Slide Explode to see the order everything goes in from the back.")
+    open(os.path.join(stl, "viewer.html"), "w").write(page)
+    print("built", os.path.join(stl, "viewer.html"), len(page))
+
+
+if "--v7" in sys.argv:
+    build_v7(sys.argv[sys.argv.index("--v7") + 1] if len(sys.argv) > sys.argv.index("--v7") + 1 else "v7")
+    sys.exit(0)
 if "--v6" in sys.argv:
     build_v6(sys.argv[sys.argv.index("--v6") + 1] if len(sys.argv) > sys.argv.index("--v6") + 1 else "v6")
     sys.exit(0)

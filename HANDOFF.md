@@ -4,6 +4,22 @@ A battery-powered remote built around the **LCDwiki E32R24P** (ESP32-32E, 2.4" S
 
 > **Latest (2026-11-01):** remote UI + Home Assistant integration shipped and running on the remote. See [`docs/HANDOFF-2026-11-01-remote-ui.md`](docs/HANDOFF-2026-11-01-remote-ui.md); it supersedes the firmware rows below.
 
+## 2026-11-13 session: case v7 "Keel" (overrides the v6 case section below)
+
+The user printed v6.1 in full: the display half stopped short of the key half (0.15 mm tenon fits, entering at the bend), the M2 pilots were too small (drawn 1.7), and the bend itself was unclear. They asked to scrap the bend. v7 is straight, with a shallow V back.
+
+Spec and as-built record: `docs/superpowers/specs/2026-11-13-remote-case-v7-design.md`. Code: `case/v7/`.
+
+- **Parts**: `shell` (face + walls, one piece, face down, already turned corner to corner), `head_back` and `key_back` (flat plates, outside down; the key plate is the battery door), plus v6's wheel, caps, D-pad ring, contact plates and dock.
+- **Shape**: 52 × 225.4; 15.6 thick at the tip, 20.5 at the keel line (y 101.5), 16.6 at the end.
+- **Hardware**: 4 × M2 × 12 and 4 × M2 × 8, all countersunk, all from the back. Pilots drawn 1.9, fits 0.25 to 0.3.
+- **Print first**: `t0_screw_gauge` (tell Claude which hole bites: `m2[0]` in `case/v7/params.scad`), `t1_wheel_zone`, `t2_bottom_end`.
+- **Assembly**: everything from the back; the order is in the spec, section 6.
+- **Checks**: `case/v7/export.sh all`; `python3 -m pytest case/tests/test_v7.py` (49 green); `python3 case/fit_check_v7.py` (no collisions).
+- **Release**: `release/v7.0/` (14 STLs, viewer, zip, SHA256SUMS.txt), on copyparty at `/stl/v7.0/` (SHA-256 checked) and in `C:\Users\navazdeen.shamsu\Downloads\umote_case_v7\`. Viewer: `python3 case/viewer/build_viewer.py --v7 v7.0`.
+- **v6 bug found**: v5/v6 face-down panels were exported with a mirror, so the printed key panel is a mirror image (POWER's hole on the mic's side). v7 uses a true flip and tests it.
+- **Open**: the [CHECK] list in the spec, section 8.
+
 ## 2026-11-05 session: case v6 (overrides the v5 case section below)
 
 The user printed v5.1 in full and it failed in the hand:

@@ -4,7 +4,8 @@
 # Environment variables:
 #   SIM_STATE = normal | noboard | saver | critical     SIM_PAGE = 0..3     SIM_TOAST = text
 #   SIM_FIXTURE = boot | art | noart_ps5 | off | live | long_title | stale | sheet | new_hdmi |
-#                 soundbar | home | home_focus_each | options_fan | picker
+#                 soundbar | home | home_focus_each | options_fan | options_lights | options_switches |
+#                 options_display | picker
 #   SIM_TEXT = large    the Large text size
 #   SIM_DUMP = <path>   write the visible widget tree for tools/check_ui.py, then exit
 
@@ -111,6 +112,10 @@ script:
     parameters: { code: string }
     then:
       - lambda: 'ui::toast("IR " + code);'
+  - id: ui_volume
+    parameters: { code: string }
+    then:
+      - lambda: 'ui::toast(std::string(id(g_vol_to_tv) ? "TV " : "IR ") + code);'
   - id: ui_ha
     parameters: { kind: string, entities: string, value: string }
     then:

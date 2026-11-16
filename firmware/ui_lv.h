@@ -73,7 +73,9 @@ struct Hooks {
   std::function<void(int, const std::string &, bool)> name_source;  // port, name, switch to it
   std::function<void(int)> page_shown;                          // page index
   std::function<void(const std::string &)> sb_ir;               // soundbar IR code name
-  // Home Assistant call: kind = "toggle" | "on" | "off" | "fan_pct" | "timer"; entities comma-separated.
+  std::function<void(const std::string &)> volume;              // on-screen "VOL_UP" | "VOL_DOWN" | "MUTE"
+  // Home Assistant call: kind = "toggle" | "on" | "off" | "fan_pct" | "timer" | "bri" (light
+  // brightness, value in percent) | "number" (value as is); entities comma-separated.
   std::function<void(const std::string &, const std::string &, const std::string &)> ha;
   std::function<void()> wifi_scan;
   std::function<void(const std::string &, const std::string &)> wifi_join;   // ssid, password
@@ -147,21 +149,22 @@ inline void set_icon(lv_obj_t *im, const std::string &name, int px) {
 }
 
 using Tap = std::function<void()>;
-inline void on_tap(lv_obj_t *o, Tap fn) {
+// LV_EVENT_CLICKED also fires when a long press is released; an object with its own long-press
+// action takes LV_EVENT_SHORT_CLICKED instead.
+inline void on_tap(lv_obj_t *o, Tap fn, lv_event_code_t code = LV_EVENT_CLICKED) {
   lv_obj_add_flag(o, LV_OBJ_FLAG_CLICKABLE);
   auto *heap = new Tap(std::move(fn));
-  lv_obj_add_event_cb(o, [](lv_event_t *e) { (*static_cast<Tap *>(lv_event_get_user_data(e)))(); },
-                      LV_EVENT_CLICKED, heap);
+  lv_obj_add_event_cb(o, [](lv_event_t *e) { (*static_cast<Tap *>(lv_event_get_user_data(e)))(); }, code, heap);
   lv_obj_add_event_cb(o, [](lv_event_t *e) { delete static_cast<Tap *>(lv_event_get_user_data(e)); },
                       LV_EVENT_DELETE, heap);
 }
 
 // Rounded button; pressed state dims it. Returns the button.
 inline lv_obj_t *button(lv_obj_t *parent, int x, int y, int w, int h, uint32_t bg, lv_opa_t opa, int radius,
-                        Tap fn) {
+                        Tap fn, lv_event_code_t code = LV_EVENT_CLICKED) {
   lv_obj_t *b = box(parent, x, y, w, h, bg, opa, radius);
   lv_obj_set_style_bg_opa(b, opa > LV_OPA_50 ? (lv_opa_t) LV_OPA_70 : (lv_opa_t) (opa + 30), LV_STATE_PRESSED);
-  on_tap(b, std::move(fn));
+  on_tap(b, std::move(fn), code);
   return b;
 }
 
@@ -176,6 +179,19 @@ inline lv_obj_t *text_button(lv_obj_t *parent, int x, int y, int w, int h, const
 inline void show(lv_obj_t *o, bool on) {
   if (on) lv_obj_remove_flag(o, LV_OBJ_FLAG_HIDDEN);
   else lv_obj_add_flag(o, LV_OBJ_FLAG_HIDDEN);
+}
+
+// A sheet slides up from the bottom edge to where it was built.
+inline void slide_in(lv_obj_t *sheet) {
+  lv_obj_update_layout(sheet);
+  lv_anim_t a;
+  lv_anim_init(&a);
+  lv_anim_set_var(&a, sheet);
+  lv_anim_set_exec_cb(&a, [](void *o, int32_t v) { lv_obj_set_y((lv_obj_t *) o, v); });
+  lv_anim_set_values(&a, 320, lv_obj_get_y(sheet));
+  lv_anim_set_duration(&a, 180);
+  lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
+  lv_anim_start(&a);
 }
 
 // ---- data from Home Assistant ------------------------------------------------------------------------
@@ -249,6 +265,7 @@ inline void build_status() {
 inline lv_obj_t *banner, *banner_text, *toast_box, *toast_text;
 inline lv_timer_t *toast_timer;
 
+constexpr int BANNER_PAD = 9;
 // Battery / button-board warning replaces the status icons; empty text hides it.
 inline void set_status(int batt_pct, bool wifi_up, const char *warning, uint32_t warn_color) {
   if (!ready) return;
@@ -258,14 +275,21 @@ inline void set_status(int batt_pct, bool wifi_up, const char *warning, uint32_t
   show(chrome.batt, !warn);
   show(banner, warn);
   if (warn) {
+    // the pill takes the width of its text and keeps its right edge
     lv_label_set_text(banner_text, warning);
+    lv_obj_update_layout(banner_text);
+    int w = lv_obj_get_width(banner_text) + 2 * BANNER_PAD, h = lv_obj_get_height(banner_text) + 6;
+    lv_obj_set_size(banner, w, h);
+    lv_obj_set_pos(banner, 236 - w, 10);
+    lv_obj_set_style_radius(banner, h / 2, 0);
+    lv_obj_center(banner_text);
     lv_obj_set_style_bg_color(banner, lv_color_hex(warn_color), 0);
   }
 }
 
 inline void build_overlays() {
   banner = nm(box(lv_layer_top(), 136, 10, 100, 22, 0xE5484D, LV_OPA_COVER, 11), "banner");
-  banner_text = text(banner, 0, 3, 100, R.f12s, WHITE, "", LV_TEXT_ALIGN_CENTER);
+  banner_text = nm(text(banner, 0, 3, 0, R.f12s, WHITE, ""), "banner_text");
   show(banner, false);
   toast_box = nm(box(lv_layer_top(), 20, 132, 200, 44, CARD, 235, 12), "toast");
   toast_text = text(toast_box, 8, 13, 184, R.f14s, WHITE, "", LV_TEXT_ALIGN_CENTER);
@@ -591,11 +615,13 @@ inline void drop_modal(lv_obj_t *&m) {
 }
 inline void destroy_sheets();
 inline void destroy_options();
+inline void destroy_group();
 inline void destroy_picker();
 inline void close_sheets() {
   for (auto *m : modals()) show(m, false);
   destroy_sheets();
   destroy_options();
+  destroy_group();
   destroy_picker();
 }
 inline void build_sheets();
@@ -787,7 +813,7 @@ inline void build_soundbar(lv_obj_t *page) {
   for (int i = 0; i < 3; i++) {
     std::string code = vols[i].code;
     lv_obj_t *b = nm(button(page, 12 + 75 * i, 178, 66, 64, CARD, LV_OPA_COVER, 12, [code] {
-                       if (hooks.sb_ir) hooks.sb_ir(code);
+                       if (hooks.volume) hooks.volume(code);   // soundbar or TV: Settings > Buttons
                      }), vols[i].id);
     icon(b, vols[i].icon, 24, 21, 12, WHITE);
     text(b, 0, 38, 66, R.f12, WHITE, vols[i].label, LV_TEXT_ALIGN_CENTER, 204);
@@ -796,12 +822,19 @@ inline void build_soundbar(lv_obj_t *page) {
 
 // ---- Home page ------------------------------------------------------------------------------------------
 struct Tile {
-  std::string id, name, kind, icon, state, label, entities, led, timer;
+  std::string id, name, kind, icon, state, label, entities, led, timer, brightness;
   int speed_count = 0;
+};
+// One row of a tile's menu (a light, a relay, a display's brightness), in the order of the tile's entities.
+struct Member {
+  std::string name, state;
+  int bri = -1;            // percent; -1 = no brightness
+  float lo = 0, hi = 100;  // a number's range
 };
 struct HomePage {
   lv_obj_t *page, *grid;
   std::vector<Tile> tiles;
+  std::map<std::string, std::vector<Member>> members;   // by tile id
   std::vector<lv_obj_t *> objs;
   int focus = 0;
   int64_t updated_ms = 0;
@@ -828,9 +861,28 @@ inline void parse_tiles(const std::string &json) {
     tile.led = t["options"]["led"] | "";
     tile.timer = t["options"]["timer"] | "";
     tile.speed_count = t["options"]["speed_count"] | 0;
+    tile.brightness = t["options"]["brightness"] | "";
     hp.tiles.push_back(tile);
   }
   if (hp.focus >= (int) hp.tiles.size()) hp.focus = 0;
+}
+
+inline void parse_members(const std::string &json) {
+  JsonDocument doc;
+  if (deserializeJson(doc, json)) return;
+  hp.members.clear();
+  for (JsonPair kv : doc.as<JsonObject>()) {
+    std::vector<Member> &list = hp.members[kv.key().c_str()];
+    for (JsonObject m : kv.value().as<JsonArray>()) {
+      Member mem;
+      mem.name = umote::sanitize(m["n"] | "", "Device");
+      mem.state = m["s"] | "off";
+      mem.bri = m["b"] | -1;
+      mem.lo = m["lo"] | 0.0f;
+      mem.hi = m["hi"] | 100.0f;
+      list.push_back(mem);
+    }
+  }
 }
 
 inline void open_options(int i);
@@ -856,21 +908,83 @@ inline void toggle_tile(int i) {
   render_home();
 }
 
+// Press and hold: the tile sinks in a little and a fill sweeps across it until the long press fires
+// (LVGL's 400 ms), so the hold reads as "something is coming". A quick tap never shows it.
+constexpr int TILE_W = 100, TILE_H = 64;
+struct Hold {
+  lv_obj_t *tile = nullptr, *fill = nullptr;
+  int x = 0, y = 0;
+};
+inline Hold hold;
+inline void hold_reset() {
+  if (!hold.tile) return;
+  lv_anim_delete(hold.tile, nullptr);
+  lv_obj_delete(hold.fill);
+  lv_obj_set_pos(hold.tile, hold.x, hold.y);
+  lv_obj_set_size(hold.tile, TILE_W, TILE_H);
+  hold = Hold{};
+}
+inline void hold_start(lv_obj_t *tile, int index, bool on) {
+  hold_reset();
+  hold.tile = tile;
+  hold.x = 12 + 116 * (index % 2);
+  hold.y = 5 + 77 * (index / 2);
+  hold.fill = box(tile, 0, 0, 1, TILE_H, on ? 0x000000 : WHITE, 40, 14);
+  lv_obj_move_to_index(hold.fill, 0);   // behind the icon and the labels
+  lv_anim_t a;
+  lv_anim_init(&a);
+  lv_anim_set_delay(&a, 90);
+  lv_anim_set_duration(&a, 300);
+  lv_anim_set_var(&a, hold.fill);
+  lv_anim_set_exec_cb(&a, [](void *o, int32_t v) { lv_obj_set_width((lv_obj_t *) o, v); });
+  lv_anim_set_values(&a, 1, TILE_W);
+  lv_anim_start(&a);
+  lv_anim_set_var(&a, tile);
+  lv_anim_set_exec_cb(&a, [](void *o, int32_t v) {
+    if (o != hold.tile) return;
+    lv_obj_set_pos(hold.tile, hold.x + v, hold.y + v);
+    lv_obj_set_size(hold.tile, TILE_W - 2 * v, TILE_H - 2 * v);
+  });
+  lv_anim_set_values(&a, 0, 3);
+  lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
+  lv_anim_start(&a);
+}
+
 inline void render_home() {
   if (!ready) return;
+  hold = Hold{};   // its tile goes with the grid
   lv_obj_clean(hp.grid);
   hp.objs.clear();
   for (size_t i = 0; i < hp.tiles.size(); i++) {
     const Tile &t = hp.tiles[i];
     bool on = t.state == "on", off_line = t.state == "offline";
     int x = 12 + 116 * (i % 2), y = 5 + 77 * (i / 2);
-    lv_obj_t *o = nm(button(hp.grid, x, y, 100, 64, on ? 0xF2F2F7 : 0x1F1F22, LV_OPA_COVER, 14, [i] {
+    lv_obj_t *o = nm(button(hp.grid, x, y, TILE_W, TILE_H, on ? 0xF2F2F7 : 0x1F1F22, LV_OPA_COVER, 14, [i] {
                        hp.focus = (int) i;
                        toggle_tile((int) i);
-                     }), "home_tile_" + std::to_string(i));
+                     }, LV_EVENT_SHORT_CLICKED), "home_tile_" + std::to_string(i));
     lv_obj_set_style_outline_color(o, lv_color_hex(YELLOW), 0);
-    lv_obj_add_event_cb(o, [](lv_event_t *e) { open_options((int) (intptr_t) lv_event_get_user_data(e)); },
-                        LV_EVENT_LONG_PRESSED, (void *) (intptr_t) i);
+    lv_obj_add_event_cb(o, [](lv_event_t *e) {
+      int idx = (int) (intptr_t) lv_event_get_user_data(e);
+      switch (lv_event_get_code(e)) {
+        case LV_EVENT_PRESSED:
+          if (idx < (int) hp.tiles.size())
+            hold_start((lv_obj_t *) lv_event_get_target(e), idx, hp.tiles[idx].state == "on");
+          break;
+        case LV_EVENT_LONG_PRESSED:
+          hold_reset();
+          hp.focus = idx;
+          paint_focus();
+          open_options(idx);
+          break;
+        case LV_EVENT_RELEASED:
+        case LV_EVENT_PRESS_LOST:
+          hold_reset();
+          break;
+        default:
+          break;
+      }
+    }, LV_EVENT_ALL, (void *) (intptr_t) i);
     if (off_line) lv_obj_set_style_opa(o, 153, 0);
     lv_obj_t *ib = box(o, 9, 6, 22, 22, on ? 0xFFCC00 : GREY, LV_OPA_COVER, 8);
     icon(ib, t.icon, 14, 4, 4, on ? 0x000000 : WHITE);
@@ -895,6 +1009,7 @@ inline void build_home(lv_obj_t *page) {
   lv_obj_add_flag(hp.grid, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_set_scroll_dir(hp.grid, LV_DIR_VER);
   lv_obj_set_scrollbar_mode(hp.grid, LV_SCROLLBAR_MODE_OFF);
+  lv_obj_add_event_cb(hp.grid, [](lv_event_t *) { hold_reset(); }, LV_EVENT_SCROLL_BEGIN, nullptr);   // a drag is not a hold
 }
 
 // D-pad on the Home page: left/right by one, up/down by a row.
@@ -944,9 +1059,16 @@ inline void destroy_options() {
   drop_modal(op.root);
   op = OptSheet{};
 }
+inline void open_group(const std::string &tile_id);
+// The menu of a tile: speed/timer/LED for a fan, one row per light or relay for a group, power and
+// brightness for a display.
 inline void open_options(int i) {
   if (!ready) return;
-  if (i < 0 || i >= (int) hp.tiles.size() || hp.tiles[i].kind != "fan") return;
+  if (i < 0 || i >= (int) hp.tiles.size()) return;
+  if (hp.tiles[i].kind != "fan") {
+    open_group(hp.tiles[i].id);
+    return;
+  }
   if (!op.root) build_options();
   op.tile_id = hp.tiles[i].id;
   const Tile &t = hp.tiles[i];
@@ -959,6 +1081,7 @@ inline void open_options(int i) {
   lv_label_set_text_fmt(op.of, "of %d", t.speed_count);
   show(op.led_row, !t.led.empty());
   show(op.root, true);
+  slide_in(lv_obj_get_child(op.root, 0));
 }
 
 inline void set_speed(int d) {
@@ -1017,6 +1140,270 @@ inline void build_options() {
                   }), "row_opt_led");
   text(op.led_row, 14, 13, 160, R.f15, WHITE, "LED light");
   op.led_tog = toggle(op.led_row);
+}
+
+// ---- device menu for groups (lights, relays) and displays -----------------------------------------------
+// One 44 px row per thing: name, a brightness slider when it dims, an on/off toggle. A group of
+// several starts with an "All" row. Built for one tile when opened, freed when closed.
+struct GRow {
+  std::string name, entities;   // what the toggle acts on
+  std::string dimmable;         // what the slider acts on (empty: no slider)
+  bool on = false, has_toggle = true, number = false, all = false;
+  int bri = -1;
+  float lo = 0, hi = 100;
+  lv_obj_t *tog = nullptr, *fill = nullptr, *knob = nullptr;
+  int tx = 0, tw = 0;           // slider track, in the row
+};
+struct GroupSheet {
+  lv_obj_t *root = nullptr, *list = nullptr;
+  std::string tile_id;
+  std::vector<GRow> rows;
+  int drag_row = -1, press_x = 0;
+  bool dragging = false;
+};
+inline GroupSheet gs;
+
+inline void destroy_group() {
+  if (!gs.root) return;
+  drop_modal(gs.root);
+  gs = GroupSheet{};
+}
+
+inline std::vector<std::string> split_list(const std::string &s) {
+  std::vector<std::string> out;
+  size_t a = 0;
+  while (a <= s.size() && !s.empty()) {
+    size_t b = s.find(',', a);
+    if (b == std::string::npos) b = s.size();
+    out.push_back(s.substr(a, b - a));
+    a = b + 1;
+  }
+  return out;
+}
+
+// Rows for a tile from the latest HA data. Without member data yet (old integration, or HA has not
+// answered since boot) a group still gets its "All" row and numbered rows, with no sliders.
+inline std::vector<GRow> group_rows(const Tile &t) {
+  std::vector<GRow> rows;
+  auto it = hp.members.find(t.id);
+  const std::vector<Member> none, &mem = it == hp.members.end() ? none : it->second;
+  if (t.kind == "display") {
+    GRow power;
+    power.name = "Power";
+    power.entities = t.entities;
+    power.on = t.state == "on";
+    rows.push_back(power);
+    if (!t.brightness.empty()) {
+      GRow b;
+      b.name = "Brightness";
+      b.dimmable = t.brightness;
+      b.has_toggle = false;
+      b.number = true;
+      b.bri = mem.empty() ? 50 : mem[0].bri;
+      if (!mem.empty()) b.lo = mem[0].lo, b.hi = mem[0].hi;
+      rows.push_back(b);
+    }
+    return rows;
+  }
+  std::vector<std::string> ents = split_list(t.entities);
+  GRow all;
+  all.name = "All";
+  all.all = true;
+  all.entities = t.entities;
+  for (size_t i = 0; i < ents.size(); i++) {
+    GRow r;
+    r.entities = ents[i];
+    if (i < mem.size()) {
+      r.name = mem[i].name;
+      r.on = mem[i].state == "on";
+      r.bri = mem[i].bri;
+    } else {
+      r.name = (t.kind == "lights" ? "Light " : "Switch ") + std::to_string(i + 1);
+      r.on = t.state == "on";
+    }
+    if (r.bri >= 0) {
+      r.dimmable = ents[i];
+      all.dimmable += (all.dimmable.empty() ? "" : ",") + ents[i];
+      if (r.on) all.bri = std::max(all.bri, r.bri);
+    }
+    all.on = all.on || r.on;
+    rows.push_back(r);
+  }
+  if (!all.dimmable.empty() && all.bri < 0) all.bri = 0;
+  if (rows.size() > 1) rows.insert(rows.begin(), all);
+  return rows;
+}
+
+inline void group_paint(GRow &r) {
+  if (r.tog) paint_toggle(r.tog, r.on);
+  if (r.fill) {
+    int x = r.tw * std::max(0, std::min(100, r.bri)) / 100;
+    lv_obj_set_width(r.fill, std::max(1, x));
+    lv_obj_set_x(r.knob, r.tx + std::max(0, std::min(r.tw - 18, x - 9)));
+  }
+}
+
+inline void group_toggle(int k) {
+  if (k < 0 || k >= (int) gs.rows.size()) return;
+  GRow &r = gs.rows[k];
+  bool on = !r.on;
+  if (hooks.ha) hooks.ha(on ? "on" : "off", r.entities, "");
+  r.on = on;   // optimistic until HA reports back
+  if (r.all) {
+    for (auto &o : gs.rows) o.on = o.has_toggle ? on : o.on;
+  } else if (!gs.rows.empty() && gs.rows[0].all) {
+    gs.rows[0].on = false;
+    for (size_t i = 1; i < gs.rows.size(); i++) gs.rows[0].on = gs.rows[0].on || gs.rows[i].on;
+  }
+  for (auto &o : gs.rows) group_paint(o);
+}
+
+inline void group_set_level(int k, int pct) {
+  if (k < 0 || k >= (int) gs.rows.size()) return;
+  GRow &r = gs.rows[k];
+  r.bri = pct;
+  if (r.number) {
+    if (hooks.ha) hooks.ha("number", r.dimmable, std::to_string((int) lroundf(r.lo + (r.hi - r.lo) * pct / 100.0f)));
+  } else {
+    r.bri = std::max(1, pct);   // 0 would switch the light off; that is the toggle's job
+    if (hooks.ha) hooks.ha("bri", r.dimmable, std::to_string(r.bri));
+    r.on = true;
+    if (r.all) {
+      for (auto &o : gs.rows)
+        if (!o.dimmable.empty() && !o.number) o.on = true, o.bri = r.bri;
+    } else if (gs.rows[0].all) {
+      gs.rows[0].on = true;
+    }
+  }
+  for (auto &o : gs.rows) group_paint(o);
+}
+
+// The slider's hit area covers the row left of the toggle. A drag has to move 6 px sideways before
+// it counts, and never counts once the list is scrolling, so scrolling the list from a row is safe.
+inline void group_slider_event(lv_event_t *e) {
+  int k = (int) (intptr_t) lv_event_get_user_data(e);
+  if (k < 0 || k >= (int) gs.rows.size()) return;
+  GRow &r = gs.rows[k];
+  lv_event_code_t code = lv_event_get_code(e);
+  lv_indev_t *indev = lv_indev_active();
+  if (!indev) return;
+  lv_point_t p;
+  lv_indev_get_point(indev, &p);
+  lv_area_t a;
+  lv_obj_get_coords((lv_obj_t *) lv_event_get_target(e), &a);
+  int x = p.x - a.x1 - r.tx;
+  int pct = r.tw > 0 ? std::max(0, std::min(100, x * 100 / r.tw)) : 0;
+  bool scrolling = lv_indev_get_scroll_obj(indev) != nullptr;
+  if (code == LV_EVENT_PRESSED) {
+    gs.drag_row = k;
+    gs.press_x = p.x;
+    gs.dragging = false;
+  } else if (code == LV_EVENT_PRESSING && gs.drag_row == k) {
+    if (scrolling) {
+      if (gs.dragging) group_paint(r);   // back to the real value
+      gs.dragging = false;
+      gs.drag_row = -1;
+      return;
+    }
+    if (!gs.dragging && std::abs((int) p.x - gs.press_x) >= 6) gs.dragging = true;
+    if (gs.dragging) {
+      int keep = r.bri;
+      r.bri = pct;
+      group_paint(r);
+      r.bri = keep;
+    }
+  } else if (code == LV_EVENT_RELEASED && gs.drag_row == k) {
+    bool tap_on_track = !gs.dragging && x >= -12 && x <= r.tw + 12;
+    bool commit = !scrolling && (gs.dragging || tap_on_track);
+    gs.dragging = false;
+    gs.drag_row = -1;
+    if (commit) group_set_level(k, pct);
+    else group_paint(r);
+  } else if (code == LV_EVENT_PRESS_LOST) {
+    gs.dragging = false;
+    gs.drag_row = -1;
+    group_paint(r);
+  }
+}
+
+inline void open_group(const std::string &tile_id) {
+  if (!ready) return;
+  const Tile *tp = nullptr;
+  for (auto &t : hp.tiles)
+    if (t.id == tile_id) tp = &t;
+  if (!tp) return;
+  destroy_group();
+  gs.tile_id = tile_id;
+  gs.rows = group_rows(*tp);
+  int n = (int) gs.rows.size();
+  int list_h = std::min(44 * n, 264), sheet_h = 48 + list_h + 6;   // six rows fit without scrolling
+  gs.root = dim_layer("grp_dim");
+  lv_obj_t *s = nm(box(gs.root, 0, 320 - sheet_h, 240, sheet_h, SHEET, LV_OPA_COVER, 14), "grp_sheet");
+  lv_obj_add_flag(s, LV_OBJ_FLAG_CLICKABLE);
+  box(s, 102, 6, 36, 5, WHITE, 77, 2);
+  text(s, 14, 18, 212, R.f17b, WHITE, tp->name.c_str());
+  gs.list = nm(box(s, 0, 48, 240, list_h, WHITE, LV_OPA_TRANSP), "grp_list");
+  if (44 * n > list_h) {
+    lv_obj_add_flag(gs.list, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scroll_dir(gs.list, LV_DIR_VER);
+    lv_obj_set_scrollbar_mode(gs.list, LV_SCROLLBAR_MODE_OFF);
+  }
+  bool sliders = false;   // some row has a slider beside its switch: switches keep to the right
+  for (auto &r : gs.rows) sliders = sliders || (!r.dimmable.empty() && r.has_toggle);
+  for (int k = 0; k < n; k++) {
+    GRow &r = gs.rows[k];
+    std::string id = std::to_string(k);
+    lv_obj_t *row = box(gs.list, 0, 44 * k, 240, 44, WHITE, LV_OPA_TRANSP);
+    bool slider = !r.dimmable.empty();
+    text(row, 14, 13, slider ? 86 : 156, slider ? R.f14 : R.f15, WHITE, r.name.c_str());
+    if (slider) {
+      // the hit area ends 8 px before the toggle's; without a toggle it takes the whole row
+      int hit_w = r.has_toggle ? 176 : 240;
+      r.tx = 106;
+      r.tw = hit_w - r.tx - (r.has_toggle ? 8 : 14);
+      lv_obj_t *hit = nm(box(row, 0, 0, hit_w, 44, WHITE, LV_OPA_TRANSP), "row_grp_sl_" + id);
+      lv_obj_add_flag(hit, LV_OBJ_FLAG_CLICKABLE);
+      for (auto c : {LV_EVENT_PRESSED, LV_EVENT_PRESSING, LV_EVENT_RELEASED, LV_EVENT_PRESS_LOST})
+        lv_obj_add_event_cb(hit, group_slider_event, c, (void *) (intptr_t) k);
+      lv_obj_t *track = box(hit, r.tx, 20, r.tw, 5, GREY, LV_OPA_COVER, 2);
+      r.fill = box(track, 0, 0, 1, 5, WHITE, LV_OPA_COVER, 2);
+      r.knob = box(hit, r.tx, 13, 18, 18, WHITE, LV_OPA_COVER, 9);
+    }
+    if (r.has_toggle) {
+      // otherwise the whole row is the switch
+      int x = sliders ? 184 : 0, w = sliders ? 56 : 240;
+      lv_obj_t *hit = nm(button(row, x, 0, w, 44, WHITE, LV_OPA_TRANSP, 0, [k] { group_toggle(k); }),
+                         "row_grp_tog_" + id);
+      r.tog = box(hit, w - 56, 9, 44, 26, GREY, LV_OPA_COVER, 13);
+      box(r.tog, 2, 2, 22, 22, WHITE, LV_OPA_COVER, 11);
+      if (!slider) lv_obj_move_to_index(hit, 0);   // the name stays on top of a full-row switch
+    }
+    group_paint(r);
+  }
+  show(gs.root, true);
+  slide_in(s);
+}
+
+// New data from HA while the sheet is open: repaint it (rebuild if the rows changed).
+inline void refresh_group() {
+  if (!ready || !gs.root || gs.dragging) return;
+  const Tile *tp = nullptr;
+  for (auto &t : hp.tiles)
+    if (t.id == gs.tile_id) tp = &t;
+  if (!tp) {
+    close_sheets();
+    return;
+  }
+  std::vector<GRow> fresh = group_rows(*tp);
+  if (fresh.size() != gs.rows.size()) {
+    open_group(gs.tile_id);
+    return;
+  }
+  for (size_t i = 0; i < fresh.size(); i++) {
+    gs.rows[i].on = fresh[i].on;
+    gs.rows[i].bri = fresh[i].bri;
+    group_paint(gs.rows[i]);
+  }
 }
 
 // ---- page picker ----------------------------------------------------------------------------------------

@@ -4,7 +4,7 @@
 #
 # The including file defines the hook scripts:
 #   ui_launch(source_id)  ui_power()  ui_tv_key(code)  ui_seek(seconds)  ui_name_source(port, name, go)
-#   ui_page_shown(page)  ui_sb_ir(code)  ui_ha(kind, entities, value)
+#   ui_page_shown(page)  ui_sb_ir(code)  ui_volume(code)  ui_ha(kind, entities, value)
 #   ui_wifi_scan()  ui_wifi_join(ssid, password)  ui_settings_changed()  ui_keep_awake()
 
 substitutions:
@@ -84,6 +84,7 @@ lvgl:
         ui::hooks.name_source = [](int p, const std::string &n, bool go) { id(ui_name_source).execute(p, n, go); };
         ui::hooks.page_shown = [](int p) { id(ui_page_shown).execute(p); };
         ui::hooks.sb_ir = [](const std::string &c) { id(ui_sb_ir).execute(c); };
+        ui::hooks.volume = [](const std::string &c) { id(ui_volume).execute(c); };
         ui::hooks.ha = [](const std::string &k, const std::string &e, const std::string &v) { id(ui_ha).execute(k, e, v); };
         auto split = [](std::string s) { std::vector<std::string> v; size_t p;
           while ((p = s.find(',')) != std::string::npos) { v.push_back(s.substr(0, p)); s = s.substr(p + 1); }
@@ -113,7 +114,8 @@ script:
     then:
       - lambda: |-
           int mode = id(g_mode);
-          const char *warn = mode == 2 ? "Battery critical" : mode == 1 ? "Saver mode"
+          // Large text: the long wording would run into the page title
+          const char *warn = mode == 2 ? (ui::large_text ? "Low battery" : "Battery critical") : mode == 1 ? "Saver mode"
                              : !id(g_board_ok) ? "Touch only" : "";
           ui::set_status(id(g_batt_pct), id(g_net) >= 2, warn, mode ? 0xE5484D : 0xF2A33A);
       - script.execute: ui_about

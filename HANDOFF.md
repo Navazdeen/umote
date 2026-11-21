@@ -4,6 +4,18 @@ A battery-powered remote built around the **LCDwiki E32R24P** (ESP32-32E, 2.4" S
 
 > **Latest (2026-11-01):** remote UI + Home Assistant integration shipped and running on the remote. See [`docs/HANDOFF-2026-11-01-remote-ui.md`](docs/HANDOFF-2026-11-01-remote-ui.md); it supersedes the firmware rows below.
 
+## 2026-11-22 session: printed carrier for the CJMCU-2317 MCP23017 module (v7.1 case)
+
+The user is buying the CJMCU-2317 / HW-839 module (26 × 21 mm, SSOP-28, ₹299) instead of the DIP-28, and will wire everything by hand under a printed plate with no copper.
+
+- **Carrier**: `pcb/make_carrier_stl.py [out] [L] [W]` writes `pcb/stl/button_carrier.stl` (43 × 112 × 1.6, same outline as the board, so the v7 clips hold it) and `button_carrier_fit_test.stl` (the strip y 45 to 82 around the window: print it first). It has holes for the 14 switch legs (from `board.tact6`), Q1, and 10 tie-down holes at the old J5 row. The module sits in a through-window at board (21.5, 63.5), 26 mm along x, its PCB level with the plate, on 0.6 lips under its 21 mm ends (the pins run along both 26 mm edges). An engraved arrow on the top face points at the tip. Print it top face up. The 0805/1206 parts go inline on the wires.
+- **Zero margin**: the band between the BACK/HOME/VOICE and VOL+/CH+ rows is exactly 21.0 mm. The window (21.3) cuts 0.05 mm into those switches' leg holes. Caliper the real module and re-run with its size.
+- **Module pinout** (back silk): single row A2, A1, A0, RESET, NC/SO, NC/CS, SDA, SCL, GND, VCC; double row VCC/GND, ITB/ITA, B0/A0 … B7/A7 (port pins, not address pins). [CHECK] whether A0–A2 go to GND and RESET to VCC on the module; if not, tie them (the firmware expects 0x20). INTA (ITA) goes to IO35. Pin numbers in `remote.yaml` don't change: GPAn/GPBn are the same bits.
+- **Wires under the plate**: v7.1 leaves 1.45 mm between the board's underside and the battery, which runs under almost the whole board. Use thin wire (30 AWG wire-wrap) and cut the switch legs flush.
+- **Fit check**: `python3 case/fit_check_v7.py --module` models the module in the carrier (no collisions); without the flag it checks the DIP board as before (no collisions). `pytest case/tests/test_v7.py`: 49 green.
+- **Release**: added to `release/v7.1/` (SHA256SUMS.txt and the zip updated) and to copyparty `/stl/v7.1/`, all 19 files checked against the sums.
+- copyparty `/stl/v7.1/button_board_holes.stl` (2026-11-17) is not in the repo; origin unknown.
+
 ## 2026-11-16 session: case v7.1 (flat battery deck, hairline keel seam) and the printable board at 1.0 mm
 
 The user wants to stick the battery down, and v7.0's key plate held it on three 2.4 mm ribs. They also asked for the printable button board with the copper pattern 1.0 mm high, and whether it still fits.
@@ -164,7 +176,7 @@ Design: `docs/superpowers/specs/2026-11-05-remote-case-v5-design.md`. Plan: `doc
 
 **PCB: routed (2026-10-28).** `pcb/build_board.py` = hand route + router for the IR driver: all 18 nets connected, **0 jumpers, DRC clean** (`pcb/board.png`, `pcb/best.pkl`). `pcb/make_stl.py` makes a printable stand-in board (`pcb/stl/button_board_print.stl`): a 1.6 mm base with the copper pattern raised 0.4 mm for copper tape, holes +0.2 mm, printed copper side up (mirrored). The assembly and wire guide is `pcb/stl/button_board_copper_guide.png`. Print it in PETG/ASA, not PLA, and use low-temperature solder (Sn42Bi58). `export.py` (updated 2026-10-29) writes `pcb/fab/`: a fab Gerber zip (F/B copper, F/B mask, F/B silk, outline, PTH drill; checked by rendering it with gerbonara), KiCad pcb/pro, plotter SVGs and pinmap.json. The SMD silk goes on the copper side; the wire-pad names are on the bottom silk, reading from below. The 2 wire jumpers are dashed silk lines only (no holes).
 - IR LED skin is now 1.0 mm: at 0.6 the slicer printed the pockets' outline on the outside.
-- Release files are staged in `release/` and pushed to copyparty /stl/ with `release/upload_to_copyparty.sh`.
+- Release files are staged in `release/<version>/` and pushed to copyparty `/stl/<version>/` with `release/upload_to_copyparty.sh <version> [files]` (changed 2026-11-22: it never writes to the `/stl/` root, and it checks the server against SHA256SUMS.txt).
 
 **PCB (earlier notes):** `pcb/board.py` layout `"wires"` (no connectors: wires solder to existing pads; I2C pull-ups go on the display board; INT push-pull), chip at y 65.5, SW3 rotated 180. `pcb/hand_route.py` holds the full hand route for all 14 keys, GND and 3V3: **DRC clean, no jumpers so far**. Still to route: the IR driver (Q1, R4–R7, C2) and its GND, then export. The bottom-J5 and right-J5 router experiments (8–11 failed nets each) are in `sweep_bottom.log` / `try_*.png` for the record.
 

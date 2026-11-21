@@ -2,7 +2,9 @@
 fit_check_v6.components with the bend at 0) against the three printed parts and each other; wire
 paths; every part going in from the back; the back plates going on and coming off; moving parts.
 
-Usage: python3 case/fit_check_v7.py [stl_dir] [grow_mm]      exit 1 on any undesigned collision
+Usage: python3 case/fit_check_v7.py [--module] [stl_dir] [grow_mm]      exit 1 on any undesigned collision
+  --module: the printed carrier (pcb/make_carrier_stl.py) with the CJMCU-2317 MCP23017 module in
+            its window, instead of the etched board's DIP-28
 """
 import itertools, json, os, sys
 import numpy as np
@@ -25,17 +27,29 @@ SKIP = {
     ("wire BAT", "battery 46x105"), ("wire BAT", "display back parts"),
     ("wire roller", "carrier"), ("wire roller", "EC11"), ("wire roller", "MCP23017 DIP-28"),
     ("wire boards", "display back parts"), ("wire boards", "MCP23017 DIP-28"),
+    ("wire roller", "MCP23017 module"), ("wire boards", "MCP23017 module"),   # the wires end on it
+    ("button PCB", "MCP23017 module"),                                        # it sits in the carrier's window
 }
+MODULE = (26.0, 21.0, 0.6)     # CJMCU-2317: length (x) and width (y), and the carrier's lip under it
 EXACT = {"USB-C plug overmold", "USB-C plug metal"}
 CASE = {"shell": "asm_shell", "head back": "asm_head_back", "key back": "asm_key_back", "wheel": "asm_wheel",
         "caps": "caps_asm", "dpad ring": "asm_dpad_ring", "dock": "asm_dock",
         "pogo plate": "asm_pogo_plate_a", "dock plate": "asm_dock_plate_a"}                      # the remote docked
 
 
-def components(P):
+def components(P, module=False):
     comp, head, key = v6.components(P)
     yh, yk, cyw, by = P["y_head_end"], P["y_key_start"], P["cy"], P["bb_y0"]
     cx, cyy = P["bb_w"] / 2 - 20.6, by + 63.5
+    if module:
+        # module PCB on the carrier's 0.6 lips (0.5 of through-hole solder under and over it), and
+        # the SSOP-28 (10.5 x 8.0 with leads, 2.0 tall) on top. Window centre: board (21.5, 63.5).
+        L, W, lip = MODULE
+        mx, mz = P["bb_w"] / 2 - 21.5, P["bb_z0"] + lip
+        del comp["MCP23017 DIP-28"]
+        comp["MCP23017 module"] = trimesh.util.concatenate([
+            v6.box(mx - L / 2, mx + L / 2, cyy - W / 2, cyy + W / 2, mz - 0.5, mz + 1.6 + 0.5),
+            v6.box(mx - 5.25, mx + 5.25, cyy - 4.0, cyy + 4.0, mz + 1.6, mz + 1.6 + 2.0)])
     # wires, all laid in from the back. Through the wheel zone they run in the -x notches of both
     # cross walls (x -15.3..-10, beside the wheel). The battery pair leaves the battery's top end,
     # crosses low under the board's start, and runs under the display's back parts to the BAT socket.
@@ -64,12 +78,14 @@ def fmt(h):
 
 
 def main(argv):
+    module = "--module" in argv
+    argv = [a for a in argv if a != "--module"]
     stl = argv[0] if argv else os.path.join(os.path.dirname(__file__), "stl_v7")
     grow = float(argv[1]) if len(argv) > 1 else 0.15
     P = json.load(open(f"{stl}/params.json")); P["_stl"] = stl
     bad = []
     case = {n: trimesh.load(f"{stl}/{f}.stl", force="mesh") for n, f in CASE.items()}
-    comp = components(P)
+    comp = components(P, module)
     print(f"Components vs case (grown {grow} mm):")
     for (a, ma), (b, mb) in itertools.product(comp.items(), case.items()):
         if (a, b) in SKIP or (a.startswith("stem") and b == "caps") or (a.startswith("switch") and b == "shell"):
@@ -94,9 +110,10 @@ def main(argv):
     shell = case["shell"]
     board = comp["button PCB"].copy()      # the 4 clips flex 0.6 each as the board snaps past their hooks
     board.apply_transform(np.diag([(P["bb_w"] - 1.3) / P["bb_w"], 1, 1, 1]))
+    chip = "MCP23017 module" if module else "MCP23017 DIP-28"
     roller = trimesh.util.concatenate([comp["EC11"], comp["EC11 nut"], comp["carrier"], case["wheel"]])
     for n, m in [("display PCB", comp["display PCB"]), ("LCD + touch glass", comp["LCD + touch glass"]), ("USB-C receptacle", comp["USB-C receptacle"]),
-                 ("button PCB", board), ("MCP23017 DIP-28", comp["MCP23017 DIP-28"]), ("INMP441 module", comp["INMP441 module"]),
+                 ("button PCB", board), (chip, comp[chip]), ("INMP441 module", comp["INMP441 module"]),
                  ("battery 46x105", comp["battery 46x105"])]:
         h = hit(sweep(m, [0, 0, -25]), shell, tol=0.05)
         if h is not None:

@@ -258,3 +258,98 @@ def test_wheel_window_lands_are_3(P):
 def test_fit_check_has_no_collisions():
     import fit_check_v7
     assert fit_check_v7.main([STL7]) == 0
+
+
+# ---------- v7.2: 6x6x9.5 switches, roofed cap pockets, hooks that hold, carrier spacers ----------
+import sys as _sys
+_sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "pcb"))
+import board as _B
+
+
+def switch_xy(P):
+    return [(P["bb_w"] / 2 - x, P["bb_y0"] + y) for (x, y, *_r) in _B.BUTTONS.values()]
+
+
+def test_plunger_fits_bore(P):
+    """The 5.7 plunger goes all the way into the hex bore and leaves >= 1.0 of cap over its tip."""
+    assert P["sw_total"] == 9.5 and P["sw_body"] == 3.8
+    assert P["sock"] == pytest.approx(P["act_top"] - (P["front_in"] - 0.8))
+    assert P["act_top"] + 1.0 <= P["T"] + P["cap_proud"] + 1e-6
+
+
+@pytest.mark.parametrize("asm", ["caps_asm", "caps_asm_pressed", "caps_asm_rocker_tilt"])
+def test_caps_clear_switch_bodies(asm, P):
+    """No cap, D-pad sector or rocker touches a 6 x 6 switch body, at rest, pressed 0.3 or tipped."""
+    caps = load(asm)
+    for x, y in switch_xy(P):
+        body = trimesh.creation.box([6.0, 6.0, P["sw_body"]])
+        body.apply_translation([x, y, P["bb_top"] + P["sw_body"] / 2])
+        inter = trimesh.boolean.intersection([caps, body], engine="manifold")
+        assert inter.is_empty or inter.volume < 1e-3, f"{asm} hits the switch at ({x:.1f}, {y:.1f}): {inter.volume:.3f} mm3"
+
+
+def test_no_bridges_in_caps():
+    """The only flat ceilings left in the caps are the hex bores' tops (~10 mm2 each)."""
+    m = load("caps")
+    z0 = m.bounds[0][2]
+    for f, n, a in zip(m.facets, m.facets_normal, m.facets_area):
+        if n[2] < -0.999 and m.triangles_center[f, 2].min() > z0 + 0.3:
+            assert a < 11.0, f"bridged ceiling of {a:.1f} mm2 at {np.round(m.triangles_center[f[0]], 1).tolist()}"
+
+
+def test_board_clip_hook_holds_the_board(P):
+    """Each hook has a flat ledge at bb_z0 under the board and a 45 deg lead-in facing the back."""
+    m = load("asm_shell")
+    x_wall = P["bb_w"] / 2 + 0.1
+    for y in P["clip_y"]:
+        def inner_x(z):
+            s = m.section([0, 0, 1], [0, 0, z])
+            v = s.vertices[(np.abs(s.vertices[:, 1] - y) < 3.5) & (s.vertices[:, 0] > x_wall - 1.0) & (s.vertices[:, 0] < x_wall + 2)]
+            return v[:, 0].min()
+        assert inner_x(P["bb_z0"] - 0.1) == pytest.approx(x_wall - 0.6, abs=0.03)     # the hook, under the board
+        assert inner_x(P["bb_z0"] + 0.1) == pytest.approx(x_wall, abs=0.03)           # flat ledge: the board's edge is free
+        assert inner_x(P["bb_z0"] - 0.6) == pytest.approx(x_wall - 0.2, abs=0.05)     # on the lead-in
+
+
+def _carrier():
+    import importlib
+    return importlib.import_module("make_carrier_stl")
+
+
+def test_spacers_land_on_the_face(P):
+    """Each carrier spacer rises from the board's top to 0.1 under the face's underside, and its column
+    misses the caps (at rest and pressed), the D-pad ring and every shell feature on the way."""
+    C = _carrier()
+    assert C.SPACER_H == pytest.approx(P["pz0"] - P["bb_top"] - 0.1)
+    shell = load("asm_shell")
+    others = [load(n) for n in ("caps_asm", "caps_asm_pressed", "caps_asm_rocker_tilt", "asm_dpad_ring")]
+    for bx, by_ in C.SPACERS:
+        x, y = P["bb_w"] / 2 - bx, P["bb_y0"] + by_
+        col = trimesh.creation.cylinder(radius=C.SPACER_D / 2 + 0.3, height=C.SPACER_H + 0.1, sections=32)
+        col.apply_translation([x, y, P["bb_top"] + (C.SPACER_H + 0.1) / 2 - 0.05])   # +0.05 overlap at the top: must hit only the face
+        for m in others:
+            i = trimesh.boolean.intersection([m, col], engine="manifold")
+            assert i.is_empty or i.volume < 1e-3, f"spacer ({bx}, {by_}) hits a cap or the ring"
+        below = col.copy(); below.apply_translation([0, 0, -0.06])
+        i = trimesh.boolean.intersection([shell, below], engine="manifold")
+        assert i.is_empty or i.volume < 1e-3, f"spacer ({bx}, {by_}) hits a shell feature on its way up"
+        hit, _, _ = shell.ray.intersects_location([[x, y, P["bb_top"] + 0.1]], [[0, 0, 1]])
+        assert hit[:, 2].min() == pytest.approx(P["bb_top"] + C.SPACER_H + 0.1, abs=0.02), f"spacer ({bx}, {by_}) top is not under the face"
+
+
+def test_carrier_spacers_printed():
+    m = trimesh.load(os.path.join(os.path.dirname(__file__), "..", "..", "pcb", "stl", "button_carrier.stl"))
+    C = _carrier()
+    assert m.is_watertight and m.body_count == 1
+    assert m.extents[2] == pytest.approx(C.PLATE + C.SPACER_H, abs=0.01)
+
+
+def test_skin_over_every_plunger(P):
+    """At least 0.6 of solid cap over each plunger tip (marks and saddles included): a 3.0 disk
+    from 0.05 to 0.65 over act_top is inside the caps, rockers and sectors."""
+    caps = load("caps_asm")
+    for x, y in switch_xy(P):
+        # the rockers sit 0.3 lower, so their bore ceiling is also at act_top
+        pts = [[x + r * np.cos(a), y + r * np.sin(a), z] for r in (0, 0.75, 1.5)
+               for a in np.linspace(0, 2 * np.pi, 8, endpoint=False) for z in np.linspace(P["act_top"] + 0.05, P["act_top"] + 0.65, 4)]
+        assert solid(caps, pts), f"thin skin over the plunger at ({x:.1f}, {y:.1f})"

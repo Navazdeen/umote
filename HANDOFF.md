@@ -4,6 +4,17 @@ A battery-powered remote built around the **LCDwiki E32R24P** (ESP32-32E, 2.4" S
 
 > **Latest (2026-11-01):** remote UI + Home Assistant integration shipped and running on the remote. See [`docs/HANDOFF-2026-11-01-remote-ui.md`](docs/HANDOFF-2026-11-01-remote-ui.md); it supersedes the firmware rows below.
 
+## 2026-11-24 session: case v7.2 for 6x6x9.5 tact switches, hooks that hold, carrier spacers
+
+The 6x6x7 switches couldn't be sourced. The new ones are 6x6x9.5: a 3.8 body under a 5.7 plunger that tapers from 3.5 to 3.0. Their tips are 2.5 mm higher, so the board couldn't reach its clips. Spec: `docs/superpowers/specs/2026-11-24-case-v7.2-tall-switch-design.md`; plan: `docs/superpowers/plans/2026-11-24-case-v7.2-tall-switch.md`. Branch `case-v7.2` (worktree `../umote-v7.2`), off `origin/master` 374e336.
+
+- **Caps**: they stand 4.0 above the face (3.0 before). The same hex bore (AF 3.4) now runs 5.6 deep and leaves 1.2 of cap over the plunger tip. Every cap, D-pad sector and rocker has a 6.6 pocket over the switch body, with a 45 deg roof up to the bore, so nothing is bridged. The v7.1 rocker's flat 0.5 pockets sagged on the print. Rocker marks are 0.5 deep (0.9 left 0.3 over the plunger). OK's nub is sunk 0.05 so it joins the cap.
+- **Board clips**: the hooks were upside down. Their slope faced the board and their flat side faced the back, so the board met a flat wall going in, nothing held it once in, and the slope measured 43.0, the board's own width. Now a flat ledge at `bb_z0` holds the board, and a 0.6 x 45 deg lead-in faces the back. The clip is 0.3 longer and still clears the battery.
+- **Carrier spacers**: `make_carrier_stl.py` adds 5 posts, d 4.0 and 4.6 tall (`SPACERS`, `SPACER_D`, `SPACER_H`), at board (17, 3.5), (6.5, 39), (35, 41.5), (6.5, 100.5) and (32, 102). They stop 0.1 under the face's underside, on flat face clear of caps, rockers, the ring, clips, wires, the mic, Q1 and the window. The board is held both ways: posts against the face, hooks under the edges. The carrier still prints top face up, and the posts stand upright. The script is now importable (it writes only under `__main__`).
+- **Checks**: `pytest case/tests/test_v7.py` gives 58 green. New tests cover plunger fit, caps clear of the switch bodies (at rest, pressed, tipped), no bridges in the caps, the hook profile, the spacers landing on the face, and the skin over every plunger. `case/fit_check_v7.py` with and without `--module` finds no collisions. Python now runs through uv (`.venv` was rebuilt; the old one pointed at a deleted miniconda).
+- **Release**: `release/v7.2/` holds 14 case STLs, `button_board_print.stl` (unchanged), the carrier and its fit strip (unchanged), the viewer, the zip and SHA256SUMS.txt. Changed from v7.1: shell, caps, t2_bottom_end, button_carrier. Uploaded to copyparty `/stl/v7.2/`.
+- **[CHECK] on the print**: the hex bore's grip on the tapered plunger (it holds the 3.5 base, and the 3.0 tip sits loose). The 0.1 spacer gap. Whether the 0.6 hook ledge printed clean (it's an overhang in the face-down shell).
+
 ## 2026-11-22 session: printed carrier for the CJMCU-2317 MCP23017 module (v7.1 case)
 
 The user is buying the CJMCU-2317 / HW-839 module (26 × 21 mm, SSOP-28, ₹299) instead of the DIP-28, and will wire everything by hand under a printed plate with no copper.

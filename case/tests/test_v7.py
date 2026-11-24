@@ -380,8 +380,8 @@ def test_copper_board_fits_the_v7_1_hooks_and_spacers():
 
 
 def test_insulator_plate_fits_under_the_copper_board(P):
-    """button_board_insulator.stl: 0.8 thick, on the copper tape over the 1.0 traces, clear of the
-    shell (walls, clips, end stops), with a pocket over every hole of the copper board."""
+    """button_board_insulator.stl, a tray: 0.8 thick, on the copper tape over the 1.0 traces, clear of
+    the shell (walls, clips, end stops), nothing over a solder joint, ribs only on trace tops."""
     pcb = os.path.join(os.path.dirname(__file__), "..", "..", "pcb", "stl")
     plate = trimesh.load(os.path.join(pcb, "button_board_insulator.stl"))
     assert plate.is_watertight and plate.extents[2] == pytest.approx(0.8, abs=0.01)
@@ -398,4 +398,9 @@ def test_insulator_plate_fits_under_the_copper_board(P):
     in_hole = ~board.contains(np.c_[pts, np.full(len(pts), 0.8)])
     hole_pts = pts[in_hole & board.contains(np.c_[pts + [0.9, 0], np.full(len(pts), 0.8)])]
     assert len(hole_pts) > 50
-    assert not plate.contains(np.c_[hole_pts, np.full(len(hole_pts), 0.6)]).any(), "a hole without a pocket over it"
+    assert not plate.contains(np.c_[hole_pts, np.full(len(hole_pts), 0.6)]).any(), "plastic over a solder joint"
+    # tray (v7.2): inside the 1.5 rim, every rib point rests on a trace top
+    inner = pts[(pts[:, 0] > 1.7) & (pts[:, 0] < 41.3) & (pts[:, 1] > 1.7) & (pts[:, 1] < 110.3)]
+    rib = inner[plate.contains(np.c_[inner, np.full(len(inner), 0.6)])]
+    assert len(rib) > 100, "no ribs"
+    assert board.contains(np.c_[rib, np.full(len(rib), board.bounds[1][2] - 0.3)]).all(), "a rib off the traces"

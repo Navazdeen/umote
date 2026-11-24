@@ -424,7 +424,7 @@ def test_cap_walls_round_the_switch_pockets(P):
 def test_copper_board_lets_the_legs_through():
     """v7.2.2: the legs didn't come through 1.6 base + 1.0 traces, and the MCP23017's 0.9 holes were too
     small. The board is 2.0 at every hole (1.0 base inside a 1.6 rim, trace tops level), the DIP-28
-    holes are 1.2 and the component side is still flat (the switches and caps don't move)."""
+    holes are 1.0 x 1.6 slots (v7.2.3) and the component side is still flat (the switches and caps don't move)."""
     import pickle
     pcb = os.path.join(os.path.dirname(__file__), "..", "..", "pcb")
     m = trimesh.load(os.path.join(pcb, "stl", "button_board_print.stl"))
@@ -433,8 +433,10 @@ def test_copper_board_lets_the_legs_through():
     dip = [p for pt in parts if pt.kind == "DIP28" for p in pt.pads]
     for p in dip:
         x, y = m.bounds[0][0] + 43.0 - p.x, m.bounds[0][1] + 112.0 - p.y      # printed copper side up, mirrored
-        ring = [[x + 0.58 * np.cos(a), y + 0.58 * np.sin(a), z] for a in np.linspace(0, 2 * np.pi, 8, endpoint=False) for z in (0.5, 1.5)]
-        assert empty(m, ring), f"DIP hole at ({p.x}, {p.y}) under 1.2"
+        slot = [[x + dx, y + dy, z] for dx, dy in ((0.45, 0), (-0.45, 0), (0, 0.75), (0, -0.75), (0.3, 0.5), (-0.3, -0.5)) for z in (0.5, 1.5)]
+        assert empty(m, slot), f"DIP slot at ({p.x}, {p.y}) under 1.0 x 1.6"
+        # >= 0.45 of ring towards the neighbouring pins, at trace level (0.35 was dropped by the slicer)
+        assert solid(m, [[x + s * 0.55, y, 1.5] for s in (-1, 1)] + [[x + s * 0.9, y, 1.5] for s in (-1, 1)]), f"thin DIP ring at ({p.x}, {p.y})"
     # the middle is 1.0 thick away from the traces, the rim 1.6 (it carries the chamfers onto the hooks)
     cx, cy = m.bounds[:, 0].mean(), m.bounds[:, 1].mean()
     assert solid(m, [[m.bounds[0][0] + 1.2, cy, 1.5], [m.bounds[1][0] - 1.2, cy, 1.5]])

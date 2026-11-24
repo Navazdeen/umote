@@ -4,6 +4,50 @@ A battery-powered remote built around the **LCDwiki E32R24P** (ESP32-32E, 2.4" S
 
 > **Latest (2026-11-01):** remote UI + Home Assistant integration shipped and running on the remote. See [`docs/HANDOFF-2026-11-01-remote-ui.md`](docs/HANDOFF-2026-11-01-remote-ui.md); it supersedes the firmware rows below.
 
+## 2026-11-24 session: v7.2 caps and boards for 6x6x9.5 tact switches (shell unchanged)
+
+The 6x6x7 switches couldn't be sourced. The new ones are 6x6x9.5: a 3.8 body under a 5.7 plunger that tapers from 3.5 to 3.0. Their tips are 2.5 mm higher. **The user can't reprint the shell**, so v7.2 changes only the caps and the printed boards, and `case/v7/shell.scad` and `shell.stl` are byte-identical to v7.1 (a test checks it). Spec: `docs/superpowers/specs/2026-11-24-case-v7.2-tall-switch-design.md`. Branch `case-v7.2` (worktree `../umote-v7.2`), off `origin/master` 374e336.
+
+- **Caps** (`keys.scad`, `params.scad`):
+  - `sw_body 3.8`, `sw_total 9.5`, `cap_proud 4.0`. The same hex bore (AF 3.4) runs 5.6 deep and leaves 1.2 of cap over the plunger tip.
+  - Every cap, D-pad sector and rocker has a 6.6 pocket over the switch body (`sw_pocket`, 0.6 deep, 1.0 in rockers) with a 45 deg roof up to the bore, so nothing is bridged. The v7.1 rocker's flat 0.5 pockets sagged on the print.
+  - Rocker marks are 0.5 deep (0.9 left 0.3 over the plunger). OK's nub is sunk 0.05 so it joins the cap.
+- **The v7.1 hooks are upside down.** Their slope faces the board and their flat side faces the back, so the board sat loose and the gap measured a flush 43.0. Instead of fixing the shell, both boards get 0.5 x 45 deg chamfers on their long edges, top and bottom (`pcb/make_stl_common.py`):
+  - the bottom chamfer lies on the hook's slope with the board at `bb_z0`;
+  - the top chamfer is the lead-in that spreads the clips going in.
+- **Spacers** (`make_stl_common.SPACERS`): 5 posts, d 4.0 and 4.75 tall, at board (17, 3.5), (6, 40.5), (35, 41.5), (11, 106) and (33.5, 103.5). They reach the face's underside with a 0.05 preload, pressing the board onto the 4 slopes, so it's held both ways.
+  - They're on both printed boards: `make_carrier_stl.py`, and `make_stl_holes.py` (now in the repo, and now printed **component side up**, with its 1206 pockets on the bed).
+  - The scripts check the posts against holes, pockets and part bodies (0.92 clear on the holes board). The tests check them against the shell, caps, rockers and ring.
+- **Copper-tape board** (`pcb/make_stl.py`, `button_board_print.stl`): the 1.0 traces and the 0.25–0.35 rings round the holes printed badly.
+  - Every net's copper now grows in 0.05 steps, up to 0.5 a side, keeping 0.6 to the other nets. Traces reach about 2.0, every hole ring is at least 0.5 (switches about 0.9), and there's 80% more copper.
+  - Holes are drill + 0.2 (slicer X-Y hole compensation +0.1), and the DIP-28 and Q1 holes are 0.9.
+  - Same edge chamfers as the other boards, and copper stays 0.8 from the edge.
+  - The 5 spacers are a separate `button_spacers.stl` (d 4.0 x 4.95), glued into 0.2 recesses on the bed side. They can't print on that side, and a peg hole would cut a trace at (33.5, 103.5).
+  - The build takes about 6 min (the growth steps).
+  - Slicer settings are in `release/v7.2/REPRINT.txt`: Arachne, min feature 25%, 0.12 layers for the traces, ironing.
+- **Insulating tray** (`pcb/make_insulator_stl.py`, `button_board_insulator.stl`): goes between the copper board's traces and the battery.
+  - The user's battery is **4.2** thick, not the 5.0 the case models, so there are 2.25 under the board.
+  - The tray is 0.8 thick and sits on the copper tape over the 1.0 traces, leaving 0.4 to the battery.
+  - Its shape (the user asked for a tray instead of 59 pockets): a 0.4 floor, a 1.5 rim, and one 0.4 recess for the joints. 51 thin ribs (0.8) rest on trace tops, 2.2 clear of every hole; they're taken from `button_board_print.stl`, so run `make_stl.py` first.
+  - Windows are cut for C1, C2, R4–R7 and the J5 wires.
+  - Tests check it against the shell, nothing over a joint, and ribs only on traces.
+  - `params.scad` still models a 5.0 battery (changing it would move the board and the shell).
+- **Checks**: `pytest case/tests/test_v7.py` gives 61 green. `case/fit_check_v7.py` with and without `--module` finds no collisions (the spacers are modelled in both). Python runs through uv (`.venv` rebuilt; the old one pointed at a deleted miniconda).
+- **Release**: `release/v7.2/` is the whole set plus `REPRINT.txt`. Only `caps.stl`, the three boards and `button_spacers.stl` differ from v7.1. Uploaded to copyparty `/stl/v7.2/`, SHA-checked.
+- **[CHECK] on the print**: the hex bore's grip on the tapered plunger (it holds the 3.5 base, and the 3.0 tip sits loose). Whether the 0.05 preload holds the board without rattling. The bridges over the holes board's 1206 pockets.
+
+## 2026-11-22 session: printed carrier for the CJMCU-2317 MCP23017 module (v7.1 case)
+
+The user is buying the CJMCU-2317 / HW-839 module (26 × 21 mm, SSOP-28, ₹299) instead of the DIP-28, and will wire everything by hand under a printed plate with no copper.
+
+- **Carrier**: `pcb/make_carrier_stl.py [out] [L] [W]` writes `pcb/stl/button_carrier.stl` (43 × 112 × 1.6, same outline as the board, so the v7 clips hold it) and `button_carrier_fit_test.stl` (the strip y 45 to 82 around the window: print it first). It has holes for the 14 switch legs (from `board.tact6`), Q1, and 10 tie-down holes at the old J5 row. The module sits in a through-window at board (21.5, 63.5), 26 mm along x, its PCB level with the plate, on 0.6 lips under its 21 mm ends (the pins run along both 26 mm edges). An engraved arrow on the top face points at the tip. Print it top face up. The 0805/1206 parts go inline on the wires.
+- **Zero margin**: the band between the BACK/HOME/VOICE and VOL+/CH+ rows is exactly 21.0 mm. The window (21.3) cuts 0.05 mm into those switches' leg holes. Caliper the real module and re-run with its size.
+- **Module pinout** (back silk): single row A2, A1, A0, RESET, NC/SO, NC/CS, SDA, SCL, GND, VCC; double row VCC/GND, ITB/ITA, B0/A0 … B7/A7 (port pins, not address pins). [CHECK] whether A0–A2 go to GND and RESET to VCC on the module; if not, tie them (the firmware expects 0x20). INTA (ITA) goes to IO35. Pin numbers in `remote.yaml` don't change: GPAn/GPBn are the same bits.
+- **Wires under the plate**: v7.1 leaves 1.45 mm between the board's underside and the battery, which runs under almost the whole board. Use thin wire (30 AWG wire-wrap) and cut the switch legs flush.
+- **Fit check**: `python3 case/fit_check_v7.py --module` models the module in the carrier (no collisions); without the flag it checks the DIP board as before (no collisions). `pytest case/tests/test_v7.py`: 49 green.
+- **Release**: added to `release/v7.1/` (SHA256SUMS.txt and the zip updated) and to copyparty `/stl/v7.1/`, all 19 files checked against the sums.
+- copyparty `/stl/v7.1/button_board_holes.stl` (2026-11-17) is not in the repo; origin unknown.
+
 ## 2026-11-16 session: case v7.1 (flat battery deck, hairline keel seam) and the printable board at 1.0 mm
 
 The user wants to stick the battery down, and v7.0's key plate held it on three 2.4 mm ribs. They also asked for the printable button board with the copper pattern 1.0 mm high, and whether it still fits.
@@ -164,7 +208,7 @@ Design: `docs/superpowers/specs/2026-11-05-remote-case-v5-design.md`. Plan: `doc
 
 **PCB: routed (2026-10-28).** `pcb/build_board.py` = hand route + router for the IR driver: all 18 nets connected, **0 jumpers, DRC clean** (`pcb/board.png`, `pcb/best.pkl`). `pcb/make_stl.py` makes a printable stand-in board (`pcb/stl/button_board_print.stl`): a 1.6 mm base with the copper pattern raised 0.4 mm for copper tape, holes +0.2 mm, printed copper side up (mirrored). The assembly and wire guide is `pcb/stl/button_board_copper_guide.png`. Print it in PETG/ASA, not PLA, and use low-temperature solder (Sn42Bi58). `export.py` (updated 2026-10-29) writes `pcb/fab/`: a fab Gerber zip (F/B copper, F/B mask, F/B silk, outline, PTH drill; checked by rendering it with gerbonara), KiCad pcb/pro, plotter SVGs and pinmap.json. The SMD silk goes on the copper side; the wire-pad names are on the bottom silk, reading from below. The 2 wire jumpers are dashed silk lines only (no holes).
 - IR LED skin is now 1.0 mm: at 0.6 the slicer printed the pockets' outline on the outside.
-- Release files are staged in `release/` and pushed to copyparty /stl/ with `release/upload_to_copyparty.sh`.
+- Release files are staged in `release/<version>/` and pushed to copyparty `/stl/<version>/` with `release/upload_to_copyparty.sh <version> [files]` (changed 2026-11-22: it never writes to the `/stl/` root, and it checks the server against SHA256SUMS.txt).
 
 **PCB (earlier notes):** `pcb/board.py` layout `"wires"` (no connectors: wires solder to existing pads; I2C pull-ups go on the display board; INT push-pull), chip at y 65.5, SW3 rotated 180. `pcb/hand_route.py` holds the full hand route for all 14 keys, GND and 3V3: **DRC clean, no jumpers so far**. Still to route: the IR driver (Q1, R4–R7, C2) and its GND, then export. The bottom-J5 and right-J5 router experiments (8–11 failed nets each) are in `sweep_bottom.log` / `try_*.png` for the record.
 

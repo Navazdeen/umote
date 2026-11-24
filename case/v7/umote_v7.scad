@@ -32,7 +32,8 @@ P = [["W", W], ["wall", wall], ["tip_wall", tip_wall], ["T", T], ["L", L], ["the
   ["pogo_d", pogo_d], ["pogo_l", pogo_l], ["roll_z", roll_z], ["roll", roll], ["cap_proud", cap_proud],
   ["pp_w", pp_w], ["pp_z0", pp_z0], ["pp_t", pp_t], ["conn_b", conn_b], ["end_block_y", end_block_y],
   ["cap_hole", cap_hole], ["cap_d", cap_d], ["side_clr", side_clr], ["batt_end", batt_end], ["bb_end", bb_end], ["eye", eye],
-  ["clip_y", clip_y], ["rib_x", rib_x], ["dock_g", dock_g]];
+  ["clip_y", clip_y], ["rib_x", rib_x], ["dock_g", dock_g],
+  ["act_top", act_top], ["sock", sock], ["cap_h", cap_h], ["clip_t", clip_t], ["clip_w", clip_w], ["pocket_w", pocket_w]];
 function jv(v) = is_list(v) ? str("[", jl(v, 0), "]") : str(v);
 function jl(v, i) = i >= len(v) ? "" : str(jv(v[i]), i < len(v) - 1 ? "," : "", jl(v, i + 1));
 function jo(p, i) = i >= len(p) ? "" : str("\"", p[i][0], "\":", jv(p[i][1]), i < len(p) - 1 ? "," : "", jo(p, i + 1));

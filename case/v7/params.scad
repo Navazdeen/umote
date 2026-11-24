@@ -47,7 +47,7 @@ led_from_usb  = 40.58;
 
 // ---------- button board ----------
 bb_w = 43.0;  bb_l = 112.0;  bb_pcb = 1.6;
-sw_body = 3.5;  sw_total = 7.0;  smd_h = 0.8;  top_parts = 4.4;
+sw_body = 3.8;  sw_total = 9.5;  smd_h = 0.8;  top_parts = 4.4;   // v7.2: 6x6x9.5 switch (5.7 plunger, 3.5 -> 3.0 taper); 6x6x7 in v4-v7.1
 batt = [46, 105, 5];
 foam = 0.5;
 
@@ -72,7 +72,7 @@ singles = [  // [x, y, name, mark]
   [34.5, 77.0, "CH+",  12],
   [34.5, 90.0, "CH-",  13],
 ];
-cap_d = 8.6;  cap_hole = 9.8;  cap_proud = 3.0;  cap_flange = 0.8;  flange_x = 0.9;
+cap_d = 8.6;  cap_hole = 9.8;  cap_proud = 4.0;  cap_flange = 0.8;  flange_x = 0.9;
 // 0.6 a side round the caps (0.45 in v5 rubbed on the print, user 2026-11-05)
 cap_top_cham = 0.6;
 rib_w = 1.2;  rib_out = 1.0;  rib_clr = 0.25;  rib_skin = 0.6;  flange_clr = 0.35;
@@ -82,6 +82,7 @@ cap_rib_w = 1.0;
 cap_rib_h = cap_flange + top_t - rib_skin - 0.45;
 flange_shrink = 0.2;
 ef = 0.3;
+pocket_w = 6.6;  pocket_h = 0.6;  rk_pocket_h = 1.0;   // v7.2: switch-body pocket under every cap (45 deg roof, no bridge)
 side_clr = 0.6;                      // D-pad / OK gap to the plate opening, per side (0.45 in v5)
 
 // ---------- mic ----------

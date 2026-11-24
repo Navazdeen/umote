@@ -258,3 +258,149 @@ def test_wheel_window_lands_are_3(P):
 def test_fit_check_has_no_collisions():
     import fit_check_v7
     assert fit_check_v7.main([STL7]) == 0
+
+
+# ---------- v7.2: 6x6x9.5 switches, roofed cap pockets, hooks that hold, carrier spacers ----------
+import sys as _sys
+_sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "pcb"))
+import board as _B
+
+
+def switch_xy(P):
+    return [(P["bb_w"] / 2 - x, P["bb_y0"] + y) for (x, y, *_r) in _B.BUTTONS.values()]
+
+
+def test_plunger_fits_bore(P):
+    """The 5.7 plunger goes all the way into the hex bore and leaves >= 1.0 of cap over its tip."""
+    assert P["sw_total"] == 9.5 and P["sw_body"] == 3.8
+    assert P["sock"] == pytest.approx(P["act_top"] - (P["front_in"] - 0.8))
+    assert P["act_top"] + 1.0 <= P["T"] + P["cap_proud"] + 1e-6
+
+
+@pytest.mark.parametrize("asm", ["caps_asm", "caps_asm_pressed", "caps_asm_rocker_tilt"])
+def test_caps_clear_switch_bodies(asm, P):
+    """No cap, D-pad sector or rocker touches a 6 x 6 switch body, at rest, pressed 0.3 or tipped."""
+    caps = load(asm)
+    for x, y in switch_xy(P):
+        body = trimesh.creation.box([6.0, 6.0, P["sw_body"]])
+        body.apply_translation([x, y, P["bb_top"] + P["sw_body"] / 2])
+        inter = trimesh.boolean.intersection([caps, body], engine="manifold")
+        assert inter.is_empty or inter.volume < 1e-3, f"{asm} hits the switch at ({x:.1f}, {y:.1f}): {inter.volume:.3f} mm3"
+
+
+def test_no_bridges_in_caps():
+    """The only flat ceilings left in the caps are the hex bores' tops (~10 mm2 each)."""
+    m = load("caps")
+    z0 = m.bounds[0][2]
+    for f, n, a in zip(m.facets, m.facets_normal, m.facets_area):
+        if n[2] < -0.999 and m.triangles_center[f, 2].min() > z0 + 0.3:
+            assert a < 11.0, f"bridged ceiling of {a:.1f} mm2 at {np.round(m.triangles_center[f[0]], 1).tolist()}"
+
+
+def test_shell_is_the_printed_v7_1():
+    """v7.2 doesn't touch the shell: the user has it printed. Boards and caps fit it as it is."""
+    rel = os.path.join(os.path.dirname(__file__), "..", "..", "release", "v7.1", "shell.stl")
+    assert open(os.path.join(STL7, "shell.stl"), "rb").read() == open(rel, "rb").read()
+
+
+def hook_inner_x(m, P, y, z):
+    x_wall = P["bb_w"] / 2 + 0.1
+    s = m.section([0, 0, 1], [0, 0, z])
+    v = s.vertices[(np.abs(s.vertices[:, 1] - y) < 3.5) & (s.vertices[:, 0] > x_wall - 1.0) & (s.vertices[:, 0] < x_wall + 2)]
+    return v[:, 0].min()
+
+
+def test_board_chamfer_sits_on_the_hook_slope(P):
+    """The v7.1 hooks have a 45 deg slope where the board's bottom edge is. The boards' 0.5 x 45 deg
+    bottom chamfer lies on it with the board at bb_z0, so the spacers press the board onto 4 slopes."""
+    import make_stl_common as K
+    m = load("asm_shell")
+    for y in P["clip_y"]:
+        for dz in (0.1, 0.25, 0.4):
+            board_edge = P["bb_w"] / 2 - K.CHAMFER + dz          # the chamfer's x at height dz above the board's underside
+            assert hook_inner_x(m, P, y, P["bb_z0"] + dz) == pytest.approx(board_edge, abs=0.06)
+
+
+def test_spacers_land_on_the_face(P):
+    """Each spacer rises from the board's top to the face's underside, 0.05 past it (the board rides
+    0.05 up the hook slopes: a light preload), and its column misses the caps (at rest, pressed,
+    tipped), the D-pad ring and every shell feature on the way."""
+    import make_stl_common as K
+    assert K.SPACER_H == pytest.approx(P["pz0"] - P["bb_top"] + K.PRELOAD) and K.PRELOAD == 0.05
+    shell = load("asm_shell")
+    others = [load(n) for n in ("caps_asm", "caps_asm_pressed", "caps_asm_rocker_tilt", "asm_dpad_ring")]
+    for bx, by_ in K.SPACERS:
+        x, y = P["bb_w"] / 2 - bx, P["bb_y0"] + by_
+        h = P["pz0"] - P["bb_top"]
+        col = trimesh.creation.cylinder(radius=K.SPACER_D / 2 + 0.3, height=h, sections=32)
+        col.apply_translation([x, y, P["bb_top"] + h / 2])
+        for m in others:
+            i = trimesh.boolean.intersection([m, col], engine="manifold")
+            assert i.is_empty or i.volume < 1e-3, f"spacer ({bx}, {by_}) hits a cap or the ring"
+        below = col.copy(); below.apply_translation([0, 0, -0.02])
+        i = trimesh.boolean.intersection([shell, below], engine="manifold")
+        assert i.is_empty or i.volume < 1e-3, f"spacer ({bx}, {by_}) hits a shell feature on its way up"
+        for r in (0, K.SPACER_D / 2 - 0.1):
+            for a in np.linspace(0, 2 * np.pi, 8, endpoint=False):
+                hit, _, _ = shell.ray.intersects_location([[x + r * np.cos(a), y + r * np.sin(a), P["bb_top"] + 0.1]], [[0, 0, 1]])
+                assert hit[:, 2].min() == pytest.approx(P["pz0"], abs=0.02), f"spacer ({bx}, {by_}) does not land on the flat face"
+
+
+@pytest.mark.parametrize("stl", ["button_carrier.stl", "button_board_holes.stl"])
+def test_boards_have_spacers_and_chamfers(stl):
+    import make_stl_common as K
+    m = trimesh.load(os.path.join(os.path.dirname(__file__), "..", "..", "pcb", "stl", stl))
+    assert m.is_watertight and m.body_count == 1
+    assert m.extents[2] == pytest.approx(1.6 + K.SPACER_H, abs=0.01)
+    assert m.extents[0] == pytest.approx(43.0, abs=0.01) and m.extents[1] == pytest.approx(112.0, abs=0.01)
+    # 0.5 x 45 deg on both long edges, top and bottom of the 1.6 plate: full width only from 0.5 to 1.1
+    for z, w in ((0.05, 43.0 - 2 * (0.5 - 0.05)), (0.8, 43.0), (1.55, 43.0 - 2 * (0.5 - 0.05))):
+        cx, y = m.bounds[:, 0].mean(), m.bounds[0][1] + 25.0
+        assert solid(m, [[cx - w / 2 + 0.03, y, z], [cx + w / 2 - 0.03, y, z]]), f"{stl} narrower than {w} at z {z}"
+        assert empty(m, [[cx - w / 2 - 0.03, y, z], [cx + w / 2 + 0.03, y, z]]), f"{stl} wider than {w} at z {z}"
+
+
+def test_copper_board_fits_the_v7_1_hooks_and_spacers():
+    """The copper-tape board (make_stl.py): chamfered like the other boards, 0.2 recesses on the bed
+    side for the 5 glue-in posts (button_spacers.stl), which reach the face with the same preload."""
+    import make_stl_common as K
+    pcb = os.path.join(os.path.dirname(__file__), "..", "..", "pcb", "stl")
+    m = trimesh.load(os.path.join(pcb, "button_board_print.stl"))
+    assert m.is_watertight and m.body_count == 1
+    cx, y = m.bounds[:, 0].mean(), m.bounds[0][1] + 25.0
+    for z, w in ((0.05, 42.1), (0.8, 43.0), (1.55, 42.1)):
+        assert solid(m, [[cx - w / 2 + 0.03, y, z], [cx + w / 2 - 0.03, y, z]])
+        assert empty(m, [[cx - w / 2 - 0.03, y, z], [cx + w / 2 + 0.03, y, z]])
+    # recesses: printed copper side up and mirrored, so board (x, y) is at (43 - x, 112 - y) in the STL
+    for bx, by_ in K.SPACERS:
+        x, yy = m.bounds[0][0] + 43.0 - bx, m.bounds[0][1] + 112.0 - by_
+        assert empty(m, [[x, yy, 0.1], [x + 1.9, yy, 0.1]]) and solid(m, [[x, yy, 0.3]])
+    s = trimesh.load(os.path.join(pcb, "button_spacers.stl"))
+    assert len(s.split()) == 5 and s.extents[2] == pytest.approx(K.SPACER_H + 0.2, abs=0.01)
+
+
+def test_insulator_plate_fits_under_the_copper_board(P):
+    """button_board_insulator.stl, a tray: 0.8 thick, on the copper tape over the 1.0 traces, clear of
+    the shell (walls, clips, end stops), nothing over a solder joint, ribs only on trace tops."""
+    pcb = os.path.join(os.path.dirname(__file__), "..", "..", "pcb", "stl")
+    plate = trimesh.load(os.path.join(pcb, "button_board_insulator.stl"))
+    assert plate.is_watertight and plate.extents[2] == pytest.approx(0.8, abs=0.01)
+    # print frame -> case: stl (x, y) = (43 - bx, 112 - by), board (bx, by) -> case (bb_w/2 - bx, bb_y0 + by)
+    m = plate.copy()
+    m.apply_transform(np.diag([1, -1, 1, 1]))
+    m.apply_translation([-P["bb_w"] / 2, P["bb_y0"] + P["bb_l"], P["bb_z0"] - 1.0 - 0.05 - 0.8])
+    i = trimesh.boolean.intersection([m, load("asm_shell")], engine="manifold")
+    assert i.is_empty or i.volume < 1e-3, f"the plate hits the shell: {i.volume:.3f} mm3"
+    board = trimesh.load(os.path.join(pcb, "button_board_print.stl"))
+    # every hole of the copper board (empty through its base) has the plate's pocket over it
+    xs, ys = np.meshgrid(np.arange(0.5, 43, 0.5), np.arange(0.5, 112, 0.5))
+    pts = np.c_[xs.ravel(), ys.ravel()]
+    in_hole = ~board.contains(np.c_[pts, np.full(len(pts), 0.8)])
+    hole_pts = pts[in_hole & board.contains(np.c_[pts + [0.9, 0], np.full(len(pts), 0.8)])]
+    assert len(hole_pts) > 50
+    assert not plate.contains(np.c_[hole_pts, np.full(len(hole_pts), 0.6)]).any(), "plastic over a solder joint"
+    # tray (v7.2): inside the 1.5 rim, every rib point rests on a trace top
+    inner = pts[(pts[:, 0] > 1.7) & (pts[:, 0] < 41.3) & (pts[:, 1] > 1.7) & (pts[:, 1] < 110.3)]
+    rib = inner[plate.contains(np.c_[inner, np.full(len(inner), 0.6)])]
+    assert len(rib) > 100, "no ribs"
+    assert board.contains(np.c_[rib, np.full(len(rib), board.bounds[1][2] - 0.3)]).all(), "a rib off the traces"

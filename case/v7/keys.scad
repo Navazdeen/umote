@@ -31,6 +31,16 @@ module ef_flange(h) {
   for (k = [0 : 2]) translate([0, 0, k * ef / 3]) linear_extrude(ef / 3 + 0.01) offset(delta = -ef * (3 - k) / 3) children();
   translate([0, 0, ef]) linear_extrude(h - ef) children();
 }
+// v7.2: pocket over the 6x6 switch body: vertical for h, then a 45 deg roof up to the hex bore, so
+// nothing under a cap is bridged (the v7.1 rockers' flat 0.5 pockets sagged on the print)
+module sw_pocket(h) {
+  rb = grip_af / cos(30) / 2;            // the bore's corner radius: the roof ends there
+  translate([0, 0, -1]) linear_extrude(1 + h) square(pocket_w, center = true);
+  translate([0, 0, h - 0.01]) hull() {
+    linear_extrude(0.01) square(pocket_w, center = true);
+    translate([0, 0, pocket_w / 2 - rb]) linear_extrude(0.01) square(2 * rb, center = true);
+  }
+}
 // blind hex bore for the plunger, with a 0.4 lead-in; its small flat ceiling is the only bridge
 module bore() {
   translate([0, 0, -1]) rotate(30) cylinder(d = grip_af / cos(30), h = 1 + sock, $fn = 6);
@@ -47,7 +57,7 @@ module ring_cap(i) {
         translate([0, 0, cap_top_cham - 0.01]) linear_extrude(0.01) offset(r = -side_clr - cap_top_cham) sector2d(i);
       }
     }
-    rotate(i * 90) translate([dpad_sw, 0, 0]) bore();
+    rotate(i * 90) translate([dpad_sw, 0, 0]) { bore(); sw_pocket(pocket_h); }
     rotate(i * 90) translate([dpad_sw - 0.5, 0, cap_h - 0.4]) linear_extrude(1) polygon([[-1.2, -2.0], [-1.2, 2.0], [1.4, 0]]);
   }
 }
@@ -64,7 +74,7 @@ module round_cap(d, m, key = true, fd = flange_d - 2 * flange_shrink, rib_a = 0)
       cylinder(d = d, h = cap_h - cap_top_cham);
       translate([0, 0, cap_h - cap_top_cham]) cylinder(d1 = d, d2 = d - 2 * cap_top_cham, h = cap_top_cham);
     }
-    bore();
+    bore();  sw_pocket(pocket_h);
     translate([0, 0, cap_h - 0.4]) linear_extrude(1) mark(m);
   }
 }
@@ -92,7 +102,8 @@ module chevron() {
 
 
 // ---------- v5: OK nub, rockers, D-pad ring ----------
-module ok_cap_nub() { ok_cap(); translate([0, 0, cap_h]) intersection() { sphere(d = 1.6, $fn = 24); translate([-1, -1, 0]) cube(2); } }
+module ok_cap_nub() { ok_cap(); translate([0, 0, cap_h - 0.05]) intersection() {   // sunk 0.05 so it joins the cap (it only touched it)
+   sphere(d = 1.6, $fn = 24); translate([-1, -1, 0]) cube(2); } }
 rk_drop = 0.3;                      // rockers sit rk_drop lower: their ends can rise that far as they tip
 rk_h = cap_h + rk_drop;  rk_sock = sock + rk_drop;
 rk_flange_half = rk_drop * 6.5 / 0.3 - 0.5;   // tipping 0.3 at a switch (6.5 out) lifts the flange end less than rk_drop
@@ -113,9 +124,9 @@ module rocker(p, marks) {
         translate([0, 0, cap_top_cham - 0.01]) linear_extrude(0.01) capsule2d(q, cap_d - 2 * cap_top_cham); }
     }
     for (e = q) translate(e) rk_bore();
-    for (e = q) translate(concat(e, [-1])) linear_extrude(1.5) square(6.6, center = true);   // clear of the switch body when pressed
+    for (e = q) translate(e) sw_pocket(rk_pocket_h);   // clear of the switch body when tipped and pressed
     translate([0, 0, rk_h + 40 - 0.5]) rotate([0, 90, 0]) cylinder(r = 40, h = 20, center = true, $fn = 360);   // saddle, 0.5 deep
-    for (i = [0, 1]) translate(concat(q[i], [rk_h - 0.9])) linear_extrude(2) mark(marks[i]);
+    for (i = [0, 1]) translate(concat(q[i], [rk_h - 0.5])) linear_extrude(2) mark(marks[i]);   // 0.5 deep (0.9 in v7.1): 0.7 left over the plunger
   }
 }
 rockers = [[vol, [10, 11]], [ch, [12, 13]]];

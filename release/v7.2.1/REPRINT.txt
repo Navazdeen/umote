@@ -1,0 +1,35 @@
+umote case v7.2.1 - for the 6x6x9.5 tact switches.
+v7.2.1: only caps.stl changed from v7.2. The switch pockets' corners no longer break through the cap
+walls above the flange (the holes at the 4 corners); >= 0.6 of wall stays. Reprint the caps only.
+ The shell is NOT changed: use your v7.1 shell.
+
+Print only these:
+  caps.stl                 caps, D-pad sectors, OK, both rockers (4.0 proud, deep hex bore, roofed pockets)
+  and the board you use:
+  button_board_print.stl   copper-tape board (raised traces). Copper side UP. Spacers: print
+                           button_spacers.stl (5 posts) and glue them (CA) into the 5 shallow
+                           round recesses on the board's bed side.
+  button_board_insulator.stl  0.8 tray between the copper side and the battery (for a 4.2 battery;
+                           0.4 clear): 0.4 floor, 1.5 rim, thin ribs that rest on trace tops between
+                           the joints. Print it flat side down (a brim helps keep it flat). Lay it on
+                           the traces after soldering, rim and ribs towards the board, and fix it
+                           with dots of double-sided tape. Cut the legs flush and keep solder low.
+                           Windows leave the 1206 parts and the J5 wires free.
+  button_board_holes.stl   holes-only board. Component side UP, posts printed on it.
+  button_carrier.stl       module carrier. Component side UP, posts printed on it.
+
+Everything else in this folder is byte-identical to v7.1.
+The boards' long edges are chamfered 0.5 x 45 deg top and bottom: the bottom chamfer sits on the
+v7.1 hooks' slope, and the 5 posts press the board onto it from the face (locked both ways).
+
+Copper-tape board, v7.2: traces and pads grown into the free space (traces up to 2.0, rings round
+the holes >= 0.5, switch rings ~0.9), >= 0.6 between nets. Holes are drill + 0.2 in the model.
+
+Slicer (Orca / Bambu Studio names; PrusaSlicer is similar), 0.4 nozzle, PETG:
+  Wall generator ............ Arachne
+  Minimum feature size ...... 25 %        Minimum wall width ... 50 %
+  Outer wall line width ..... 0.40        Walls ................ 2 (4 is fine for the 1.6 base)
+  Layer height .............. 0.2 base; height range modifier from 1.6 mm up at 0.12 (the traces)
+  Ironing ................... topmost surface only (flat trace tops for the copper tape)
+  X-Y hole compensation ..... +0.1        Elephant foot compensation ... 0.15
+  Solder .................... Sn42Bi58 low-temperature, iron ~200 C

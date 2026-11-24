@@ -36,9 +36,12 @@ module ef_flange(h) {
 module sw_pocket(h) {
   rb = grip_af / cos(30) / 2;            // the bore's corner radius: the roof ends there
   translate([0, 0, -1]) linear_extrude(1 + h) square(pocket_w, center = true);
+  // v7.2.1: the roof starts from the square clipped to r 3.7. The full square's corners (r 4.67) broke
+  // through the 8.6 caps' walls just above the flange; now >= 0.6 of wall stays. The square part (h) is
+  // inside the flange (0.8), and the switch body's corners stay below h even pressed or tipped.
   translate([0, 0, h - 0.01]) hull() {
-    linear_extrude(0.01) square(pocket_w, center = true);
-    translate([0, 0, pocket_w / 2 - rb]) linear_extrude(0.01) square(2 * rb, center = true);
+    linear_extrude(0.01) intersection() { square(pocket_w, center = true); circle(r = pocket_roof_r, $fn = 64); }
+    translate([0, 0, pocket_roof_r - rb + 0.3]) linear_extrude(0.01) circle(r = rb, $fn = 32);   // +0.3: every roof face steeper than 45
   }
 }
 // blind hex bore for the plunger, with a 0.4 lead-in; its small flat ceiling is the only bridge

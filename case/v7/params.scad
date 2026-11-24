@@ -82,7 +82,7 @@ cap_rib_w = 1.0;
 cap_rib_h = cap_flange + top_t - rib_skin - 0.45;
 flange_shrink = 0.2;
 ef = 0.3;
-pocket_w = 6.6;  pocket_h = 0.6;  rk_pocket_h = 1.0;   // v7.2: switch-body pocket under every cap (45 deg roof, no bridge)
+pocket_w = 6.6;  pocket_h = 0.6;  rk_pocket_h = 1.0;  pocket_roof_r = 3.7;   // roof: cap r 4.3 - 0.6 wall (v7.2.1)   // v7.2: switch-body pocket under every cap (45 deg roof, no bridge)
 side_clr = 0.6;                      // D-pad / OK gap to the plate opening, per side (0.45 in v5)
 
 // ---------- mic ----------

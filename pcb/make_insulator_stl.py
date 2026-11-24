@@ -1,9 +1,10 @@
 """Insulating plate between the copper-tape board's copper side and the battery (v7.2, 2026-11-24).
 
 The user's battery is 4.2 thick (the case models 5.0), so under the board there's 2.25:
-  board underside (bb_z0 8.3) - 1.0 raised traces - 0.05 copper tape = plate top 7.25
-  plate 0.8 thick                                                     = plate bottom 6.45
-  battery top: deck 1.65 + 0.2 tape + 4.2                             = 6.05, so 0.4 clear.
+  component side (bb_top 9.9) - 2.0 to the trace tops - 0.05 copper tape = plate top 7.85
+  plate 0.8 thick                                                         = plate bottom 7.05
+  battery top: deck 1.65 + 0.2 tape + 4.2                                 = 6.05, so 1.0 clear
+  (0.4 before v7.2.2 thinned the board's middle).
 It's a tray (user's request, easier to print than 59 pockets): a 0.4 floor, a 1.5 rim round the
 board's outline, and one 0.4 deep recess for the solder joints and the flush-cut legs. Thin ribs
 (0.8) inside it rest on trace tops between the joints so the floor can't sag onto them; they come
@@ -26,7 +27,7 @@ import board as B
 from make_stl_common import extrude
 
 OUT = sys.argv[1] if len(sys.argv) > 1 else "stl"
-BB_Z0, RIDGE, TAPE = 8.3, 1.0, 0.05          # v7 board underside; make_stl.py's RIDGE; copper tape
+BB_Z0, BOARD_TOP, TAPE = 8.3, 2.0, 0.05     # v7 board underside (component side + 1.6); make_stl.py's TOP (trace tops); copper tape
 SEAT, BATT_TAPE, BATT = 1.65, 0.2, 4.2       # key plate deck, tape under the battery, the user's battery (measured)
 PLATE_T, POCKET_H = 0.8, 0.4
 RIM, RIB_W, RIB_PITCH, JOINT_KEEP = 1.5, 0.8, 7.0, 2.2   # rib keep-out radius round each hole centre
@@ -35,7 +36,7 @@ os.makedirs(OUT, exist_ok=True)
 res = pickle.load(open("best.pkl", "rb"))
 parts = B.build(res["assign"], res["layout"])
 
-top = BB_Z0 - RIDGE - TAPE
+top = BB_Z0 + 1.6 - BOARD_TOP - TAPE
 clear = top - PLATE_T - (SEAT + BATT_TAPE + BATT)
 assert clear >= 0.3, f"plate to battery {clear:.2f}"
 
@@ -50,7 +51,8 @@ for pt in parts:
         wins.append(box(min(xs) - 1.6, pt.y - 1.8, max(xs) + 1.6, B.BOARD_H + 1))
 windows = unary_union(wins)
 
-outline = box(0, 0, B.BOARD_W, B.BOARD_H)
+SIDE_IN = 0.7                                # v7.2.2: 0.6 higher now, its long edges would touch the clip hooks' tips (x 21.0)
+outline = box(SIDE_IN, 0, B.BOARD_W - SIDE_IN, B.BOARD_H)
 mirror = lambda g: affinity.scale(g, xfact=-1, origin=(B.BOARD_W / 2, B.BOARD_H / 2))
 flip_y = lambda g: affinity.scale(g, yfact=-1, origin=(B.BOARD_W / 2, B.BOARD_H / 2))
 fix = lambda g: flip_y(mirror(g))            # as make_stl.py: copper side seen from above

@@ -7,7 +7,8 @@ v7.2 (2026-11-24, the 1.0 traces and 0.25-0.35 rings round the holes printed bad
   - every net's copper grows by up to GROW a side into free space, but stays GAP from every other
     net (traces up to 2.0 wide where there's room; switch rings ~0.85). Crowded spots keep v7.1's copper;
   - holes are drill + 0.2 (0.3 before): set the slicer's X-Y hole compensation to +0.1;
-  - the DIP-28 holes are 1.2 and Q1's 1.1 (v7.2.2; 0.9 in v7.2 was too small);
+  - the DIP-28 and Q1 holes are 1.0 x 1.6 slots across the pin row (v7.2.3; 0.9 round in v7.2 was too
+    small, 1.2 round in v7.2.2 left 0.35 rings the slicer dropped);
   - v7.2.2: the base is 1.0 inside a 1.6 rim and all trace tops are level at 2.0, so the board is
     2.0 thick at every hole (2.6 in v7.2) and the legs come through 0.6 further;
   - both long edges chamfered 0.5 x 45 deg top and bottom, to lock onto the v7.1 shell's hooks
@@ -28,7 +29,11 @@ from make_stl_common import extrude, chamfer_long_edges, check_clear, posts2d, S
 OUT = sys.argv[1] if len(sys.argv) > 1 else "stl"
 RIDGE = float(os.environ.get("RIDGE", 1.0))   # raised copper pattern height (0.4 at first, 1.4 on 2026-10-29, 1.0 on 2026-11-16: user's requests)
 HOLE_EXTRA = 0.2     # + the slicer's X-Y hole compensation 0.1 (0.3 in the model before, which ate the rings)
-LEG_HOLE = {"DIP28": 1.2, "TO92_wide": 1.1}   # v7.2.2: 0.9 (v7.2) printed too small for the MCP23017's legs
+# v7.2.3: slots, not round holes, for the parts whose pins sit 2.54 apart in a row along x (DIP-28,
+# Q1). Their legs are flat (~0.5 x 0.25) and splay across the row, so the room goes across (y). Along
+# the row a 1.0 slot leaves ~0.47 of ring to each neighbour; the 1.2 round holes of v7.2.2 left 0.35,
+# which the slicer dropped. (x, y) sizes:
+LEG_SLOT = {"DIP28": (1.0, 1.6), "TO92_wide": (1.0, 1.6)}
 # v7.2.2: the legs didn't come through 1.6 base + 1.0 traces. The base is 1.0 inside a 1.6 rim (the rim
 # keeps the edge chamfers and the hook fit) and every trace top is level at TOP, so the board is 2.0 at
 # every hole. The component side stays flat: the switches (and so the caps) don't move.
@@ -41,8 +46,11 @@ res = pickle.load(open("best.pkl", "rb"))
 parts = B.build(res["assign"], res["layout"])
 
 
-def hole_d(part, p):
-    return LEG_HOLE.get(part.kind, p.drill + HOLE_EXTRA)
+def hole_geom(part, p):
+    if part.kind in LEG_SLOT:
+        w, h = LEG_SLOT[part.kind]
+        return LineString([(p.x, p.y - (h - w) / 2), (p.x, p.y + (h - w) / 2)]).buffer(w / 2, 16)
+    return Point(p.x, p.y).buffer((p.drill + HOLE_EXTRA) / 2, 24)
 
 
 # copper by net (a pad with no net is its own net)
@@ -65,7 +73,7 @@ for _ in range(int(round(GROW / STEP))):
         nxt[k] = g.buffer(STEP, 8).difference(others.buffer(GAP + STEP, 16)).intersection(inside).union(g)
     grown = nxt
 cu = unary_union(list(grown.values()))
-hole_list = [(Point(p.x, p.y).buffer(hole_d(part, p) / 2, 24), part, p) for part in parts for p in part.pads if p.drill]
+hole_list = [(hole_geom(part, p), part, p) for part in parts for p in part.pads if p.drill]
 holes = unary_union([h for h, _, _ in hole_list])
 
 # checks: nets apart by >= GAP (or as close as v7.1 had them), and the ring round each hole
@@ -78,8 +86,8 @@ rings = {}
 for h, part, p in hole_list:
     c = next(v for k, v in grown.items() if v.contains(Point(p.x, p.y)))
     outside = box(-5, -5, B.BOARD_W + 5, B.BOARD_H + 5).difference(c.union(h))
-    r = hole_d(part, p) / 2
-    w = min(Point(p.x + r * np.cos(a), p.y + r * np.sin(a)).distance(outside) for a in np.linspace(0, 2 * np.pi, 36, endpoint=False))
+    edge = h.exterior
+    w = min(edge.interpolate(t, normalized=True).distance(outside) for t in np.linspace(0, 1, 72, endpoint=False))
     rings.setdefault(part.kind, []).append(w)
 recesses = posts2d().buffer((RECESS_D - SPACER_D) / 2, 48)
 check_clear(recesses, holes, what="holes")

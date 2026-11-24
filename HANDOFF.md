@@ -4,6 +4,14 @@ A battery-powered remote built around the **LCDwiki E32R24P** (ESP32-32E, 2.4" S
 
 > **Latest (2026-11-01):** remote UI + Home Assistant integration shipped and running on the remote. See [`docs/HANDOFF-2026-11-01-remote-ui.md`](docs/HANDOFF-2026-11-01-remote-ui.md); it supersedes the firmware rows below.
 
+## 2026-11-24: v7.2.3 slotted MCP23017 and Q1 holes
+
+The slicer preview of v7.2.2 showed no wall round the MCP23017 holes on the pin-to-pin sides. The 1.2 round holes left 0.35 of ring there (pins 2.54 apart, 0.6 gap between pads), which is right at the user's 85 % minimum wall width.
+- The DIP-28 and Q1 holes are now 1.0 x 1.6 slots across the pin row (`LEG_SLOT`, `hole_geom` in `make_stl.py`): 0.45 of ring to each neighbour, and the splayed legs get room across the chip.
+- The ring check now measures along the hole's own edge. The tray's ribs follow the new traces.
+- 63 tests pass (the legs test checks the slot and the 0.45 ring). Fit checks are clean.
+- `release/v7.2.3/` (board + tray changed) is on copyparty `/stl/v7.2.3/`.
+
 ## 2026-11-24: v7.2.2 copper-tape board lets the legs through
 
 On the printed v7.2 copper board, the MCP23017's legs didn't fit the 0.9 holes, and the legs didn't come through 1.6 base + 1.0 traces.

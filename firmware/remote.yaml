@@ -35,13 +35,17 @@
 #   - <= 20 %: ultra saver (25 % backlight, 8 s timeout, no voice). <= 5 %: IR only.
 #
 # Status LED (the on-board RGB LED, seen as a glow through the back plate):
-#   amber steady   charging            green steady   full (shown for about an hour)
+#   amber breath   charging            green breath   full (slower; shown for about an hour)
 #   red blink      battery <= 20 %     red steady     battery <= 5 %        (both only while awake)
 #   green flash    IR sent             blue flash     sent over WiFi        blue pulse   listening
 # Charging is guessed from the battery voltage (umote::ChargeTracker in logic.h): no pin reports it.
-# Asleep, the LED pins are held, so charging shows as red + green full on (no PWM in deep sleep).
-# To notice the charger at all the remote wakes dark for about a second every ${poll_idle_min} min,
-# and every ${poll_charge_min} min while charging [CHECK the cost on a meter].
+# Deep sleep has no PWM, so on the charger the remote does not deep-sleep: it stays up with the
+# screen dark and WiFi off ("docked", go_to_sleep) and breathes the LED; the charger carries that.
+# Off the charger it deep-sleeps with the LED off. IO16/IO17 (green/blue) hang on VDD_SDIO, which
+# ESP-IDF always cuts in deep sleep (the LED then glows green through the dead pads), so
+# rtc_sleep_init is wrapped to keep that rail up (logic.h) [CHECK the cost on a meter: flash standby].
+# To notice the charger at all the remote wakes dark for about a second every ${poll_idle_min} min;
+# docked, it reads the battery every ${poll_charge_min} min.
 
 substitutions:
   name: tv-remote
@@ -55,12 +59,15 @@ substitutions:
   stb_nec_address: "0x0000"      # set-top box NEC address [CHECK: capture]
   key_mask: "0xDDFF"             # the 14 key bits used in pinmap.json
   poll_idle_min: "15"            # dark wake to look for a charger
-  poll_charge_min: "5"           # dark wake to follow the charge
+  poll_charge_min: "5"           # docked: battery reading to follow the charge
 
 esphome:
   name: ${name}
   includes:
     - <esp_pm.h>
+  platformio_options:
+    build_flags:
+      - -Wl,--wrap=rtc_sleep_init   # keeps VDD_SDIO up in deep sleep: __wrap_rtc_sleep_init in logic.h
   on_boot:
     - priority: 800              # as early as possible
       then:
@@ -179,6 +186,8 @@ globals:
   - { id: g_autoprobe, type: bool, initial_value: 'true' }  # interval may auto-reboot on a probe hit
   - { id: g_pm_lock, type: esp_pm_lock_handle_t, initial_value: 'nullptr' }
   - { id: g_charge, type: int, initial_value: '0' }         # umote::Charge: 0 none, 1 charging, 2 full
+  - { id: g_dock, type: bool, initial_value: 'false' }      # on the charger, screen dark, LED breathing
+  - { id: g_rest_read, type: bool, initial_value: 'true' }  # the next battery reading is a resting one
 
 # ---------------------------------------------------------------- power
 deep_sleep:
@@ -215,6 +224,8 @@ light:
     default_transition_length: 0s
     effects:
       - pulse: { name: listening, transition_length: 400ms, update_interval: 400ms }
+      - pulse: { name: breathe, transition_length: 1500ms, update_interval: 1500ms, min_brightness: 2%, max_brightness: 30% }
+      - pulse: { name: breathe_slow, transition_length: 3s, update_interval: 3s, min_brightness: 2%, max_brightness: 25% }
       - strobe:
           name: low
           colors:
@@ -272,11 +283,13 @@ sensor:
           static const char *const NAME[] = {"Normal", "Ultra saver", "Critical"};
           id(power_mode).publish_state(NAME[m]);
           // charging, from how the voltage moves. The first reading after a wake is taken before
-          // the screen and WiFi are on ("rested"); the 60 s ones after it are under load.
+          // the screen and WiFi are on ("rested"); the 60 s ones after it are under load. Docked,
+          // only the reading go_to_sleep asks for every ${poll_charge_min} min counts (the tracker
+          // counts resting readings as time), and it is a resting one.
           static RTC_DATA_ATTR umote::ChargeTracker chg = {};
-          static bool rested = true;
-          id(g_charge) = (int) chg.feed((int) (x * 1000), rested);
-          rested = false;
+          bool rested = id(g_rest_read);
+          id(g_rest_read) = false;
+          if (rested || !id(g_dock)) id(g_charge) = (int) chg.feed((int) (x * 1000), rested);
           static const char *const CHG[] = {"Not charging", "Charging", "Full"};
           id(charge_state).publish_state(CHG[id(g_charge)]);
       - script.execute: ui_refresh
@@ -463,6 +476,10 @@ script:
           if (full && !id(g_mode) && !api::global_api_server->is_connected_with_state_subscription())
             id(g_idle_ms) = std::max<uint32_t>(id(g_idle_ms), 15000);
           if (!id(g_fast)) { esp_pm_lock_acquire(id(g_pm_lock)); id(g_fast) = true; }
+          if (id(g_dock)) {                     // picked up off the dock: WiFi was switched off there
+            id(g_dock) = false;
+            if (id(g_mode) < 2) id(net_up).execute();
+          }
       - light.turn_on: { id: backlight, brightness: !lambda 'return id(g_bright);' }
       - delay: 1500ms
       - lambda: 'if (id(g_fast)) { esp_pm_lock_release(id(g_pm_lock)); id(g_fast) = false; }'
@@ -490,6 +507,25 @@ script:
                 }());
           timeout: 3s
       - light.turn_off: backlight
+      # On the charger: no deep sleep (it has no PWM). Stay up, dark, WiFi off, LED breathing, until
+      # the tracker says the charger is gone or "full" has been shown long enough. Any input
+      # restarts idle_timer, which stops this script.
+      - if:
+          condition:
+            lambda: 'return id(g_charge) != 0;'
+          then:
+            - lambda: 'id(g_dock) = true;'
+            - wifi.disable:
+            - lambda: 'id(g_net) = 0;'
+            - script.execute: led_base
+            - while:
+                condition:
+                  lambda: 'return id(g_charge) != 0;'
+                then:
+                  - delay: ${poll_charge_min}min
+                  - lambda: 'id(g_rest_read) = true;'
+                  - component.update: batt_v
+            - lambda: 'id(g_dock) = false;'
       - light.turn_off: status_led
       - lambda: |-
           // the crease roller (GPB1/GPB5) must not wake it from a knock: only keys do. GPINTENB
@@ -508,8 +544,8 @@ script:
           // the board is missing (IO35 floats) or a key is jammed (it would wake at once).
           if (id(g_board_ok) && !stuck)
             esp_sleep_enable_ext0_wakeup(GPIO_NUM_35, 0);
-          // timer wake: follow the charge, or look for a charger; a jammed key is looked at again too
-          uint32_t nap_min = id(g_charge) ? ${poll_charge_min} : ${poll_idle_min};
+          // timer wake: look for a charger; a jammed key is looked at again too
+          uint32_t nap_min = ${poll_idle_min};
           if (stuck) nap_min = std::min<uint32_t>(nap_min, 10);
           id(sleeper).set_sleep_duration(nap_min * 60 * 1000);
           // drive or release every pin into its zero-current state and hold it through sleep
@@ -524,10 +560,10 @@ script:
           drive(GPIO_NUM_4, 1);      // amp shut down
           drive(GPIO_NUM_21, 0);     // backlight off
           drive(GPIO_NUM_18, 0);     // mic SCK stopped: INMP441 sleeps
-          // RGB LED (common anode, low = on), held through sleep: red + green while charging,
-          // green when full, otherwise off
-          drive(GPIO_NUM_22, id(g_charge) == 1 ? 0 : 1);
-          drive(GPIO_NUM_16, id(g_charge) ? 0 : 1);
+          // RGB LED (common anode, low = on): off through sleep. IO16/IO17 only stay high because
+          // VDD_SDIO is kept up (__wrap_rtc_sleep_init, logic.h).
+          drive(GPIO_NUM_22, 1);
+          drive(GPIO_NUM_16, 1);
           drive(GPIO_NUM_17, 1);
           // IO19 (WS) and IO23 (SD) have 10k pull-ups from the SD slot: leave them inputs, never low
           gpio_reset_pin(GPIO_NUM_19);
@@ -535,9 +571,6 @@ script:
           gpio_reset_pin(GPIO_NUM_23);
           gpio_set_pull_mode(GPIO_NUM_23, GPIO_FLOATING);
           gpio_deep_sleep_hold_en();
-          // IO16/IO17 (LED green/blue) live on VDD_SDIO, which deep sleep powers down: the held
-          // "off" level then collapses and the LED lights green. Keeping VDD_SDIO up costs a few uA.
-          esp_sleep_pd_config(ESP_PD_DOMAIN_VDDSDIO, ESP_PD_OPTION_ON);
           esp_deep_sleep_disable_rom_logging();
           if (id(g_board_ok)) {      // reading GPIOA/B clears a pending INT so IO35 is high
             uint8_t v;
@@ -957,8 +990,11 @@ script:
             id(status_led).turn_off().perform();
             return;
           }
+          // charging and full breathe (the pulse effect fades the colour set here); saver: a red blink
+          const char *fx = c == 1 ? "breathe" : c == 2 ? "breathe_slow" : m == 1 ? "low" : "None";
+          if (c && id(status_led).get_effect_name() == fx) return;      // already breathing: don't restart the fade
           auto call = id(status_led).turn_on();
-          call.set_effect(!c && m == 1 ? "low" : "None");               // saver: a red blink
+          call.set_effect(fx);
           if (c == 1) call.set_rgb(1.0f, 0.45f, 0.0f);                  // charging: amber
           else if (c == 2) call.set_rgb(0.0f, 1.0f, 0.0f);              // full: green
           else call.set_rgb(1.0f, 0.0f, 0.0f);                          // critical: red

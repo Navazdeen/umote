@@ -304,3 +304,19 @@ inline std::string ellipsize(const std::string &s, size_t max_chars) {
 }
 
 }  // namespace umote
+
+// ---- deep sleep: keep VDD_SDIO up ---------------------------------------------------------------------
+// The LED's green and blue pins (IO16/IO17) are powered from VDD_SDIO. esp_deep_sleep_start() always
+// switches that rail off (esp_sleep_pd_config() is ignored for it in deep sleep), the held "off" level
+// collapses and the LED glows green. Linked with -Wl,--wrap=rtc_sleep_init (remote.yaml), this keeps the
+// rail on; the flash chip then sits in standby instead of unpowered [CHECK the sleep current].
+#if defined(ESP_PLATFORM) && defined(CONFIG_IDF_TARGET_ESP32)
+#include <soc/rtc.h>
+extern "C" {
+void __real_rtc_sleep_init(rtc_sleep_config_t cfg);
+__attribute__((used)) void __wrap_rtc_sleep_init(rtc_sleep_config_t cfg) {
+  cfg.vddsdio_pd_en = 0;
+  __real_rtc_sleep_init(cfg);
+}
+}
+#endif

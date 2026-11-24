@@ -358,3 +358,22 @@ def test_boards_have_spacers_and_chamfers(stl):
         cx, y = m.bounds[:, 0].mean(), m.bounds[0][1] + 25.0
         assert solid(m, [[cx - w / 2 + 0.03, y, z], [cx + w / 2 - 0.03, y, z]]), f"{stl} narrower than {w} at z {z}"
         assert empty(m, [[cx - w / 2 - 0.03, y, z], [cx + w / 2 + 0.03, y, z]]), f"{stl} wider than {w} at z {z}"
+
+
+def test_copper_board_fits_the_v7_1_hooks_and_spacers():
+    """The copper-tape board (make_stl.py): chamfered like the other boards, 0.2 recesses on the bed
+    side for the 5 glue-in posts (button_spacers.stl), which reach the face with the same preload."""
+    import make_stl_common as K
+    pcb = os.path.join(os.path.dirname(__file__), "..", "..", "pcb", "stl")
+    m = trimesh.load(os.path.join(pcb, "button_board_print.stl"))
+    assert m.is_watertight and m.body_count == 1
+    cx, y = m.bounds[:, 0].mean(), m.bounds[0][1] + 25.0
+    for z, w in ((0.05, 42.1), (0.8, 43.0), (1.55, 42.1)):
+        assert solid(m, [[cx - w / 2 + 0.03, y, z], [cx + w / 2 - 0.03, y, z]])
+        assert empty(m, [[cx - w / 2 - 0.03, y, z], [cx + w / 2 + 0.03, y, z]])
+    # recesses: printed copper side up and mirrored, so board (x, y) is at (43 - x, 112 - y) in the STL
+    for bx, by_ in K.SPACERS:
+        x, yy = m.bounds[0][0] + 43.0 - bx, m.bounds[0][1] + 112.0 - by_
+        assert empty(m, [[x, yy, 0.1], [x + 1.9, yy, 0.1]]) and solid(m, [[x, yy, 0.3]])
+    s = trimesh.load(os.path.join(pcb, "button_spacers.stl"))
+    assert len(s.split()) == 5 and s.extents[2] == pytest.approx(K.SPACER_H + 0.2, abs=0.01)

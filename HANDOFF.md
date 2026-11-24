@@ -18,8 +18,15 @@ The 6x6x7 switches couldn't be sourced. The new ones are 6x6x9.5: a 3.8 body und
 - **Spacers** (`make_stl_common.SPACERS`): 5 posts, d 4.0 and 4.75 tall, at board (17, 3.5), (6, 40.5), (35, 41.5), (11, 106) and (33.5, 103.5). They reach the face's underside with a 0.05 preload, pressing the board onto the 4 slopes, so it's held both ways.
   - They're on both printed boards: `make_carrier_stl.py`, and `make_stl_holes.py` (now in the repo, and now printed **component side up**, with its 1206 pockets on the bed).
   - The scripts check the posts against holes, pockets and part bodies (0.92 clear on the holes board). The tests check them against the shell, caps, rockers and ring.
-- **Checks**: `pytest case/tests/test_v7.py` gives 59 green. `case/fit_check_v7.py` with and without `--module` finds no collisions (the spacers are modelled in both). Python runs through uv (`.venv` rebuilt; the old one pointed at a deleted miniconda).
-- **Release**: `release/v7.2/` is the whole set plus `REPRINT.txt`. Only `caps.stl`, `button_board_holes.stl` and `button_carrier.stl` differ from v7.1. Uploaded to copyparty `/stl/v7.2/`, SHA-checked.
+- **Copper-tape board** (`pcb/make_stl.py`, `button_board_print.stl`): the 1.0 traces and the 0.25–0.35 rings round the holes printed badly.
+  - Every net's copper now grows in 0.05 steps, up to 0.5 a side, keeping 0.6 to the other nets. Traces reach about 2.0, every hole ring is at least 0.5 (switches about 0.9), and there's 80% more copper.
+  - Holes are drill + 0.2 (slicer X-Y hole compensation +0.1), and the DIP-28 and Q1 holes are 0.9.
+  - Same edge chamfers as the other boards, and copper stays 0.8 from the edge.
+  - The 5 spacers are a separate `button_spacers.stl` (d 4.0 x 4.95), glued into 0.2 recesses on the bed side. They can't print on that side, and a peg hole would cut a trace at (33.5, 103.5).
+  - The build takes about 6 min (the growth steps).
+  - Slicer settings are in `release/v7.2/REPRINT.txt`: Arachne, min feature 25%, 0.12 layers for the traces, ironing.
+- **Checks**: `pytest case/tests/test_v7.py` gives 60 green. `case/fit_check_v7.py` with and without `--module` finds no collisions (the spacers are modelled in both). Python runs through uv (`.venv` rebuilt; the old one pointed at a deleted miniconda).
+- **Release**: `release/v7.2/` is the whole set plus `REPRINT.txt`. Only `caps.stl`, the three boards and `button_spacers.stl` differ from v7.1. Uploaded to copyparty `/stl/v7.2/`, SHA-checked.
 - **[CHECK] on the print**: the hex bore's grip on the tapered plunger (it holds the 3.5 base, and the 3.0 tip sits loose). Whether the 0.05 preload holds the board without rattling. The bridges over the holes board's 1206 pockets.
 
 ## 2026-11-22 session: printed carrier for the CJMCU-2317 MCP23017 module (v7.1 case)

@@ -9,6 +9,7 @@ from shapely.ops import unary_union
 from shapely import affinity
 import board as B
 from route import pad_geom
+from make_stl_common import extrude
 
 OUT = sys.argv[1] if len(sys.argv) > 1 else "stl"
 RIDGE = float(os.environ.get("RIDGE", 1.0))   # raised copper pattern height (0.4 at first, 1.4 on 2026-10-29, 1.0 on 2026-11-16: user's requests)
@@ -26,22 +27,6 @@ mirror = lambda g: affinity.scale(g, xfact=-1, origin=(B.BOARD_W / 2, B.BOARD_H 
 flip_y = lambda g: affinity.scale(g, yfact=-1, origin=(B.BOARD_W / 2, B.BOARD_H / 2))
 base2d = flip_y(mirror(box(0, 0, B.BOARD_W, B.BOARD_H).difference(holes)))
 ridge2d = flip_y(mirror(cu.difference(holes)))
-
-
-def extrude(g, h, z0):
-    from shapely.geometry.polygon import orient
-    ms = []
-    for poly in getattr(g, "geoms", [g]):
-        poly = orient(poly.buffer(0).simplify(0.02), 1.0)   # 0.02 mm: removes near-duplicate vertices that break triangulation
-        if poly.is_empty or poly.area < 0.01:
-            continue
-        m = trimesh.creation.extrude_polygon(poly, h); m.apply_translation([0, 0, z0])
-        if not m.is_volume:
-            m.fix_normals()
-        ms.append(m)
-    bad = [m for m in ms if not m.is_volume]
-    assert not bad, f"{len(bad)} extrusions are not closed volumes"
-    return trimesh.boolean.union(ms, engine="manifold") if len(ms) > 1 else ms[0]
 
 
 base = extrude(base2d, B_PCB := 1.6, 0)

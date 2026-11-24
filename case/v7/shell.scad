@@ -115,12 +115,9 @@ module key_collars() translate([0, 0, pz0 - cap_flange - 0.4]) linear_extrude(ca
     translate([-50, y_key_start + 0.2]) square([100, L]);
   }
 module board_clip() {
-  // v7.2: the hook was upside down (its slope faced the board, its flat the back). Now a flat ledge at
-  // bb_z0 holds the board's underside and a 0.6 x 45 deg lead-in faces the back, where the board comes in.
-  // The ledge is a 0.6 overhang in print (face down).
-  len = pz0 - bb_z0 + 0.8;
+  len = pz0 - bb_z0 + 0.5;
   translate([0, -clip_w / 2, 0]) rotate([90, 0, 0]) mirror([0, 0, 1]) linear_extrude(clip_w)
-    polygon([[0, 0], [clip_t, 0], [clip_t, -len], [0, -len], [-0.6, -len + 0.6], [-0.6, -len + 0.8], [0, -len + 0.8]]);
+    polygon([[0, 0], [clip_t, 0], [clip_t, -len], [-0.6, -len + 0.0], [-0.6, -len + 0.5], [0, -len + 1.1]]);
 }
 module end_block() {
   translate([-40, end_block_y, -30]) cube([80, 30, 30 + pz0 + 0.01]);

@@ -10,8 +10,9 @@ Same 43 x 112 outline as the button board, so the case fits it unchanged. It has
     J5 wire pads were (strain relief for the display and IR LED wires);
   - an engraved arrow on the top face pointing at the tip (POWER end), so the board can't go in
     mirrored.
-  - v7.2: five spacer posts (d 4.0, 4.6 tall) on the top face. They stop 0.1 under the case face, so the
-    plate is held both ways: posts against the face, the shell's 4 hooks under its edges.
+  - v7.2: five spacer posts (d 4.0, 4.75 tall) on the top face, and 0.5 x 45 deg chamfers on both long
+    edges, top and bottom (make_stl_common.py). The bottom chamfers sit on the v7.1 shell's hook slopes
+    and the posts press the plate onto them from the face, so it's held both ways with the shell as printed.
 The 1206 resistors and capacitors go inline on the wires.
 
 Printed TOP FACE UP (component side up; the lips print on the bed). Viewed from above, the STL
@@ -27,6 +28,7 @@ from shapely.ops import unary_union
 from shapely import affinity
 from shapely.geometry.polygon import orient
 import board as B
+from make_stl_common import SPACERS, SPACER_D, SPACER_H, posts2d, add_spacers, chamfer_long_edges, check_clear
 
 _MAIN = __name__ == "__main__"
 OUT = sys.argv[1] if _MAIN and len(sys.argv) > 1 else "stl"
@@ -37,11 +39,6 @@ PLATE = 1.6           # same as the PCB (the case and fit_check assume 1.6)
 LIP_T, LIP_W = 0.6, 1.2
 HOLE_EXTRA = 0.3      # printed holes come out small (as in make_stl.py)
 MOD_X, MOD_Y = 21.5, 63.5   # window centre: board centre-ish, centred in the 53..74 band
-# v7.2 spacers: posts on the top face that stop 0.1 under the shell face's underside (pz0 - bb_top - 0.1),
-# so the board can't be pushed in; the shell's hooks hold it from the back. Spots (board coords) are on
-# flat face underside, clear of caps, rockers, the D-pad ring, clips, wires, the mic, Q1 and the window.
-SPACERS = [(17.0, 3.5), (6.5, 39.0), (35.0, 41.5), (6.5, 100.5), (32.0, 102.0)]
-SPACER_D, SPACER_H = 4.0, 4.6
 
 # ---- switch and Q1 holes
 parts = [B.tact6(r, x, y, "S", fn, rot) for r, (x, y, fn, rot) in B.BUTTONS.items()]
@@ -94,11 +91,14 @@ def build(clip=None):
         plate2d, lip2d = plate2d.intersection(clip), lip2d.intersection(clip)
     body = trimesh.boolean.union([extrude(flip_y(plate2d), PLATE, 0), extrude(flip_y(lip2d), LIP_T, 0)],
                                  engine="manifold")
-    posts = unary_union([Point(x, y).buffer(SPACER_D / 2, 48) for x, y in SPACERS])
+    posts = posts2d()
+    check_clear(posts, unary_union([holes, window, arrow]), what="holes, window or arrow")
     if clip is not None:
         posts = posts.intersection(clip)
     if not posts.is_empty:
-        body = trimesh.boolean.union([body, extrude(flip_y(posts), SPACER_H + 0.01, PLATE - 0.01)], engine="manifold")
+        body = add_spacers(body, flip_y(posts), PLATE)
+    if clip is None:
+        body = chamfer_long_edges(body, B.BOARD_W, B.BOARD_H, PLATE)
     if clip is None or clip.contains(arrow):
         cut = extrude(flip_y(arrow), ARROW_D + 0.01, PLATE - ARROW_D)
         body = trimesh.boolean.difference([body, cut], engine="manifold")

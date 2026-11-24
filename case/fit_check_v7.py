@@ -30,7 +30,7 @@ SKIP = {
     ("wire roller", "MCP23017 module"), ("wire boards", "MCP23017 module"),   # the wires end on it
     ("button PCB", "MCP23017 module"),                                        # it sits in the carrier's window
     ("button PCB", "carrier spacers"),                                        # v7.2: printed on the carrier
-    ("carrier spacers", "shell"), ("carrier spacers", "dpad ring"),          # v7.2: they stop 0.1 under the face (and a ring tab in it)
+    ("carrier spacers", "shell"),                                             # v7.2: they press on the face (0.05 preload)
 }
 MODULE = (26.0, 21.0, 0.6)     # CJMCU-2317: length (x) and width (y), and the carrier's lip under it
 EXACT = {"USB-C plug overmold", "USB-C plug metal"}
@@ -52,12 +52,12 @@ def components(P, module=False):
         comp["MCP23017 module"] = trimesh.util.concatenate([
             v6.box(mx - L / 2, mx + L / 2, cyy - W / 2, cyy + W / 2, mz - 0.5, mz + 1.6 + 0.5),
             v6.box(mx - 5.25, mx + 5.25, cyy - 4.0, cyy + 4.0, mz + 1.6, mz + 1.6 + 2.0)])
-        # v7.2: the carrier's spacer posts (pcb/make_carrier_stl.py), board top to 0.1 under the face
-        sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pcb"))
-        import make_carrier_stl as C
-        comp["carrier spacers"] = trimesh.util.concatenate([
-            cyl([P["bb_w"] / 2 - x, P["bb_y0"] + y, P["bb_top"]], [P["bb_w"] / 2 - x, P["bb_y0"] + y, P["bb_top"] + C.SPACER_H], C.SPACER_D)
-            for x, y in C.SPACERS])
+    # v7.2: the spacer posts on both printed boards (pcb/make_stl_common.py), board top to the face (0.05 preload)
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pcb"))
+    import make_stl_common as K
+    comp["carrier spacers"] = trimesh.util.concatenate([
+        cyl([P["bb_w"] / 2 - x, P["bb_y0"] + y, P["bb_top"]], [P["bb_w"] / 2 - x, P["bb_y0"] + y, P["bb_top"] + K.SPACER_H], K.SPACER_D)
+        for x, y in K.SPACERS])
     # wires, all laid in from the back. Through the wheel zone they run in the -x notches of both
     # cross walls (x -15.3..-10, beside the wheel). The battery pair leaves the battery's top end,
     # crosses low under the board's start, and runs under the display's back parts to the BAT socket.

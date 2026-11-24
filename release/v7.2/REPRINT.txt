@@ -1,0 +1,10 @@
+umote case v7.2 - for the 6x6x9.5 tact switches. The shell is NOT changed: use your v7.1 shell.
+
+Print only these:
+  caps.stl                 caps, D-pad sectors, OK, both rockers (4.0 proud, deep hex bore, roofed pockets)
+  button_board_holes.stl   holes-only board   } print the one you use. Component side UP,
+  button_carrier.stl       module carrier     } spacer posts up, no supports.
+
+Everything else in this folder is byte-identical to v7.1.
+The boards' long edges are chamfered 0.5 x 45 deg top and bottom: the bottom chamfer sits on the
+v7.1 hooks' slope, and the 5 posts press the board onto it from the face (locked both ways).

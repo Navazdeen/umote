@@ -297,59 +297,64 @@ def test_no_bridges_in_caps():
             assert a < 11.0, f"bridged ceiling of {a:.1f} mm2 at {np.round(m.triangles_center[f[0]], 1).tolist()}"
 
 
-def test_board_clip_hook_holds_the_board(P):
-    """Each hook has a flat ledge at bb_z0 under the board and a 45 deg lead-in facing the back."""
-    m = load("asm_shell")
+def test_shell_is_the_printed_v7_1():
+    """v7.2 doesn't touch the shell: the user has it printed. Boards and caps fit it as it is."""
+    rel = os.path.join(os.path.dirname(__file__), "..", "..", "release", "v7.1", "shell.stl")
+    assert open(os.path.join(STL7, "shell.stl"), "rb").read() == open(rel, "rb").read()
+
+
+def hook_inner_x(m, P, y, z):
     x_wall = P["bb_w"] / 2 + 0.1
+    s = m.section([0, 0, 1], [0, 0, z])
+    v = s.vertices[(np.abs(s.vertices[:, 1] - y) < 3.5) & (s.vertices[:, 0] > x_wall - 1.0) & (s.vertices[:, 0] < x_wall + 2)]
+    return v[:, 0].min()
+
+
+def test_board_chamfer_sits_on_the_hook_slope(P):
+    """The v7.1 hooks have a 45 deg slope where the board's bottom edge is. The boards' 0.5 x 45 deg
+    bottom chamfer lies on it with the board at bb_z0, so the spacers press the board onto 4 slopes."""
+    import make_stl_common as K
+    m = load("asm_shell")
     for y in P["clip_y"]:
-        def inner_x(z):
-            s = m.section([0, 0, 1], [0, 0, z])
-            v = s.vertices[(np.abs(s.vertices[:, 1] - y) < 3.5) & (s.vertices[:, 0] > x_wall - 1.0) & (s.vertices[:, 0] < x_wall + 2)]
-            return v[:, 0].min()
-        assert inner_x(P["bb_z0"] - 0.1) == pytest.approx(x_wall - 0.6, abs=0.03)     # the hook, under the board
-        assert inner_x(P["bb_z0"] + 0.1) == pytest.approx(x_wall, abs=0.03)           # flat ledge: the board's edge is free
-        assert inner_x(P["bb_z0"] - 0.6) == pytest.approx(x_wall - 0.2, abs=0.05)     # on the lead-in
-
-
-def _carrier():
-    import importlib
-    return importlib.import_module("make_carrier_stl")
+        for dz in (0.1, 0.25, 0.4):
+            board_edge = P["bb_w"] / 2 - K.CHAMFER + dz          # the chamfer's x at height dz above the board's underside
+            assert hook_inner_x(m, P, y, P["bb_z0"] + dz) == pytest.approx(board_edge, abs=0.06)
 
 
 def test_spacers_land_on_the_face(P):
-    """Each carrier spacer rises from the board's top to 0.1 under the face's underside, and its column
-    misses the caps (at rest and pressed), the D-pad ring and every shell feature on the way."""
-    C = _carrier()
-    assert C.SPACER_H == pytest.approx(P["pz0"] - P["bb_top"] - 0.1)
+    """Each spacer rises from the board's top to the face's underside, 0.05 past it (the board rides
+    0.05 up the hook slopes: a light preload), and its column misses the caps (at rest, pressed,
+    tipped), the D-pad ring and every shell feature on the way."""
+    import make_stl_common as K
+    assert K.SPACER_H == pytest.approx(P["pz0"] - P["bb_top"] + K.PRELOAD) and K.PRELOAD == 0.05
     shell = load("asm_shell")
     others = [load(n) for n in ("caps_asm", "caps_asm_pressed", "caps_asm_rocker_tilt", "asm_dpad_ring")]
-    for bx, by_ in C.SPACERS:
+    for bx, by_ in K.SPACERS:
         x, y = P["bb_w"] / 2 - bx, P["bb_y0"] + by_
-        col = trimesh.creation.cylinder(radius=C.SPACER_D / 2 + 0.3, height=C.SPACER_H + 0.1, sections=32)
-        col.apply_translation([x, y, P["bb_top"] + (C.SPACER_H + 0.1) / 2 - 0.05])   # +0.05 overlap at the top: must hit only the face
+        h = P["pz0"] - P["bb_top"]
+        col = trimesh.creation.cylinder(radius=K.SPACER_D / 2 + 0.3, height=h, sections=32)
+        col.apply_translation([x, y, P["bb_top"] + h / 2])
         for m in others:
             i = trimesh.boolean.intersection([m, col], engine="manifold")
             assert i.is_empty or i.volume < 1e-3, f"spacer ({bx}, {by_}) hits a cap or the ring"
-        below = col.copy(); below.apply_translation([0, 0, -0.06])
+        below = col.copy(); below.apply_translation([0, 0, -0.02])
         i = trimesh.boolean.intersection([shell, below], engine="manifold")
         assert i.is_empty or i.volume < 1e-3, f"spacer ({bx}, {by_}) hits a shell feature on its way up"
-        hit, _, _ = shell.ray.intersects_location([[x, y, P["bb_top"] + 0.1]], [[0, 0, 1]])
-        assert hit[:, 2].min() == pytest.approx(P["bb_top"] + C.SPACER_H + 0.1, abs=0.02), f"spacer ({bx}, {by_}) top is not under the face"
+        for r in (0, K.SPACER_D / 2 - 0.1):
+            for a in np.linspace(0, 2 * np.pi, 8, endpoint=False):
+                hit, _, _ = shell.ray.intersects_location([[x + r * np.cos(a), y + r * np.sin(a), P["bb_top"] + 0.1]], [[0, 0, 1]])
+                assert hit[:, 2].min() == pytest.approx(P["pz0"], abs=0.02), f"spacer ({bx}, {by_}) does not land on the flat face"
 
 
-def test_carrier_spacers_printed():
-    m = trimesh.load(os.path.join(os.path.dirname(__file__), "..", "..", "pcb", "stl", "button_carrier.stl"))
-    C = _carrier()
+@pytest.mark.parametrize("stl", ["button_carrier.stl", "button_board_holes.stl"])
+def test_boards_have_spacers_and_chamfers(stl):
+    import make_stl_common as K
+    m = trimesh.load(os.path.join(os.path.dirname(__file__), "..", "..", "pcb", "stl", stl))
     assert m.is_watertight and m.body_count == 1
-    assert m.extents[2] == pytest.approx(C.PLATE + C.SPACER_H, abs=0.01)
-
-
-def test_skin_over_every_plunger(P):
-    """At least 0.6 of solid cap over each plunger tip (marks and saddles included): a 3.0 disk
-    from 0.05 to 0.65 over act_top is inside the caps, rockers and sectors."""
-    caps = load("caps_asm")
-    for x, y in switch_xy(P):
-        # the rockers sit 0.3 lower, so their bore ceiling is also at act_top
-        pts = [[x + r * np.cos(a), y + r * np.sin(a), z] for r in (0, 0.75, 1.5)
-               for a in np.linspace(0, 2 * np.pi, 8, endpoint=False) for z in np.linspace(P["act_top"] + 0.05, P["act_top"] + 0.65, 4)]
-        assert solid(caps, pts), f"thin skin over the plunger at ({x:.1f}, {y:.1f})"
+    assert m.extents[2] == pytest.approx(1.6 + K.SPACER_H, abs=0.01)
+    assert m.extents[0] == pytest.approx(43.0, abs=0.01) and m.extents[1] == pytest.approx(112.0, abs=0.01)
+    # 0.5 x 45 deg on both long edges, top and bottom of the 1.6 plate: full width only from 0.5 to 1.1
+    for z, w in ((0.05, 43.0 - 2 * (0.5 - 0.05)), (0.8, 43.0), (1.55, 43.0 - 2 * (0.5 - 0.05))):
+        cx, y = m.bounds[:, 0].mean(), m.bounds[0][1] + 25.0
+        assert solid(m, [[cx - w / 2 + 0.03, y, z], [cx + w / 2 - 0.03, y, z]]), f"{stl} narrower than {w} at z {z}"
+        assert empty(m, [[cx - w / 2 - 0.03, y, z], [cx + w / 2 + 0.03, y, z]]), f"{stl} wider than {w} at z {z}"

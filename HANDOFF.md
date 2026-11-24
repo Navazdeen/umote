@@ -25,7 +25,14 @@ The 6x6x7 switches couldn't be sourced. The new ones are 6x6x9.5: a 3.8 body und
   - The 5 spacers are a separate `button_spacers.stl` (d 4.0 x 4.95), glued into 0.2 recesses on the bed side. They can't print on that side, and a peg hole would cut a trace at (33.5, 103.5).
   - The build takes about 6 min (the growth steps).
   - Slicer settings are in `release/v7.2/REPRINT.txt`: Arachne, min feature 25%, 0.12 layers for the traces, ironing.
-- **Checks**: `pytest case/tests/test_v7.py` gives 60 green. `case/fit_check_v7.py` with and without `--module` finds no collisions (the spacers are modelled in both). Python runs through uv (`.venv` rebuilt; the old one pointed at a deleted miniconda).
+- **Insulating plate** (`pcb/make_insulator_stl.py`, `button_board_insulator.stl`): goes between the copper board's traces and the battery.
+  - The user's battery is **4.2** thick, not the 5.0 the case models, so there are 2.25 under the board.
+  - The plate is 0.8 thick and sits on the copper tape over the 1.0 traces, leaving 0.4 to the battery.
+  - It has 0.4 pockets over every solder joint, and windows for C1, C2, R4–R7 and the J5 wire pads (open to the bottom end).
+  - It prints battery side down and is fixed with tape dots.
+  - The test checks it against the shell and that every hole has a pocket over it.
+  - `params.scad` still models a 5.0 battery (changing it would move the board and the shell).
+- **Checks**: `pytest case/tests/test_v7.py` gives 61 green. `case/fit_check_v7.py` with and without `--module` finds no collisions (the spacers are modelled in both). Python runs through uv (`.venv` rebuilt; the old one pointed at a deleted miniconda).
 - **Release**: `release/v7.2/` is the whole set plus `REPRINT.txt`. Only `caps.stl`, the three boards and `button_spacers.stl` differ from v7.1. Uploaded to copyparty `/stl/v7.2/`, SHA-checked.
 - **[CHECK] on the print**: the hex bore's grip on the tapered plunger (it holds the 3.5 base, and the 3.0 tip sits loose). Whether the 0.05 preload holds the board without rattling. The bridges over the holes board's 1206 pockets.
 

@@ -6,6 +6,10 @@ Print only these:
   button_board_print.stl   copper-tape board (raised traces). Copper side UP. Spacers: print
                            button_spacers.stl (5 posts) and glue them (CA) into the 5 shallow
                            round recesses on the board's bed side.
+  button_board_insulator.stl  0.8 plate between the copper side and the battery (for a 4.2 battery;
+                           0.4 clear). Print it flat side down. Lay it on the traces after soldering,
+                           pockets towards the board (one over each joint), and fix it with dots of
+                           double-sided tape. Windows leave the 1206 parts and the J5 wires free.
   button_board_holes.stl   holes-only board. Component side UP, posts printed on it.
   button_carrier.stl       module carrier. Component side UP, posts printed on it.
 

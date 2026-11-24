@@ -7,7 +7,9 @@ v7.2 (2026-11-24, the 1.0 traces and 0.25-0.35 rings round the holes printed bad
   - every net's copper grows by up to GROW a side into free space, but stays GAP from every other
     net (traces up to 2.0 wide where there's room; switch rings ~0.85). Crowded spots keep v7.1's copper;
   - holes are drill + 0.2 (0.3 before): set the slicer's X-Y hole compensation to +0.1;
-  - the DIP-28 and Q1 holes are 0.9 (their legs are ~0.5): their rings are pitch-limited;
+  - the DIP-28 holes are 1.2 and Q1's 1.1 (v7.2.2; 0.9 in v7.2 was too small);
+  - v7.2.2: the base is 1.0 inside a 1.6 rim and all trace tops are level at 2.0, so the board is
+    2.0 thick at every hole (2.6 in v7.2) and the legs come through 0.6 further;
   - both long edges chamfered 0.5 x 45 deg top and bottom, to lock onto the v7.1 shell's hooks
     (make_stl_common.py);
   - 0.2 deep locating recesses on the component side (the bed side) for the 5 spacer posts, which
@@ -26,7 +28,11 @@ from make_stl_common import extrude, chamfer_long_edges, check_clear, posts2d, S
 OUT = sys.argv[1] if len(sys.argv) > 1 else "stl"
 RIDGE = float(os.environ.get("RIDGE", 1.0))   # raised copper pattern height (0.4 at first, 1.4 on 2026-10-29, 1.0 on 2026-11-16: user's requests)
 HOLE_EXTRA = 0.2     # + the slicer's X-Y hole compensation 0.1 (0.3 in the model before, which ate the rings)
-THIN_LEG_HOLE = 0.9  # DIP-28 and TO-92 legs are ~0.5: a 0.9 hole leaves them a thicker ring than drill + extra
+LEG_HOLE = {"DIP28": 1.2, "TO92_wide": 1.1}   # v7.2.2: 0.9 (v7.2) printed too small for the MCP23017's legs
+# v7.2.2: the legs didn't come through 1.6 base + 1.0 traces. The base is 1.0 inside a 1.6 rim (the rim
+# keeps the edge chamfers and the hook fit) and every trace top is level at TOP, so the board is 2.0 at
+# every hole. The component side stays flat: the switches (and so the caps) don't move.
+BASE_IN, RIM_LONG, RIM_SHORT, TOP = 1.0, 2.5, 2.0, 2.0
 GROW, GAP = 0.5, 0.6 # copper growth a side; the least gap between two nets (copper tape mustn't bridge it)
 EDGE = CHAMFER + 0.3 # copper keeps this far from the board's edge (off the chamfer and the hooks)
 RECESS_D, RECESS_H = SPACER_D + 0.2, 0.2
@@ -36,7 +42,7 @@ parts = B.build(res["assign"], res["layout"])
 
 
 def hole_d(part, p):
-    return THIN_LEG_HOLE if part.kind in ("DIP28", "TO92_wide") else p.drill + HOLE_EXTRA
+    return LEG_HOLE.get(part.kind, p.drill + HOLE_EXTRA)
 
 
 # copper by net (a pad with no net is its own net)
@@ -84,9 +90,12 @@ flip_y = lambda g: affinity.scale(g, yfact=-1, origin=(B.BOARD_W / 2, B.BOARD_H 
 fix = lambda g: flip_y(mirror(g))
 outline = box(0, 0, B.BOARD_W, B.BOARD_H)
 B_PCB = 1.6
+assert TOP - BASE_IN == RIDGE
+rim = outline.difference(box(RIM_LONG, RIM_SHORT, B.BOARD_W - RIM_LONG, B.BOARD_H - RIM_SHORT))
 base = trimesh.boolean.union([extrude(fix(outline.difference(holes).difference(recesses)), RECESS_H + 0.01, 0),
-                              extrude(fix(outline.difference(holes)), B_PCB - RECESS_H, RECESS_H)], engine="manifold")
-ridge = extrude(fix(cu.difference(holes)), RIDGE + 0.01, B_PCB - 0.01)
+                              extrude(fix(outline.difference(holes)), BASE_IN - RECESS_H, RECESS_H),
+                              extrude(fix(rim.difference(holes)), B_PCB - BASE_IN + 0.01, BASE_IN - 0.01)], engine="manifold")
+ridge = extrude(fix(cu.difference(holes)), TOP - BASE_IN + 0.01, BASE_IN - 0.01)   # tops level at TOP (0.4 over the rim)
 board = trimesh.boolean.union([base, ridge], engine="manifold")
 board = chamfer_long_edges(board, B.BOARD_W, B.BOARD_H, B_PCB)
 board.export(f"{OUT}/button_board_print.stl")

@@ -4,6 +4,17 @@ A battery-powered remote built around the **LCDwiki E32R24P** (ESP32-32E, 2.4" S
 
 > **Latest (2026-11-01):** remote UI + Home Assistant integration shipped and running on the remote. See [`docs/HANDOFF-2026-11-01-remote-ui.md`](docs/HANDOFF-2026-11-01-remote-ui.md); it supersedes the firmware rows below.
 
+## 2026-11-24: v7.2.2 copper-tape board lets the legs through
+
+On the printed v7.2 copper board, the MCP23017's legs didn't fit the 0.9 holes, and the legs didn't come through 1.6 base + 1.0 traces.
+- `make_stl.py`: the base is 1.0 inside a 1.6 rim (2.5 along the long edges, 2.0 at the ends), and every trace top is level at 2.0 (`BASE_IN`, `RIM_LONG`, `RIM_SHORT`, `TOP`). The board is 2.0 at every hole, so the legs come through 0.6 further.
+  - The rim keeps the edge chamfers and the hook fit.
+  - The component side is flat and unchanged, so the switches, caps and spacers are the same.
+- Holes: DIP-28 1.2 and Q1 1.1 (`LEG_HOLE`). The DIP rings are 0.35 (pitch-limited); Arachne prints that.
+- `make_insulator_stl.py`: the tray rests on trace tops 0.6 higher, so it has 1.0 to a 4.2 battery. It's 0.7 narrower a side (`SIDE_IN`), because its edges otherwise touched the clip hooks' tips.
+- 63 tests pass (new: `test_copper_board_lets_the_legs_through`). Fit checks are clean.
+- `release/v7.2.2/` (only `button_board_print.stl` and `button_board_insulator.stl` differ from v7.2.1) is on copyparty `/stl/v7.2.2/`.
+
 ## 2026-11-24: v7.2.1 caps (pocket corners broke through)
 
 The printed v7.2 caps had a hole at each corner of the switch pocket, just above the flange. The 6.6 square's corners (r 4.67) and the bottom of its 45 deg roof are wider than the 8.6 cap (r 4.3), and above the 0.8 flange nothing covered them.

@@ -388,7 +388,7 @@ def test_insulator_plate_fits_under_the_copper_board(P):
     # print frame -> case: stl (x, y) = (43 - bx, 112 - by), board (bx, by) -> case (bb_w/2 - bx, bb_y0 + by)
     m = plate.copy()
     m.apply_transform(np.diag([1, -1, 1, 1]))
-    m.apply_translation([-P["bb_w"] / 2, P["bb_y0"] + P["bb_l"], P["bb_z0"] - 1.0 - 0.05 - 0.8])
+    m.apply_translation([-P["bb_w"] / 2, P["bb_y0"] + P["bb_l"], P["bb_top"] - 2.0 - 0.05 - 0.8])   # trace tops 2.0 under the component side (v7.2.2)
     i = trimesh.boolean.intersection([m, load("asm_shell")], engine="manifold")
     assert i.is_empty or i.volume < 1e-3, f"the plate hits the shell: {i.volume:.3f} mm3"
     board = trimesh.load(os.path.join(pcb, "button_board_print.stl"))
@@ -400,7 +400,7 @@ def test_insulator_plate_fits_under_the_copper_board(P):
     assert len(hole_pts) > 50
     assert not plate.contains(np.c_[hole_pts, np.full(len(hole_pts), 0.6)]).any(), "plastic over a solder joint"
     # tray (v7.2): inside the 1.5 rim, every rib point rests on a trace top
-    inner = pts[(pts[:, 0] > 1.7) & (pts[:, 0] < 41.3) & (pts[:, 1] > 1.7) & (pts[:, 1] < 110.3)]
+    inner = pts[(pts[:, 0] > 2.4) & (pts[:, 0] < 40.6) & (pts[:, 1] > 1.7) & (pts[:, 1] < 110.3)]
     rib = inner[plate.contains(np.c_[inner, np.full(len(inner), 0.6)])]
     assert len(rib) > 100, "no ribs"
     assert board.contains(np.c_[rib, np.full(len(rib), board.bounds[1][2] - 0.3)]).all(), "a rib off the traces"
@@ -419,3 +419,24 @@ def test_cap_walls_round_the_switch_pockets(P):
         pts = [[x + 3.8 * np.cos(a), y + 3.8 * np.sin(a), z] for a in np.radians([45, 135, 225, 315])
                for z in np.linspace(z0, P["T"] + P["cap_proud"] - 1.5, 6)]
         assert solid(caps, pts), f"thin or open cap wall at a pocket corner, switch ({x:.1f}, {y:.1f})"
+
+
+def test_copper_board_lets_the_legs_through():
+    """v7.2.2: the legs didn't come through 1.6 base + 1.0 traces, and the MCP23017's 0.9 holes were too
+    small. The board is 2.0 at every hole (1.0 base inside a 1.6 rim, trace tops level), the DIP-28
+    holes are 1.2 and the component side is still flat (the switches and caps don't move)."""
+    import pickle
+    pcb = os.path.join(os.path.dirname(__file__), "..", "..", "pcb")
+    m = trimesh.load(os.path.join(pcb, "stl", "button_board_print.stl"))
+    assert m.extents[2] == pytest.approx(2.0, abs=0.01)
+    parts = _B.build(*[pickle.load(open(os.path.join(pcb, "best.pkl"), "rb"))[k] for k in ("assign", "layout")])
+    dip = [p for pt in parts if pt.kind == "DIP28" for p in pt.pads]
+    for p in dip:
+        x, y = m.bounds[0][0] + 43.0 - p.x, m.bounds[0][1] + 112.0 - p.y      # printed copper side up, mirrored
+        ring = [[x + 0.58 * np.cos(a), y + 0.58 * np.sin(a), z] for a in np.linspace(0, 2 * np.pi, 8, endpoint=False) for z in (0.5, 1.5)]
+        assert empty(m, ring), f"DIP hole at ({p.x}, {p.y}) under 1.2"
+    # the middle is 1.0 thick away from the traces, the rim 1.6 (it carries the chamfers onto the hooks)
+    cx, cy = m.bounds[:, 0].mean(), m.bounds[:, 1].mean()
+    assert solid(m, [[m.bounds[0][0] + 1.2, cy, 1.5], [m.bounds[1][0] - 1.2, cy, 1.5]])
+    bare = [[x, y, 1.3] for x in np.linspace(cx - 15, cx + 15, 31) for y in np.linspace(cy - 40, cy + 40, 81)]
+    assert (~m.contains(bare)).sum() > 0.3 * len(bare), "middle not thinned"

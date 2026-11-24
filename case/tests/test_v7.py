@@ -404,3 +404,18 @@ def test_insulator_plate_fits_under_the_copper_board(P):
     rib = inner[plate.contains(np.c_[inner, np.full(len(inner), 0.6)])]
     assert len(rib) > 100, "no ribs"
     assert board.contains(np.c_[rib, np.full(len(rib), board.bounds[1][2] - 0.3)]).all(), "a rib off the traces"
+
+
+def test_cap_walls_round_the_switch_pockets(P):
+    """v7.2.1: the 6.6 pockets' corners broke through the caps' 8.6 walls just above the flange (the
+    user's print had a hole at each corner). Above the pocket's square part every cap, sector and
+    rocker keeps >= 0.5 of wall at the diagonals (r 3.8 from the switch is solid)."""
+    caps = load("caps_asm")
+    rockers = {(round(x, 1), round(y, 1)) for k, (x, y) in enumerate(switch_xy(P))
+               if list(_B.BUTTONS)[k] in ("SW10", "SW11", "SW13", "SW14")}
+    for x, y in switch_xy(P):
+        rk = (round(x, 1), round(y, 1)) in rockers
+        z0 = P["front_in"] - 0.8 - (0.3 if rk else 0.0) + (1.0 if rk else 0.6) + 0.25   # cap bottom + pocket square part + margin
+        pts = [[x + 3.8 * np.cos(a), y + 3.8 * np.sin(a), z] for a in np.radians([45, 135, 225, 315])
+               for z in np.linspace(z0, P["T"] + P["cap_proud"] - 1.5, 6)]
+        assert solid(caps, pts), f"thin or open cap wall at a pocket corner, switch ({x:.1f}, {y:.1f})"

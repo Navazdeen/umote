@@ -4,6 +4,15 @@ A battery-powered remote built around the **LCDwiki E32R24P** (ESP32-32E, 2.4" S
 
 > **Latest (2026-11-01):** remote UI + Home Assistant integration shipped and running on the remote. See [`docs/HANDOFF-2026-11-01-remote-ui.md`](docs/HANDOFF-2026-11-01-remote-ui.md); it supersedes the firmware rows below.
 
+## 2026-11-24: v7.2.1 caps (pocket corners broke through)
+
+The printed v7.2 caps had a hole at each corner of the switch pocket, just above the flange. The 6.6 square's corners (r 4.67) and the bottom of its 45 deg roof are wider than the 8.6 cap (r 4.3), and above the 0.8 flange nothing covered them.
+- The roof now starts from the square clipped to `pocket_roof_r` 3.7 and is 0.3 taller, so every face is steeper than 45. That leaves at least 0.6 of wall. The square part stays inside the flange, and the switch body's corners stay below it pressed or tipped.
+- The rockers' outer ends keep small open corners in their bottom 1.0: the body's corners reach past the rocker's round ends. They're under the face, so hidden.
+- New test `test_cap_walls_round_the_switch_pockets` (62 green). Fit checks are clean.
+- `release/v7.2.1/` is the whole set; only `caps.stl` differs from v7.2. On copyparty `/stl/v7.2.1/`.
+- **Icon gaps on the cap tops** are slicer-side. The 0.4 engraving is only 2 layers at 0.2. Fix: 0.12 layers for the top 1 mm, 5+ top shell layers, ensure vertical shell thickness, gap fill on, monotonic top surface.
+
 ## 2026-11-24 session: v7.2 caps and boards for 6x6x9.5 tact switches (shell unchanged)
 
 The 6x6x7 switches couldn't be sourced. The new ones are 6x6x9.5: a 3.8 body under a 5.7 plunger that tapers from 3.5 to 3.0. Their tips are 2.5 mm higher. **The user can't reprint the shell**, so v7.2 changes only the caps and the printed boards, and `case/v7/shell.scad` and `shell.stl` are byte-identical to v7.1 (a test checks it). Spec: `docs/superpowers/specs/2026-11-24-case-v7.2-tall-switch-design.md`. Branch `case-v7.2` (worktree `../umote-v7.2`), off `origin/master` 374e336.
